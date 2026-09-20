@@ -204,6 +204,7 @@
 
     .badge-amber { color: var(--amber); background: #3b2e15; border-color: #665124; }
     .badge-green { color: var(--green); background: #14382e; border-color: #1f6352; }
+    .badge-red { color: var(--red); background: #3a1923; border-color: #662734; }
 
     .settings-grid {
       display: grid;
@@ -397,6 +398,34 @@
       font-size: 12px;
     }
 
+    /* Стили для интерактивного предпросмотра массового импорта */
+    .batch-preview-box {
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #080d19;
+      padding: 8px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .batch-item-row {
+      display: grid;
+      grid-template-columns: 36px minmax(140px, 3fr) minmax(0, 5fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: #101728;
+      font-size: 12px;
+      border-left: 3px solid transparent;
+    }
+
+    .batch-item-row.ok { border-left-color: var(--green); }
+    .batch-item-row.warn { border-left-color: var(--amber); background: #231c14; }
+    .batch-item-row.error { border-left-color: var(--red); background: #2b141c; }
+
     .toasts {
       position: fixed;
       bottom: 18px;
@@ -425,7 +454,7 @@
       border-radius: 18px;
       padding: 24px;
       width: min(560px, calc(100vw - 32px));
-      max-height: 85vh;
+      max-height: 88vh;
       overflow: auto;
     }
 
@@ -450,6 +479,8 @@
       .layout, .play-layout { grid-template-columns: 1fr; }
       .topics-grid, .books-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .desktop-description { display: none; }
+      .batch-item-row { grid-template-columns: 30px 1fr auto; }
+      .batch-item-words { display: none; }
     }
 
     @media (max-width: 560px) {
@@ -514,7 +545,7 @@
 
   <main>
     <section id="view-constructor" class="stack">
-      <!-- Контекстный баннер: отображается, когда мы редактируем тему конкретной книги -->
+      <!-- Контекстный баннер книги -->
       <div id="bookContextBanner" class="book-header-banner" hidden>
         <div class="row wrap">
           <span class="badge badge-green">Режим книги</span>
@@ -524,9 +555,9 @@
           </div>
         </div>
         <div class="row">
-          <button id="prevBookTopicBtn" class="small">‹ Пред. тема</button>
-          <button id="nextBookTopicBtn" class="small">След. тема ›</button>
-          <button id="backToBookBtn" class="primary small">← К списку книги</button>
+          <button id="prevBookTopicBtn" class="small" type="button">‹ Пред. тема</button>
+          <button id="nextBookTopicBtn" class="small" type="button">След. тема ›</button>
+          <button id="backToBookBtn" class="primary small" type="button">← К списку книги</button>
         </div>
       </div>
 
@@ -566,8 +597,8 @@
             </div>
 
             <div class="actions">
-              <button id="generateButton" class="primary">🔄 Перестроить сетку</button>
-              <button id="saveTopicButton" class="success">💾 Сохранить</button>
+              <button id="generateButton" class="primary" type="button">🔄 Перестроить сетку</button>
+              <button id="saveTopicButton" class="success" type="button">💾 Сохранить</button>
             </div>
 
             <div id="generationStatus" class="muted small-text" role="status"></div>
@@ -604,12 +635,12 @@
           <div class="card stack">
             <h3>Экспорт этой темы</h3>
             <div class="actions">
-              <button id="xlsxButton">📊 Файл XLSX</button>
-              <button id="tsvButton">📋 Для Excel</button>
-              <button id="rawButton">🔤 225 символов</button>
+              <button id="xlsxButton" type="button">📊 Файл XLSX</button>
+              <button id="tsvButton" type="button">📋 Для Excel</button>
+              <button id="rawButton" type="button">🔤 225 символов</button>
             </div>
             <div class="actions">
-              <button id="printButton">🖨️ Печать / PDF темы</button>
+              <button id="printButton" type="button">🖨️ Печать / PDF темы</button>
             </div>
             <label class="check">
               <input id="printAnswers" type="checkbox" checked>
@@ -623,8 +654,8 @@
             <div class="row between wrap">
               <div id="boardStats" class="small-text">0 слов · 0% занято</div>
               <div class="row">
-                <button id="revealButton" class="small">👁 Подсветка: вкл</button>
-                <button id="clearButton" class="small danger">Очистить</button>
+                <button id="revealButton" class="small" type="button">👁 Подсветка: вкл</button>
+                <button id="clearButton" class="small danger" type="button">Очистить</button>
               </div>
             </div>
 
@@ -658,8 +689,8 @@
               <p class="muted small-text">Создавайте книги на 50+ тем с едиными правилами и экспортом в печать.</p>
             </div>
             <div class="actions">
-              <button id="createBookBtn" class="primary">+ Создать книгу</button>
-              <button id="importBookBtn">📥 Импорт книги (JSON)</button>
+              <button id="createBookBtn" class="primary" type="button">+ Создать книгу</button>
+              <button id="importBookBtn" type="button">📥 Импорт книги (JSON)</button>
               <input id="bookFileInput" type="file" accept=".json,application/json" hidden>
             </div>
           </div>
@@ -668,17 +699,17 @@
         <div id="booksGrid" class="books-grid"></div>
       </div>
 
-      <!-- Режим 2: Просмотр и редактирование конкретной книги -->
+      <!-- Режим 2: Просмотр и редактирование книги -->
       <div id="bookDetailView" class="stack" hidden>
         <div class="card stack">
           <div class="row between wrap">
             <div class="row">
-              <button id="backToBooksListBtn" class="small">← К каталогу книг</button>
+              <button id="backToBooksListBtn" class="small" type="button">← К каталогу книг</button>
               <h2 id="currentBookTitle">Книга</h2>
             </div>
             <div class="row wrap">
               <span id="currentBookProgressBadge" class="badge">0 / 0 готово</span>
-              <button id="editBookSettingsBtn" class="small">⚙️ Настройки книги</button>
+              <button id="editBookSettingsBtn" class="small" type="button">⚙️ Настройки книги</button>
             </div>
           </div>
 
@@ -688,26 +719,26 @@
 
           <!-- Блок быстрых действий книги -->
           <div class="actions">
-            <button id="generateAllBookGridsBtn" class="primary">🔄 Сгенерировать все сетки книги</button>
-            <button id="printFullBookBtn" class="success">🖨️ Печать всей книги (PDF)</button>
-            <button id="exportBookXlsxBtn">📊 Экспорт в XLSX</button>
-            <button id="exportBookJsonBtn">💾 Экспорт в JSON</button>
+            <button id="generateAllBookGridsBtn" class="primary" type="button">🔄 Сгенерировать все сетки книги</button>
+            <button id="printFullBookBtn" class="success" type="button">🖨️ Печать всей книги (PDF)</button>
+            <button id="exportBookXlsxBtn" type="button">📊 Экспорт в XLSX</button>
+            <button id="exportBookJsonBtn" type="button">💾 Экспорт в JSON</button>
           </div>
         </div>
 
-        <!-- Быстрый и минималистичный ввод тем -->
+        <!-- Быстрый ввод тем -->
         <div class="card stack">
           <div class="row between wrap">
             <h3>Быстрое добавление темы</h3>
-            <button id="openBatchImportBtn" class="small">⚡ Массовый ввод 50 тем</button>
+            <button id="openBatchImportBtn" class="small primary" type="button">⚡ Массовый ввод 50 тем (Умный парсер)</button>
           </div>
           <div class="layout" style="grid-template-columns: minmax(200px, 4fr) minmax(260px, 7fr) auto; gap: 8px;">
             <input id="fastTopicName" type="text" placeholder="Название темы (напр. Космос)" maxlength="120">
             <input id="fastTopicWords" type="text" placeholder="Слова через запятую или пробел (напр. ОРБИТА, ЗВЕЗДА, ПЛАНЕТА)">
-            <button id="addFastTopicBtn" class="primary" style="white-space:nowrap;">+ Добавить тему</button>
+            <button id="addFastTopicBtn" class="primary" type="button" style="white-space:nowrap;">+ Добавить</button>
           </div>
           <p class="muted small-text">
-            Совет: можно просто вводить название, слова и нажимать Enter для быстрого наполнения сборника.
+            Совет: можно вводить название, слова и нажимать Enter для быстрого наполнения сборника.
           </p>
         </div>
 
@@ -715,7 +746,7 @@
         <div class="card stack">
           <div class="row between">
             <h3>Темы сборника (<span id="bookTopicsCount">0</span>)</h3>
-            <span class="muted small-text">Нажмите «Открыть в сетке», чтобы увидеть или скорректировать макет</span>
+            <span class="muted small-text">Нажмите «Сетка», чтобы увидеть или скорректировать макет</span>
           </div>
 
           <div style="overflow-x: auto;">
@@ -724,9 +755,9 @@
                 <tr>
                   <th style="width: 45px;">№</th>
                   <th>Название темы</th>
-                  <th>Слова</th>
+                  <th>Слова темы</th>
                   <th style="width: 140px;">Размещено</th>
-                  <th style="width: 220px; text-align: right;">Действия</th>
+                  <th style="width: 200px; text-align: right;">Действия</th>
                 </tr>
               </thead>
               <tbody id="bookTopicsTableBody"></tbody>
@@ -758,8 +789,8 @@
             </p>
             <div id="reverseWarning" class="notice" hidden></div>
             <div class="actions">
-              <button id="reverseLoad">Из конструктора</button>
-              <button id="reverseClear" class="danger">Очистить</button>
+              <button id="reverseLoad" type="button">Из конструктора</button>
+              <button id="reverseClear" class="danger" type="button">Очистить</button>
             </div>
           </div>
 
@@ -768,8 +799,8 @@
             <textarea id="reverseWords" rows="5" class="mono"
               placeholder="Слова через запятую или пробел"></textarea>
             <div class="actions">
-              <button id="reverseScan" class="primary">Проверить слова</button>
-              <button id="reverseFindTopic">Найти тему</button>
+              <button id="reverseScan" class="primary" type="button">Проверить слова</button>
+              <button id="reverseFindTopic" type="button">Найти тему</button>
             </div>
             <label class="check">
               <input id="reverseTypos" type="checkbox" checked>
@@ -780,11 +811,11 @@
           <div class="card stack">
             <h3>Перенос и экспорт</h3>
             <div class="actions">
-              <button id="reverseApply" class="primary">В конструктор без перестроения</button>
+              <button id="reverseApply" class="primary" type="button">В конструктор без перестроения</button>
             </div>
             <div class="actions">
-              <button id="reverseTSV">Копировать для Excel</button>
-              <button id="reverseCopy">225 символов</button>
+              <button id="reverseTSV" type="button">Копировать для Excel</button>
+              <button id="reverseCopy" type="button">225 символов</button>
             </div>
           </div>
         </div>
@@ -807,10 +838,10 @@
               <label for="reverseLetter" class="small-text">Буква:</label>
               <input id="reverseLetter" type="text" maxlength="1" autocomplete="off"
                 autocapitalize="characters" aria-label="Буква выбранной клетки">
-              <button id="reverseSet" class="small">Записать</button>
-              <button id="reverseErase" class="small">Стереть</button>
-              <button id="reversePrev" class="small" aria-label="Предыдущая клетка">←</button>
-              <button id="reverseNext" class="small" aria-label="Следующая клетка">→</button>
+              <button id="reverseSet" class="small" type="button">Записать</button>
+              <button id="reverseErase" class="small" type="button">Стереть</button>
+              <button id="reversePrev" class="small" type="button" aria-label="Предыдущая клетка">←</button>
+              <button id="reverseNext" class="small" type="button" aria-label="Следующая клетка">→</button>
             </div>
 
             <p class="muted small-text gap">
@@ -839,15 +870,15 @@
           <div class="row wrap">
             <span id="playTimer" class="badge mono">00:00</span>
             <span id="playCounter" class="badge">0 / 0</span>
-            <button id="playPause" class="small">Пауза</button>
-            <button id="playRestart" class="small">Заново</button>
+            <button id="playPause" class="small" type="button">Пауза</button>
+            <button id="playRestart" class="small" type="button">Заново</button>
           </div>
         </div>
       </div>
 
       <div id="playNewBoard" class="notice" hidden>
         В конструкторе появилась другая версия сетки. Текущая игра не изменена.
-        <button id="playLoadNew" class="small gap-small">Начать игру на новой сетке</button>
+        <button id="playLoadNew" class="small gap-small" type="button">Начать игру на новой сетке</button>
       </div>
 
       <div class="play-layout">
@@ -882,8 +913,8 @@
             </p>
           </div>
           <div class="actions">
-            <button id="exportBackup">💾 Резервная копия JSON</button>
-            <button id="importBackup">📥 Импорт JSON</button>
+            <button id="exportBackup" type="button">💾 Резервная копия JSON</button>
+            <button id="importBackup" type="button">📥 Импорт JSON</button>
             <input id="backupFile" type="file" accept=".json,application/json" hidden>
           </div>
         </div>
@@ -913,7 +944,7 @@
         <input id="bookModalAuthor" type="text" maxlength="100" placeholder="WordVault Studio" class="gap-small">
       </div>
 
-      <h3>Глобальные настройки правил для всех сеток книги</h3>
+      <h3>Глобальные настройки правил для сеток книги</h3>
       <div class="settings-grid">
         <label class="check"><input id="bookDirH" type="checkbox" checked> Горизонталь →</label>
         <label class="check"><input id="bookDirV" type="checkbox" checked> Вертикаль ↓</label>
@@ -936,28 +967,52 @@
       </label>
     </div>
     <div class="actions">
-      <button id="bookModalSave" class="primary">Сохранить книгу</button>
-      <button id="bookModalCancel">Отмена</button>
+      <button id="bookModalSave" class="primary" type="button">Сохранить книгу</button>
+      <button id="bookModalCancel" type="button">Отмена</button>
     </div>
   </dialog>
 
-  <!-- Диалог массового импорта 50 тем -->
-  <dialog id="batchImportModal">
-    <h2>Массовый ввод тем в книгу</h2>
+  <!-- Улучшенный диалог массового ввода 50 тем с интерактивным предпросмотром -->
+  <dialog id="batchImportModal" style="width: min(840px, calc(100vw - 32px));">
+    <div class="row between wrap">
+      <h2>Массовый ввод тем в книгу</h2>
+      <button id="batchSampleBtn" class="small" type="button">📋 Вставить пример (3 темы)</button>
+    </div>
     <p class="small-text muted">
-      Вставьте ваши темы и слова. Формат максимально свободный: блок начинается с названия (или строки с решёткой #), следом идут слова. Блоки разделяются пустой строкой.
+      Вставьте текст в любом удобном формате (с <code># Заголовок</code>, нумерацией <code>1. Тема</code>, двоеточием <code>Тема: слова</code> или пустыми строками). Ни одна тема не пропадёт молча.
     </p>
-    <textarea id="batchImportText" rows="12" class="mono" placeholder="Космос
-ПЛАНЕТА, ЗВЕЗДА, ОРБИТА, КОМЕТА, СПУТНИК
 
-Океан
-АКУЛА, ДЕЛЬФИН, КИТ, КОРАЛЛ, СКАТ, РИФ
+    <div class="row between wrap gap-small">
+      <label class="check" style="margin: 0;">
+        <input id="batchAutoSplit" type="checkbox" checked>
+        <span>Делить темы более 25 слов на части (Часть 1, Часть 2)</span>
+      </label>
+      <span class="small-text muted">Оптимально для сетки 15×15: 12–22 слова</span>
+    </div>
 
-# Животные
-МЕДВЕДЬ, ВОЛК, ЛИСИЦА, РЫСЬ, БАРСУК"></textarea>
+    <textarea id="batchImportText" rows="9" class="mono gap-small" placeholder="# Космос
+
+ПЛАНЕТА, ЗВЕЗДА, ОРБИТА, КОМЕТА, СПУТНИК, АСТЕРОИД, ГАЛАКТИКА
+
+# Океан
+АКУЛА, ДЕЛЬФИН, КИТ, КОРАЛЛ, СКАТ, РИФ, МЕДУЗА, КРАБ
+
+1. Животные: ВОЛК, ЛИСИЦА, МЕДВЕДЬ, РЫСЬ, БАРСУК, БОБР"></textarea>
+
+    <div class="row between wrap gap-small">
+      <div class="row wrap" id="batchLiveBadges">
+        <span id="batchCountBadge" class="badge">Распознано: 0 тем</span>
+        <span id="batchWordsBadge" class="badge">Всего слов: 0</span>
+        <span id="batchWarnBadge" class="badge badge-amber" hidden>0 предупреждений</span>
+      </div>
+      <span class="small-text muted">Живой предпросмотр перед добавлением:</span>
+    </div>
+
+    <div id="batchPreviewList" class="batch-preview-box gap-small"></div>
+
     <div class="actions">
-      <button id="batchImportApply" class="primary">Добавить темы в книгу</button>
-      <button id="batchImportCancel">Отмена</button>
+      <button id="batchImportApply" class="primary" type="button" disabled>Добавить темы в книгу</button>
+      <button id="batchImportCancel" type="button">Отмена</button>
     </div>
   </dialog>
 
@@ -969,7 +1024,7 @@
       <div id="batchGenProgressFill" class="progress-bar-fill"></div>
     </div>
     <div class="actions">
-      <button id="batchGenCancel" class="danger">Остановить</button>
+      <button id="batchGenCancel" class="danger" type="button">Остановить</button>
     </div>
   </dialog>
 
@@ -982,8 +1037,8 @@
       <div class="gap-small">Хранилище: <span id="syncStorage"></span></div>
     </div>
     <div class="actions">
-      <button id="syncNow" class="primary">Отправить / согласовать</button>
-      <button id="syncClose">Закрыть</button>
+      <button id="syncNow" class="primary" type="button">Отправить / согласовать</button>
+      <button id="syncClose" type="button">Закрыть</button>
     </div>
   </dialog>
 
@@ -991,7 +1046,7 @@
     <h2>🏆 Все слова найдены!</h2>
     <p id="victoryText"></p>
     <div class="actions">
-      <button id="victoryClose" class="primary">Продолжить</button>
+      <button id="victoryClose" class="primary" type="button">Продолжить</button>
     </div>
   </dialog>
 
@@ -999,8 +1054,8 @@
     <h2 id="confirmTitle">Подтверждение</h2>
     <p id="confirmMessage"></p>
     <div class="actions">
-      <button id="confirmOk" class="danger">Подтвердить</button>
-      <button id="confirmCancel">Отмена</button>
+      <button id="confirmOk" class="danger" type="button">Подтвердить</button>
+      <button id="confirmCancel" type="button">Отмена</button>
     </div>
   </dialog>
 
@@ -1011,10 +1066,9 @@
     const $ = id => document.getElementById(id);
     const SIZE = 15;
     const CELLS = SIZE * SIZE;
-    const SCHEMA = 4; // Обновлена схема с поддержкой книг
+    const SCHEMA = 4;
     const MAX_WORDS = 200;
     const MAX_TOPICS = 500;
-    const MAX_BOOKS = 100;
     const MAX_PAYLOAD = 6 * 1024 * 1024;
 
     const COLORS = [
@@ -1061,8 +1115,8 @@
         $("confirmTitle").textContent = title;
         $("confirmMessage").textContent = message;
 
-        const onOk = () => { cleanup(); resolve(true); };
-        const onCancel = () => { cleanup(); resolve(false); };
+        const onOk = e => { e?.preventDefault(); cleanup(); resolve(true); };
+        const onCancel = e => { e?.preventDefault(); cleanup(); resolve(false); };
 
         function cleanup() {
           $("confirmOk").removeEventListener("click", onOk);
@@ -1071,9 +1125,9 @@
           try { dlg.close(); } catch {}
         }
 
-        $("confirmOk").addEventListener("click", onOk);
-        $("confirmCancel").addEventListener("click", onCancel);
-        dlg.addEventListener("close", onCancel);
+        $("confirmOk").addEventListener("click", onOk, { once: true });
+        $("confirmCancel").addEventListener("click", onCancel, { once: true });
+        dlg.addEventListener("close", onCancel, { once: true });
         dlg.showModal();
       });
     }
@@ -1149,13 +1203,174 @@
         if (token.length < 2 || token.length > SIZE) {
           rejected.push(`${token.slice(0, 35)} — ${token.length} букв`);
         } else if (words.length >= MAX_WORDS) {
-          rejected.push(`${token} — превышен лимит ${MAX_WORDS} слов`);
+          rejected.push(`${token} — лимит ${MAX_WORDS} слов`);
         } else {
           words.push(token);
         }
       }
 
       return { words, rejected, duplicates };
+    }
+
+    /* ==========================================================================
+       УМНЫЙ ВСЕЯДНЫЙ ПАРСЕР МАССОВОГО ИМПОРТА (BATCH PARSER)
+       Устойчив к отступам, пустым строкам, номерам и разным стилям форматирования
+       ========================================================================== */
+    function parseBatchInput(text, autoSplit = true) {
+      const lines = text.split(/\r?\n/);
+      const rawBlocks = [];
+      let curTitle = "";
+      let curWordsLines = [];
+
+      function flush() {
+        const wordsRaw = curWordsLines.join(" ").trim();
+        if (curTitle || wordsRaw) {
+          const parsed = parseWords(wordsRaw);
+          rawBlocks.push({
+            title: curTitle.trim(),
+            wordsRaw,
+            words: parsed.words,
+            rejected: parsed.rejected,
+            duplicates: parsed.duplicates
+          });
+          curTitle = "";
+          curWordsLines = [];
+        }
+      }
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        // Пустая строка не сбрасывает заголовок, если слова под ним ещё не начались!
+        // Это предотвращает потерю тем вида "# Заголовок \n\n СЛОВА..."
+        if (!trimmed) continue;
+
+        let isHeader = false;
+        let extTitle = "";
+        let inlineWords = "";
+
+        // Формат 1: Заголовки Markdown (# Тема, ## Тема)
+        if (/^#{1,4}\s+/.test(trimmed)) {
+          isHeader = true;
+          extTitle = trimmed.replace(/^#{1,4}\s+/, "");
+        }
+        // Формат 2: Нумерация вида "1. Название", "Тема 1: Название", "1) Название"
+        else if (/^(?:тема\s*\d*[:.]?|\d+[\s.)\-]+)/i.test(trimmed)) {
+          if (trimmed.includes(":") && !trimmed.endsWith(":")) {
+            const colonIdx = trimmed.indexOf(":");
+            const before = trimmed.slice(0, colonIdx).replace(/^(?:тема\s*\d*[:.]?|\d+[\s.)\-]+)/i, "").trim();
+            const after = trimmed.slice(colonIdx + 1).trim();
+            isHeader = true;
+            extTitle = before || trimmed.slice(0, colonIdx).trim();
+            inlineWords = after;
+          } else {
+            isHeader = true;
+            extTitle = trimmed.replace(/^(?:тема\s*\d*[:.]?|\d+[\s.)\-]+)/i, "").replace(/[:.]+$/, "").trim();
+            if (!extTitle) extTitle = trimmed;
+          }
+        }
+        // Формат 3: Строка с разделителем двоеточие или таб: "Космос: ПЛАНЕТА, ЗВЕЗДА"
+        else if ((trimmed.includes(":") || trimmed.includes("\t")) && !trimmed.endsWith(":")) {
+          const sep = trimmed.includes(":") ? ":" : "\t";
+          const parts = trimmed.split(sep);
+          const maybeTitle = parts[0].trim();
+          const maybeWords = parts.slice(1).join(" ").trim();
+          if (maybeTitle.length >= 2 && maybeTitle.length <= 60 && !maybeTitle.includes(",")) {
+            isHeader = true;
+            extTitle = maybeTitle;
+            inlineWords = maybeWords;
+          }
+        }
+        // Формат 4: Короткая отдельная строка заголовка без запятых
+        else if (curWordsLines.length > 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4) {
+          if (/[А-ЯA-Zа-яa-z]/.test(trimmed)) {
+            isHeader = true;
+            extTitle = trimmed;
+          }
+        }
+
+        if (isHeader) {
+          if (curWordsLines.length > 0) flush();
+          curTitle = extTitle;
+          if (inlineWords) curWordsLines.push(inlineWords);
+        } else {
+          // Если заголовок ещё не был задан, а первая строка короткая и без запятых — это заголовок
+          if (!curTitle && curWordsLines.length === 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4) {
+            curTitle = trimmed;
+          } else {
+            curWordsLines.push(trimmed);
+          }
+        }
+      }
+
+      flush();
+
+      // Обработка тем и умное деление длинных списков
+      const processed = [];
+      const warnings = [];
+
+      rawBlocks.forEach((block, idx) => {
+        const name = block.title || `Тема ${idx + 1}`;
+        const words = block.words;
+
+        if (!words.length) {
+          warnings.push(`Тема #${idx + 1} «${name}»: нет слов от 2 до 15 букв`);
+          processed.push({
+            name,
+            words: [],
+            raw: block.wordsRaw,
+            rejected: block.rejected,
+            duplicates: block.duplicates,
+            status: "error",
+            statusText: "Нет допустимых слов"
+          });
+          return;
+        }
+
+        if (autoSplit && words.length > 25) {
+          const chunkSize = words.length > 40 ? Math.ceil(words.length / 2) : 20;
+          let partNum = 1;
+          for (let s = 0; s < words.length; s += chunkSize) {
+            const chunk = words.slice(s, s + chunkSize);
+            processed.push({
+              name: `${name} (Часть ${partNum})`,
+              words: chunk,
+              raw: chunk.join(", "),
+              rejected: partNum === 1 ? block.rejected : [],
+              duplicates: partNum === 1 ? block.duplicates : 0,
+              status: "ok",
+              statusText: `${chunk.length} слов (авто-разделено)`
+            });
+            partNum++;
+          }
+        } else {
+          let status = "ok";
+          let statusText = `${words.length} слов`;
+
+          if (words.length > 25) {
+            status = "warn";
+            statusText = `${words.length} слов (много для 15×15)`;
+            warnings.push(`Тема «${name}»: ${words.length} слов — часть может не поместиться`);
+          } else if (words.length < 5) {
+            status = "warn";
+            statusText = `${words.length} слов (мало слов)`;
+            warnings.push(`Тема «${name}»: мало слов (${words.length})`);
+          }
+
+          processed.push({
+            name,
+            words,
+            raw: block.wordsRaw,
+            rejected: block.rejected,
+            duplicates: block.duplicates,
+            status,
+            statusText
+          });
+        }
+      });
+
+      return { topics: processed, warnings };
     }
 
     const DB = {
@@ -1347,7 +1562,7 @@
       schema: SCHEMA,
       board: { rev: { n: 0, by: "" }, ancestors: [], value: emptyBoard() },
       topics: {},
-      books: {} // { [bookId]: { id, title, author, settings, topics: [...], updatedAt } }
+      books: {}
     };
 
     let showAnswers = true;
@@ -1752,7 +1967,6 @@
       textModified = false;
       $("rebuildHint").hidden = true;
 
-      // Если мы в контексте книги, синхронизируем изменения с темой этой книги
       if (activeBookId && activeBookTopicIndex !== null) {
         const book = state.books[activeBookId];
         if (book && book.topics[activeBookTopicIndex]) {
@@ -1795,8 +2009,6 @@
       timer: null,
       channel: "",
       lastAck: "",
-      sending: false,
-      pending: true,
 
       init() {
         let hash = 0;
@@ -1832,9 +2044,24 @@
               if (message.length > MAX_PAYLOAD) return;
               const remote = validateState(JSON.parse(message.toString()));
               const before = stable(state);
+
               if (compareRev(remote.board.rev, state.board.rev) > 0) state.board = remote.board;
               Object.assign(state.topics, remote.topics);
-              Object.assign(state.books, remote.books);
+
+              // Защита от отката локальных изменений: проверяем метку времени updatedAt
+              if (remote.books && typeof remote.books === "object") {
+                let changedAny = false;
+                for (const [bId, rBook] of Object.entries(remote.books)) {
+                  if (!rBook || !Array.isArray(rBook.topics)) continue;
+                  const lBook = state.books[bId];
+                  if (!lBook || (rBook.updatedAt || 0) > (lBook.updatedAt || 0)) {
+                    state.books[bId] = rBook;
+                    changedAny = true;
+                  }
+                }
+                if (changedAny && activeBookId) renderBookDetail();
+              }
+
               if (stable(state) !== before) {
                 persistState();
                 renderTopics();
@@ -2075,6 +2302,7 @@
           const ok = await confirmModal(`Удалить книгу «${book.title}» (${totalTopics} тем)?`, "Удаление книги");
           if (!ok) return;
           delete state.books[book.id];
+          await persistState();
           stateChanged();
         }, "danger small"));
 
@@ -2138,17 +2366,25 @@
         actionsDiv.style.justifyContent = "flex-end";
 
         actionsDiv.append(action("👁 Сетка", () => openTopicInConstructor(activeBookId, idx), "small primary"));
+
+        // Удаление темы с первого раза (поиск по id)
         actionsDiv.append(action("✕", async () => {
           const ok = await confirmModal(`Удалить тему «${topic.name}» из этой книги?`, "Удаление темы");
           if (!ok) return;
-          book.topics.splice(idx, 1);
-          book.updatedAt = Date.now();
-          stateChanged();
-          renderBookDetail();
+
+          const targetId = topic.id;
+          const targetIndex = book.topics.findIndex(t => t.id === targetId);
+          if (targetIndex !== -1) {
+            book.topics.splice(targetIndex, 1);
+            book.updatedAt = Date.now();
+            await persistState();
+            stateChanged();
+            renderBookDetail();
+            toast(`Тема «${topic.name}» удалена.`);
+          }
         }, "small danger"));
 
         tdActions.append(actionsDiv);
-
         tr.append(tdNum, tdName, tdWords, tdStatus, tdActions);
         tbody.append(tr);
       });
@@ -2174,7 +2410,6 @@
         createdAt: Date.now()
       };
 
-      // Если сетки ещё не было, автоматически генерируем её
       if (!topic.grid || !topic.placements.length) {
         toast("Генерация сетки темы…");
         generateGrid(board.words, board.settings).then(layout => {
@@ -2223,11 +2458,70 @@
       stateChanged();
       renderBookDetail();
 
-      // Очищаем и оставляем фокус на названии для быстрого ввода следующей темы
       $("fastTopicName").value = "";
       $("fastTopicWords").value = "";
       $("fastTopicName").focus();
       toast(`Тема «${name}» добавлена (#${book.topics.length}).`);
+    }
+
+    /* ==========================================================================
+       ЛОГИКА ПРЕДПРОСМОТРА МАССОВОГО ИМПОРТА
+       ========================================================================== */
+    let parsedBatchResult = null;
+    let batchInputDebounce = null;
+
+    function refreshBatchPreview() {
+      const text = $("batchImportText").value;
+      const autoSplit = $("batchAutoSplit").checked;
+      const result = parseBatchInput(text, autoSplit);
+      parsedBatchResult = result;
+
+      const totalTopics = result.topics.length;
+      const validTopics = result.topics.filter(t => t.words.length > 0);
+      const totalWords = validTopics.reduce((sum, t) => sum + t.words.length, 0);
+
+      $("batchCountBadge").textContent = `Распознано: ${totalTopics} тем`;
+      $("batchCountBadge").className = `badge ${validTopics.length > 0 ? "badge-green" : ""}`;
+      $("batchWordsBadge").textContent = `Всего слов: ${totalWords}`;
+
+      if (result.warnings.length > 0) {
+        $("batchWarnBadge").hidden = false;
+        $("batchWarnBadge").textContent = `${result.warnings.length} предпрежд./ошибок`;
+      } else {
+        $("batchWarnBadge").hidden = true;
+      }
+
+      $("batchImportApply").disabled = validTopics.length === 0;
+      $("batchImportApply").textContent = validTopics.length > 0
+        ? `Добавить ${validTopics.length} тем в книгу`
+        : "Добавить темы в книгу";
+
+      const container = $("batchPreviewList");
+      container.replaceChildren();
+
+      if (!totalTopics) {
+        container.append(node("div", "small-text muted", "Вставьте текст выше, чтобы увидеть предпросмотр распознавания..."));
+        return;
+      }
+
+      result.topics.forEach((t, i) => {
+        const item = node("div", `batch-item-row ${t.status}`);
+        const num = node("span", "mono muted", `#${i + 1}`);
+        const title = node("b", "", t.name);
+
+        const wordsDiv = node("span", "small-text muted batch-item-words");
+        if (t.words.length) {
+          wordsDiv.textContent = t.words.slice(0, 6).join(", ") + (t.words.length > 6 ? ` … (+${t.words.length - 6})` : "");
+        } else {
+          wordsDiv.textContent = "— нет слов —";
+        }
+
+        const badgeClass = t.status === "ok" ? "badge-green" : t.status === "warn" ? "badge-amber" : "badge-red";
+        const statusBadge = node("span", `badge ${badgeClass}`, t.statusText);
+
+        item.append(num, title, wordsDiv, statusBadge);
+        container.append(item);
+      });
     }
 
     let batchCancelRequested = false;
@@ -2326,11 +2620,12 @@
       const controls = doc.createElement("div");
       controls.className = "controls";
       const printBtn = node("button", "", "🖨️ Печать книги (PDF)");
+      printBtn.type = "button";
       printBtn.onclick = () => win.print();
       controls.append(printBtn);
       doc.body.append(controls);
 
-      // 1. Обложка книги
+      // 1. Обложка
       const coverPage = node("div", "page cover");
       coverPage.append(node("h1", "", book.title));
       coverPage.append(node("h2", "", `Сборник из ${book.topics.length} филвордов`));
@@ -2352,10 +2647,10 @@
       doc.body.append(tocPage);
 
       const ruleText = book.settings?.overlap === false
-        ? "Слова читаются по прямым линиям. Слова не пересекаются (каждая буква принадлежит строго одному слову)."
+        ? "Слова читаются по прямым линиям. Слова не пересекаются (каждая буква принадлежит только одному слову)."
         : "Слова читаются по прямым линиям в любом направлении. Слова могут пересекаться и иметь общие буквы.";
 
-      // 3. Страницы с филвордами (по 1 головоломке на страницу А4)
+      // 3. Страницы с филвордами
       book.topics.forEach((t, i) => {
         const pPage = node("div", "page");
 
@@ -2384,7 +2679,7 @@
         doc.body.append(pPage);
       });
 
-      // 4. Страницы с ответами в конце
+      // 4. Страницы с ответами
       const ansPage = node("div", "page");
       ansPage.append(node("h2", "", "ОТВЕТЫ И КООРДИНАТЫ"));
       const ansGrid = node("div", "answers-grid");
@@ -2401,7 +2696,7 @@
       });
 
       ansPage.append(ansGrid);
-      ansPage.append(node("div", "page-footer", "Конец сборника ответов"));
+      ansPage.append(node("div", "page-footer", "Конец ответов"));
       doc.body.append(ansPage);
 
       win.focus();
@@ -2419,7 +2714,6 @@
 
       const wb = XLSX.utils.book_new();
 
-      // Лист 1: Оглавление сборника
       const tocRows = [["№", "Тема", "Слов", "Статус укладки"]];
       book.topics.forEach((t, i) => {
         tocRows.push([i + 1, t.name, t.words.length, t.placements?.length ? "Готово" : "Не сгенерировано"]);
@@ -2427,7 +2721,6 @@
       const tocSheet = XLSX.utils.aoa_to_sheet(tocRows);
       XLSX.utils.book_append_sheet(wb, tocSheet, "Оглавление");
 
-      // Листы с темами
       book.topics.forEach((t, i) => {
         const safeName = `${i + 1}. ${t.name}`.slice(0, 30).replace(/[\\/?*[\]]/g, "_");
         const rows = [
@@ -2501,7 +2794,6 @@
       }
     }
 
-    // Реверс-аудит (сохранена полная функциональность)
     const Reverse = {
       grid: Array(CELLS).fill("·"),
       active: null,
@@ -2761,7 +3053,6 @@
         toast("Тема сохранена в каталог.");
       });
 
-      // Навигация внутри книги из конструктора
       $("backToBookBtn").addEventListener("click", () => {
         if (activeBookId) {
           switchTab("books");
@@ -2784,7 +3075,6 @@
         }
       });
 
-      // События раздела Книг
       $("backToBooksListBtn").addEventListener("click", () => {
         $("bookDetailView").hidden = true;
         $("booksListView").hidden = false;
@@ -2852,7 +3142,6 @@
         openBook(activeBookId);
       });
 
-      // Быстрое добавление темы
       $("addFastTopicBtn").addEventListener("click", addFastTopicToBook);
       $("fastTopicWords").addEventListener("keydown", e => {
         if (e.key === "Enter") { e.preventDefault(); addFastTopicToBook(); }
@@ -2861,56 +3150,57 @@
         if (e.key === "Enter") { e.preventDefault(); $("fastTopicWords").focus(); }
       });
 
-      // Массовый импорт тем
+      // События улучшенного массового ввода тем
       $("openBatchImportBtn").addEventListener("click", () => {
         $("batchImportText").value = "";
+        refreshBatchPreview();
         $("batchImportModal").showModal();
       });
+
+      $("batchImportText").addEventListener("input", () => {
+        clearTimeout(batchInputDebounce);
+        batchInputDebounce = setTimeout(refreshBatchPreview, 120);
+      });
+
+      $("batchAutoSplit").addEventListener("change", refreshBatchPreview);
+
+      $("batchSampleBtn").addEventListener("click", () => {
+        $("batchImportText").value = `# Космос\n\nПЛАНЕТА, ЗВЕЗДА, ОРБИТА, КОМЕТА, СПУТНИК, АСТЕРОИД, ГАЛАКТИКА\n\n# Подводный мир\nАКУЛА, ДЕЛЬФИН, КИТ, КОРАЛЛ, СКАТ, РИФ, МЕДУЗА, КРАБ, ОСЬМИНОГ\n\n1. Лесные животные: ВОЛК, ЛИСИЦА, МЕДВЕДЬ, РЫСЬ, БАРСУК, БОБР, ЗАЯЦ`;
+        refreshBatchPreview();
+      });
+
       $("batchImportCancel").addEventListener("click", () => $("batchImportModal").close());
 
       $("batchImportApply").addEventListener("click", () => {
-        const text = $("batchImportText").value;
-        const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
-        if (!activeBookId || !blocks.length) {
+        if (!activeBookId || !parsedBatchResult) {
           $("batchImportModal").close();
           return;
         }
 
         const book = state.books[activeBookId];
-        let added = 0;
+        const validTopics = parsedBatchResult.topics.filter(t => t.words.length > 0);
 
-        blocks.forEach(block => {
-          const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
-          if (!lines.length) return;
+        if (!validTopics.length) {
+          toast("Нет распознанных тем для добавления.");
+          return;
+        }
 
-          let name = lines[0].replace(/^[#:\s]+/, "");
-          let wordsRaw = lines.slice(1).join(" ");
-
-          if (lines.length === 1 && lines[0].includes(":")) {
-            const parts = lines[0].split(":");
-            name = parts[0].trim();
-            wordsRaw = parts.slice(1).join(" ");
-          }
-
-          const parsed = parseWords(wordsRaw);
-          if (parsed.words.length) {
-            book.topics.push({
-              id: uid(),
-              name: name || `Тема ${book.topics.length + 1}`,
-              raw: wordsRaw,
-              words: parsed.words,
-              grid: null,
-              placements: []
-            });
-            added++;
-          }
+        validTopics.forEach(t => {
+          book.topics.push({
+            id: uid(),
+            name: t.name,
+            raw: t.raw,
+            words: t.words,
+            grid: null,
+            placements: []
+          });
         });
 
         book.updatedAt = Date.now();
         stateChanged();
         renderBookDetail();
         $("batchImportModal").close();
-        toast(`Добавлено ${added} тем в книгу!`);
+        toast(`Успешно добавлено ${validTopics.length} тем в сборник!`);
       });
 
       $("generateAllBookGridsBtn").addEventListener("click", generateAllBookGrids);
@@ -2944,7 +3234,6 @@
         e.target.value = "";
       });
 
-      // Игровые события и Реверс
       const playGrid = $("playGrid");
       playGrid.addEventListener("pointerdown", e => {
         const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("#playGrid .cell");
