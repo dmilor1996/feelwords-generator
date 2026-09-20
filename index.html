@@ -17,6 +17,12 @@
       darkMode: 'class',
       theme: {
         extend: {
+          gridTemplateColumns: {
+            '15': 'repeat(15, minmax(0, 1fr))'
+          },
+          gridTemplateRows: {
+            '15': 'repeat(15, minmax(0, 1fr))'
+          },
           colors: {
             surface: {
               950: '#07090e',
@@ -71,6 +77,21 @@
       background: #334155;
     }
 
+    /* Гарантированное построение сетки 15х15 ячеек */
+    .grid-15x15 {
+      display: grid !important;
+      grid-template-columns: repeat(15, minmax(0, 1fr)) !important;
+      grid-template-rows: repeat(15, minmax(0, 1fr)) !important;
+    }
+    .grid-15-cols {
+      display: grid !important;
+      grid-template-columns: repeat(15, minmax(0, 1fr)) !important;
+    }
+    .grid-15-rows {
+      display: grid !important;
+      grid-template-rows: repeat(15, minmax(0, 1fr)) !important;
+    }
+
     /* Эффект матового стекла */
     .glass-card {
       background: rgba(17, 23, 38, 0.75);
@@ -87,11 +108,16 @@
     /* Ячейка сетки филворда: идеальный квадрат с адаптивным масштабированием */
     .cell-box {
       aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       user-select: none;
       -webkit-user-select: none;
       touch-action: manipulation;
       transition: background-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
-      font-size: clamp(10px, 2.7vw, 15px);
+      font-size: clamp(9px, 2.4vw, 15px);
+      min-width: 0;
+      min-height: 0;
     }
     .cell-box:active {
       transform: scale(0.94);
@@ -287,57 +313,10 @@
         </div>
       </div>
 
-      <!-- Основная рабочая сетка: Слева матрица 15х15, справа панель слов и настроек -->
+      <!-- Основная рабочая сетка: Слева ввод и параметры, справа матрица 15х15 -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
         
-        <!-- Колонка 1 (Сетка 15х15) -->
-        <div class="lg:col-span-7 flex flex-col items-center">
-          <div class="w-full glass-card rounded-2xl p-2.5 sm:p-4 shadow-2xl relative">
-            
-            <!-- Заголовок панели сетки с бейджами плотности -->
-            <div class="flex items-center justify-between mb-2 sm:mb-3 px-1">
-              <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span class="text-xs font-bold text-slate-200">Матрица филворда 15 × 15</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span id="gridStatusIndicator" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-white/10">0 / 0 размещено</span>
-                <span id="densityBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-brand-500/15 text-brand-neon border border-brand-500/30">0% букв</span>
-              </div>
-            </div>
-
-            <!-- Сама сетка 15х15 -->
-            <div class="feelword-grid-container relative">
-              <div id="feelwordGrid" class="w-full h-full grid grid-cols-15 gap-0.5 sm:gap-1 bg-surface-950/80 p-1 rounded-xl border border-white/10 shadow-inner">
-                <!-- 225 ячеек генерируются через JavaScript -->
-              </div>
-            </div>
-
-            <!-- Подсказка под сеткой -->
-            <div class="mt-2.5 px-1 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
-              <div class="flex items-center gap-1">
-                <span>💡 Нажмите на любую букву или слово для <b>двойного супер-выделения 🎯</b></span>
-              </div>
-              <div>
-                <span>Свободных ячеек: <b id="emptyCellsLabel" class="text-slate-200">225</b></span>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Список активных слов в филворде (чипсы) -->
-          <div class="w-full mt-3 glass-card-subtle rounded-xl p-3">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-bold text-slate-300">Слова в сетке (нажмите для подсветки):</span>
-              <span id="placedCountSummary" class="text-[11px] font-mono text-slate-400">0 из 0</span>
-            </div>
-            <div id="activeWordsChips" class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
-              <span class="text-[11px] text-slate-500 italic">Слова появятся здесь сразу после ввода...</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Колонка 2 (Поле ввода слов и параметры) -->
+        <!-- Колонка 1: Поле ввода слов и параметры (СЛЕВА) -->
         <div class="lg:col-span-5 space-y-3 sm:space-y-4">
           
           <!-- Карточка ввода слов -->
@@ -425,6 +404,53 @@
 
         </div>
 
+        <!-- Колонка 2: Сетка 15х15 (СПРАВА) -->
+        <div class="lg:col-span-7 flex flex-col items-center">
+          <div class="w-full glass-card rounded-2xl p-2.5 sm:p-4 shadow-2xl relative">
+            
+            <!-- Заголовок панели сетки с бейджами плотности -->
+            <div class="flex items-center justify-between mb-2 sm:mb-3 px-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="text-xs font-bold text-slate-200">Матрица филворда 15 × 15</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="gridStatusIndicator" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-white/10">0 / 0 размещено</span>
+                <span id="densityBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-brand-500/15 text-brand-neon border border-brand-500/30">0% букв</span>
+              </div>
+            </div>
+
+            <!-- Сама сетка 15х15 -->
+            <div class="feelword-grid-container relative">
+              <div id="feelwordGrid" class="w-full h-full grid-15x15 gap-0.5 sm:gap-1 bg-surface-950/80 p-1 rounded-xl border border-white/10 shadow-inner">
+                <!-- 225 ячеек генерируются через JavaScript -->
+              </div>
+            </div>
+
+            <!-- Подсказка под сеткой -->
+            <div class="mt-2.5 px-1 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
+              <div class="flex items-center gap-1">
+                <span>💡 Нажмите на любую букву или слово для <b>двойного супер-выделения 🎯</b></span>
+              </div>
+              <div>
+                <span>Свободных ячеек: <b id="emptyCellsLabel" class="text-slate-200">225</b></span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Список активных слов в филворде (чипсы) -->
+          <div class="w-full mt-3 glass-card-subtle rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-slate-300">Слова в сетке (нажмите для подсветки):</span>
+              <span id="placedCountSummary" class="text-[11px] font-mono text-slate-400">0 из 0</span>
+            </div>
+            <div id="activeWordsChips" class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
+              <span class="text-[11px] text-slate-500 italic">Слова появятся здесь сразу после ввода...</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -459,61 +485,7 @@
       <!-- Рабочая область реверса -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
         
-        <!-- Колонка 1: Сетка реверса 15х15 с координатами A-O и 1-15 -->
-        <div class="lg:col-span-7 flex flex-col items-center">
-          <div class="w-full glass-card rounded-2xl p-2.5 sm:p-4 shadow-2xl">
-            
-            <div class="flex items-center justify-between mb-2 px-1">
-              <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
-                <span class="text-xs font-bold text-slate-200">Аудиторская сетка 15 × 15 с координатами</span>
-              </div>
-              <span id="reverseCellStatus" class="text-[11px] font-mono text-slate-400">Кликните по ячейке для правки</span>
-            </div>
-
-            <!-- Контейнер сетки с шахматной разметкой колонок A-O и строк 1-15 -->
-            <div class="w-full max-w-[540px] mx-auto">
-              
-              <!-- Буквы колонок A-O -->
-              <div class="grid grid-cols-15 gap-0.5 sm:gap-1 pl-6 sm:pl-7 pr-1 pb-1 text-center font-mono text-[9px] sm:text-[10px] text-slate-500 font-bold">
-                <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span><span>J</span><span>K</span><span>L</span><span>M</span><span>N</span><span>O</span>
-              </div>
-
-              <div class="flex">
-                <!-- Номера строк 1-15 -->
-                <div class="grid grid-rows-15 gap-0.5 sm:gap-1 pr-1.5 sm:pr-2 font-mono text-[9px] sm:text-[10px] text-slate-500 font-bold text-right items-center select-none">
-                  <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span>
-                </div>
-
-                <!-- Сама матрица реверса -->
-                <div class="flex-1 aspect-square">
-                  <div id="reverseGrid" class="w-full h-full grid grid-cols-15 gap-0.5 sm:gap-1 bg-surface-950/90 p-1 rounded-xl border border-white/10 shadow-inner">
-                    <!-- Генерируется из JS -->
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            <p class="mt-2 text-center text-[10px] text-slate-500">
-              💡 Можно кликнуть на любую букву и напечатать нужную клавишей на клавиатуре для быстрого исправления опечатки.
-            </p>
-
-          </div>
-
-          <!-- Результат проверки слов в реверсе -->
-          <div class="w-full mt-3 glass-card-subtle rounded-xl p-3">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-bold text-slate-300">Результат сканирования слов:</span>
-              <span id="reverseFoundSummary" class="text-[11px] font-mono text-slate-400">Ожидание проверки...</span>
-            </div>
-            <div id="reverseChipsContainer" class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
-              <span class="text-[11px] text-slate-500 italic">Введите набор букв и слова для сверки...</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Колонка 2: Вставка строки 225 букв и инструменты поиска -->
+        <!-- Колонка 1: Вставка строки 225 букв и инструменты поиска (СЛЕВА) -->
         <div class="lg:col-span-5 space-y-4">
           
           <!-- Шаг 1: Вставка 225 букв -->
@@ -572,6 +544,60 @@
 
         </div>
 
+        <!-- Колонка 2: Сетка реверса 15х15 с координатами A-O и 1-15 (СПРАВА) -->
+        <div class="lg:col-span-7 flex flex-col items-center">
+          <div class="w-full glass-card rounded-2xl p-2.5 sm:p-4 shadow-2xl">
+            
+            <div class="flex items-center justify-between mb-2 px-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+                <span class="text-xs font-bold text-slate-200">Аудиторская сетка 15 × 15 с координатами</span>
+              </div>
+              <span id="reverseCellStatus" class="text-[11px] font-mono text-slate-400">Кликните по ячейке для правки</span>
+            </div>
+
+            <!-- Контейнер сетки с шахматной разметкой колонок A-O и строк 1-15 -->
+            <div class="w-full max-w-[540px] mx-auto">
+              
+              <!-- Буквы колонок A-O -->
+              <div class="grid-15-cols gap-0.5 sm:gap-1 pl-6 sm:pl-7 pr-1 pb-1 text-center font-mono text-[9px] sm:text-[10px] text-slate-500 font-bold">
+                <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span><span>J</span><span>K</span><span>L</span><span>M</span><span>N</span><span>O</span>
+              </div>
+
+              <div class="flex">
+                <!-- Номера строк 1-15 -->
+                <div class="grid-15-rows gap-0.5 sm:gap-1 pr-1.5 sm:pr-2 font-mono text-[9px] sm:text-[10px] text-slate-500 font-bold text-right items-center select-none">
+                  <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span>
+                </div>
+
+                <!-- Сама матрица реверса -->
+                <div class="flex-1 aspect-square">
+                  <div id="reverseGrid" class="w-full h-full grid-15x15 gap-0.5 sm:gap-1 bg-surface-950/90 p-1 rounded-xl border border-white/10 shadow-inner">
+                    <!-- Генерируется из JS -->
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <p class="mt-2 text-center text-[10px] text-slate-500">
+              💡 Можно кликнуть на любую букву и напечатать нужную клавишей на клавиатуре для быстрого исправления опечатки.
+            </p>
+
+          </div>
+
+          <!-- Результат проверки слов в реверсе -->
+          <div class="w-full mt-3 glass-card-subtle rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-slate-300">Результат сканирования слов:</span>
+              <span id="reverseFoundSummary" class="text-[11px] font-mono text-slate-400">Ожидание проверки...</span>
+            </div>
+            <div id="reverseChipsContainer" class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
+              <span class="text-[11px] text-slate-500 italic">Введите набор букв и слова для сверки...</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -617,7 +643,7 @@
         <div class="lg:col-span-7 flex flex-col items-center">
           <div class="w-full glass-card rounded-2xl p-2.5 sm:p-4 shadow-2xl">
             <div class="feelword-grid-container">
-              <div id="playGrid" class="w-full h-full grid grid-cols-15 gap-0.5 sm:gap-1 bg-surface-950/90 p-1 rounded-xl border border-white/10 select-none touch-none">
+              <div id="playGrid" class="w-full h-full grid-15x15 gap-0.5 sm:gap-1 bg-surface-950/90 p-1 rounded-xl border border-white/10 select-none touch-none">
                 <!-- Ячейки для режима игры -->
               </div>
             </div>
