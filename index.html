@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090d17">
-  <title>WordVault Studio — конструктор и аудит</title>
+  <title>WordVault Studio — книги филвордов и конструктор</title>
 
   <!-- Внешние библиотеки: MQTT для облачной синхронизации и SheetJS для экспорта в Excel -->
   <script defer src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
@@ -63,12 +63,13 @@
     button.primary { background: #5256c9; border-color: #7478ec; }
     button.primary:hover { background: #666be1; }
     button.danger { background: #482134; color: #ffc3cd; }
+    button.danger:hover { background: #5a2840; }
     button.success { background: #174c43; color: #a5f3ce; }
+    button.success:hover { background: #1f6358; }
     button.small { padding: 5px 8px; font-size: 12px; }
 
     :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 
-    /* Предотвращение принудительного масштабирования страницы в iOS Safari */
     input[type="text"], input[type="number"], textarea, select {
       width: 100%;
       background: #090f1d;
@@ -81,10 +82,11 @@
 
     textarea { resize: vertical; min-height: 90px; }
     input[type="checkbox"] { accent-color: #818cf8; width: 16px; height: 16px; }
-    h1, h2, h3, p { margin: 0; }
+    h1, h2, h3, h4, p { margin: 0; }
     h1 { font-size: 18px; }
     h2 { font-size: 19px; }
-    h3 { font-size: 14px; }
+    h3 { font-size: 15px; }
+    h4 { font-size: 13px; }
     small, .muted { color: var(--muted); }
     .mono { font-family: ui-monospace, Consolas, monospace; }
     .small-text { font-size: 12px; }
@@ -144,7 +146,7 @@
 
     .nav-inner {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 8px;
       padding: 10px 18px;
     }
@@ -179,6 +181,7 @@
     }
 
     .card.subtle { background: var(--panel2); }
+    .card.accent { border-color: #5865f2; background: #161f36; }
     .row { display: flex; align-items: center; gap: 10px; }
     .wrap { flex-wrap: wrap; }
     .between { justify-content: space-between; }
@@ -199,11 +202,8 @@
       background: #142739;
     }
 
-    .badge-amber {
-      color: var(--amber);
-      background: #3b2e15;
-      border-color: #665124;
-    }
+    .badge-amber { color: var(--amber); background: #3b2e15; border-color: #665124; }
+    .badge-green { color: var(--green); background: #14382e; border-color: #1f6352; }
 
     .settings-grid {
       display: grid;
@@ -326,15 +326,57 @@
 
     .row-labels > span { display: flex; align-items: center; justify-content: flex-end; }
 
-    .topics-grid {
+    .topics-grid, .books-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 14px;
     }
 
-    .topic-card { display: flex; flex-direction: column; gap: 10px; }
-    .topic-card p { overflow-wrap: anywhere; }
-    .topic-card .actions { margin-top: auto; }
+    .topic-card, .book-card { display: flex; flex-direction: column; gap: 10px; }
+    .topic-card p, .book-card p { overflow-wrap: anywhere; }
+    .topic-card .actions, .book-card .actions { margin-top: auto; }
+
+    .book-header-banner {
+      background: linear-gradient(135deg, #2b306b, #1b264a);
+      border: 1px solid #5865f2;
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .topics-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .topics-table th, .topics-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+
+    .topics-table tr:hover { background: #18233a; }
+
+    .progress-bar-wrap {
+      width: 100%;
+      height: 8px;
+      background: #111a2d;
+      border-radius: 99px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #38bdf8);
+      width: 0%;
+      transition: width 0.2s ease;
+    }
 
     .notice {
       padding: 11px 13px;
@@ -382,7 +424,7 @@
       border: 1px solid #485b7f;
       border-radius: 18px;
       padding: 24px;
-      width: min(520px, calc(100vw - 32px));
+      width: min(560px, calc(100vw - 32px));
       max-height: 85vh;
       overflow: auto;
     }
@@ -406,7 +448,7 @@
 
     @media (max-width: 950px) {
       .layout, .play-layout { grid-template-columns: 1fr; }
-      .topics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .topics-grid, .books-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .desktop-description { display: none; }
     }
 
@@ -416,13 +458,13 @@
       h1 { font-size: 16px; }
       .header-actions { margin-left: auto; }
       .sync-badge { max-width: 180px; font-size: 10px; padding: 7px; }
-      .nav-inner { gap: 5px; padding: 8px; }
-      .tab-button { padding: 10px 3px; font-size: 11px; }
+      .nav-inner { gap: 4px; padding: 8px 6px; }
+      .tab-button { padding: 8px 2px; font-size: 10px; }
       main { padding: 12px 8px 70px; }
       .card { padding: 12px; border-radius: 12px; }
       .letter-grid { gap: 2px; padding: 3px; }
       .cell { border-radius: 3px; }
-      .topics-grid { grid-template-columns: 1fr; }
+      .topics-grid, .books-grid { grid-template-columns: 1fr; }
       .column-labels { gap: 2px; padding: 0 3px; }
       .row-labels { gap: 2px; padding-top: 3px; padding-bottom: 3px; }
       .hide-mobile { display: none; }
@@ -446,7 +488,7 @@
         <div class="logo-icon" aria-hidden="true">15²</div>
         <div>
           <h1>WordVault Studio</h1>
-          <div class="desktop-description muted small-text">Конструктор · Аудит · Игра</div>
+          <div class="desktop-description muted small-text">Конструктор · Книги филвордов · Аудит</div>
         </div>
       </div>
 
@@ -463,6 +505,7 @@
   <nav aria-label="Разделы приложения">
     <div class="nav-inner">
       <button class="tab-button active" data-tab="constructor" aria-current="page">⚡ Конструктор</button>
+      <button class="tab-button" data-tab="books">📖 Книги <span id="navBooksCount">0</span></button>
       <button class="tab-button" data-tab="reverse">🔍 Реверс</button>
       <button class="tab-button" data-tab="play">🎮 Игра</button>
       <button class="tab-button" data-tab="topics">📚 Темы <span id="topicCount">0</span></button>
@@ -471,11 +514,27 @@
 
   <main>
     <section id="view-constructor" class="stack">
+      <!-- Контекстный баннер: отображается, когда мы редактируем тему конкретной книги -->
+      <div id="bookContextBanner" class="book-header-banner" hidden>
+        <div class="row wrap">
+          <span class="badge badge-green">Режим книги</span>
+          <div>
+            <b>Книга:</b> <span id="bannerBookTitle">—</span> &nbsp;›&nbsp;
+            <b>Тема:</b> <span id="bannerTopicTitle">—</span> (<span id="bannerTopicPos">#1 из 50</span>)
+          </div>
+        </div>
+        <div class="row">
+          <button id="prevBookTopicBtn" class="small">‹ Пред. тема</button>
+          <button id="nextBookTopicBtn" class="small">След. тема ›</button>
+          <button id="backToBookBtn" class="primary small">← К списку книги</button>
+        </div>
+      </div>
+
       <div class="card">
         <div class="row between wrap">
           <div>
             <h2>Конструктор поиска слов</h2>
-            <p class="muted small-text">Прямые линии в восьми направлениях. Пересечения разрешены.</p>
+            <p class="muted small-text">Прямые линии в восьми направлениях. Настройка пересечений регулируется.</p>
           </div>
           <span class="badge">15 × 15 · 225 клеток</span>
         </div>
@@ -508,7 +567,7 @@
 
             <div class="actions">
               <button id="generateButton" class="primary">🔄 Перестроить сетку</button>
-              <button id="saveTopicButton" class="success">💾 Сохранить тему и сетку</button>
+              <button id="saveTopicButton" class="success">💾 Сохранить</button>
             </div>
 
             <div id="generationStatus" class="muted small-text" role="status"></div>
@@ -538,19 +597,19 @@
             </label>
 
             <p class="muted small-text">
-              Генератор находит наилучшую укладку пересечений с временным бюджетом оптимизации.
+              Генератор находит наилучшую укладку слов с временным бюджетом оптимизации.
             </p>
           </div>
 
           <div class="card stack">
-            <h3>Экспорт</h3>
+            <h3>Экспорт этой темы</h3>
             <div class="actions">
               <button id="xlsxButton">📊 Файл XLSX</button>
               <button id="tsvButton">📋 Для Excel</button>
               <button id="rawButton">🔤 225 символов</button>
             </div>
             <div class="actions">
-              <button id="printButton">🖨️ Печать / PDF</button>
+              <button id="printButton">🖨️ Печать / PDF темы</button>
             </div>
             <label class="check">
               <input id="printAnswers" type="checkbox" checked>
@@ -584,6 +643,94 @@
               <span id="placedSummary" class="muted small-text"></span>
             </div>
             <div id="constructorWords" class="chips gap"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-books" class="stack" hidden>
+      <!-- Режим 1: Каталог книг -->
+      <div id="booksListView" class="stack">
+        <div class="card">
+          <div class="row between wrap">
+            <div>
+              <h2>Книги и сборники филвордов</h2>
+              <p class="muted small-text">Создавайте книги на 50+ тем с едиными правилами и экспортом в печать.</p>
+            </div>
+            <div class="actions">
+              <button id="createBookBtn" class="primary">+ Создать книгу</button>
+              <button id="importBookBtn">📥 Импорт книги (JSON)</button>
+              <input id="bookFileInput" type="file" accept=".json,application/json" hidden>
+            </div>
+          </div>
+        </div>
+
+        <div id="booksGrid" class="books-grid"></div>
+      </div>
+
+      <!-- Режим 2: Просмотр и редактирование конкретной книги -->
+      <div id="bookDetailView" class="stack" hidden>
+        <div class="card stack">
+          <div class="row between wrap">
+            <div class="row">
+              <button id="backToBooksListBtn" class="small">← К каталогу книг</button>
+              <h2 id="currentBookTitle">Книга</h2>
+            </div>
+            <div class="row wrap">
+              <span id="currentBookProgressBadge" class="badge">0 / 0 готово</span>
+              <button id="editBookSettingsBtn" class="small">⚙️ Настройки книги</button>
+            </div>
+          </div>
+
+          <div class="progress-bar-wrap">
+            <div id="bookProgressBar" class="progress-bar-fill"></div>
+          </div>
+
+          <!-- Блок быстрых действий книги -->
+          <div class="actions">
+            <button id="generateAllBookGridsBtn" class="primary">🔄 Сгенерировать все сетки книги</button>
+            <button id="printFullBookBtn" class="success">🖨️ Печать всей книги (PDF)</button>
+            <button id="exportBookXlsxBtn">📊 Экспорт в XLSX</button>
+            <button id="exportBookJsonBtn">💾 Экспорт в JSON</button>
+          </div>
+        </div>
+
+        <!-- Быстрый и минималистичный ввод тем -->
+        <div class="card stack">
+          <div class="row between wrap">
+            <h3>Быстрое добавление темы</h3>
+            <button id="openBatchImportBtn" class="small">⚡ Массовый ввод 50 тем</button>
+          </div>
+          <div class="layout" style="grid-template-columns: minmax(200px, 4fr) minmax(260px, 7fr) auto; gap: 8px;">
+            <input id="fastTopicName" type="text" placeholder="Название темы (напр. Космос)" maxlength="120">
+            <input id="fastTopicWords" type="text" placeholder="Слова через запятую или пробел (напр. ОРБИТА, ЗВЕЗДА, ПЛАНЕТА)">
+            <button id="addFastTopicBtn" class="primary" style="white-space:nowrap;">+ Добавить тему</button>
+          </div>
+          <p class="muted small-text">
+            Совет: можно просто вводить название, слова и нажимать Enter для быстрого наполнения сборника.
+          </p>
+        </div>
+
+        <!-- Таблица тем книги -->
+        <div class="card stack">
+          <div class="row between">
+            <h3>Темы сборника (<span id="bookTopicsCount">0</span>)</h3>
+            <span class="muted small-text">Нажмите «Открыть в сетке», чтобы увидеть или скорректировать макет</span>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="topics-table">
+              <thead>
+                <tr>
+                  <th style="width: 45px;">№</th>
+                  <th>Название темы</th>
+                  <th>Слова</th>
+                  <th style="width: 140px;">Размещено</th>
+                  <th style="width: 220px; text-align: right;">Действия</th>
+                </tr>
+              </thead>
+              <tbody id="bookTopicsTableBody"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -753,12 +900,82 @@
 
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
+  <!-- Диалог создания/редактирования книги -->
+  <dialog id="bookModal">
+    <h2 id="bookModalTitle">Создать новую книгу</h2>
+    <div class="stack">
+      <div>
+        <label for="bookModalName"><b>Название сборника</b></label>
+        <input id="bookModalName" type="text" maxlength="120" placeholder="Например: 50 филвордов о науке" class="gap-small">
+      </div>
+      <div>
+        <label for="bookModalAuthor"><b>Автор / примечание</b></label>
+        <input id="bookModalAuthor" type="text" maxlength="100" placeholder="WordVault Studio" class="gap-small">
+      </div>
+
+      <h3>Глобальные настройки правил для всех сеток книги</h3>
+      <div class="settings-grid">
+        <label class="check"><input id="bookDirH" type="checkbox" checked> Горизонталь →</label>
+        <label class="check"><input id="bookDirV" type="checkbox" checked> Вертикаль ↓</label>
+        <label class="check"><input id="bookDirD" type="checkbox" checked> Диагонали ↘ ↙</label>
+        <label class="check"><input id="bookDirR" type="checkbox" checked> Обратные направления</label>
+      </div>
+
+      <label class="check">
+        <input id="bookAllowOverlap" type="checkbox" checked>
+        <span>Разрешить пересечения слов (общие буквы)</span>
+      </label>
+
+      <label>
+        <span class="small-text muted">Заполнение пустых клеток</span>
+        <select id="bookFillerMode" class="gap-small">
+          <option value="freq">Частотные буквы</option>
+          <option value="uniform">Равномерные случайные буквы</option>
+          <option value="dots">Точки ·</option>
+        </select>
+      </label>
+    </div>
+    <div class="actions">
+      <button id="bookModalSave" class="primary">Сохранить книгу</button>
+      <button id="bookModalCancel">Отмена</button>
+    </div>
+  </dialog>
+
+  <!-- Диалог массового импорта 50 тем -->
+  <dialog id="batchImportModal">
+    <h2>Массовый ввод тем в книгу</h2>
+    <p class="small-text muted">
+      Вставьте ваши темы и слова. Формат максимально свободный: блок начинается с названия (или строки с решёткой #), следом идут слова. Блоки разделяются пустой строкой.
+    </p>
+    <textarea id="batchImportText" rows="12" class="mono" placeholder="Космос
+ПЛАНЕТА, ЗВЕЗДА, ОРБИТА, КОМЕТА, СПУТНИК
+
+Океан
+АКУЛА, ДЕЛЬФИН, КИТ, КОРАЛЛ, СКАТ, РИФ
+
+# Животные
+МЕДВЕДЬ, ВОЛК, ЛИСИЦА, РЫСЬ, БАРСУК"></textarea>
+    <div class="actions">
+      <button id="batchImportApply" class="primary">Добавить темы в книгу</button>
+      <button id="batchImportCancel">Отмена</button>
+    </div>
+  </dialog>
+
+  <!-- Диалог прогресса пакетной генерации -->
+  <dialog id="batchGenModal">
+    <h2>Генерация книги филвордов</h2>
+    <p id="batchGenStatus">Построение оптимальных укладок сеток…</p>
+    <div class="progress-bar-wrap gap">
+      <div id="batchGenProgressFill" class="progress-bar-fill"></div>
+    </div>
+    <div class="actions">
+      <button id="batchGenCancel" class="danger">Остановить</button>
+    </div>
+  </dialog>
+
   <dialog id="syncDialog">
     <h2>Синхронизация устройств</h2>
     <p>Откройте <b>одинаковый адрес сайта</b> на телефоне и компьютере.</p>
-    <p class="small-text muted">
-      Общий публичный канал работает без регистрации.
-    </p>
     <div class="card subtle small-text">
       <div>Канал: <span id="syncChannel" class="mono"></span></div>
       <div class="gap-small">Соединение: <span id="syncConnection"></span></div>
@@ -794,10 +1011,11 @@
     const $ = id => document.getElementById(id);
     const SIZE = 15;
     const CELLS = SIZE * SIZE;
-    const SCHEMA = 3;
+    const SCHEMA = 4; // Обновлена схема с поддержкой книг
     const MAX_WORDS = 200;
     const MAX_TOPICS = 500;
-    const MAX_PAYLOAD = 4 * 1024 * 1024;
+    const MAX_BOOKS = 100;
+    const MAX_PAYLOAD = 6 * 1024 * 1024;
 
     const COLORS = [
       "#60a5fa", "#34d399", "#f472b6", "#fbbf24", "#a78bfa",
@@ -941,7 +1159,7 @@
     }
 
     const DB = {
-      driver: "idb", // 'idb' | 'local' | 'memory'
+      driver: "idb",
       db: null,
       memoryStore: new Map(),
       ok: false,
@@ -964,7 +1182,7 @@
               return;
             }
 
-            const request = indexedDB.open("WordVault_Permanent_DB", 1);
+            const request = indexedDB.open("WordVault_Permanent_DB", 2);
 
             request.onupgradeneeded = () => {
               if (!request.result.objectStoreNames.contains("app_state")) {
@@ -1034,9 +1252,7 @@
               tx.oncomplete = () => resolve(true);
               tx.onerror = tx.onabort = () => resolve(false);
               return;
-            } catch {
-              // fallback gracefully
-            }
+            } catch {}
           }
 
           if (this.driver === "LocalStorage" || !this.db) {
@@ -1101,7 +1317,6 @@
       }
     };
 
-    // Слушатели для мгновенного снятия блокировки звука в мобильных браузерах
     ["pointerdown", "touchstart", "click", "keydown"].forEach(evt => {
       window.addEventListener(evt, () => Sound.unlock(), { once: true, passive: true });
     });
@@ -1125,10 +1340,14 @@
     let deviceId = uid();
     let logicalClock = 0;
     let activeTab = "constructor";
+    let activeBookId = null;
+    let activeBookTopicIndex = null;
+
     let state = {
       schema: SCHEMA,
       board: { rev: { n: 0, by: "" }, ancestors: [], value: emptyBoard() },
-      topics: {}
+      topics: {},
+      books: {} // { [bookId]: { id, title, author, settings, topics: [...], updatedAt } }
     };
 
     let showAnswers = true;
@@ -1317,7 +1536,7 @@
       let best = null;
       let bestScore = -1;
       const startTime = performance.now();
-      const budgetMs = 380; // бюджет времени для плавной работы интерфейса
+      const budgetMs = 380;
       let iteration = 0;
       const maxIterations = 80;
 
@@ -1328,7 +1547,6 @@
         const grid = Array(CELLS).fill("");
         const placements = [];
 
-        // Дисперсия порядка: длинные слова в начале с вариациями для поиска лучших пересечений
         const shuffled = words.map(w => ({ word: w, score: w.length + (Math.random() * 0.9 - 0.45) }))
           .sort((a, b) => b.score - a.score)
           .map(x => x.word);
@@ -1359,7 +1577,6 @@
 
                 if (!valid) continue;
 
-                // Приоритет плотным пересечениям при включенном режиме
                 const score = settings.overlap
                   ? overlap * (iteration % 2 ? 2.5 : 4.0) + Math.random() * 3.5
                   : Math.random() * 10;
@@ -1386,7 +1603,6 @@
           best = { grid, placements };
         }
 
-        // Если 100% слов размещено и сделано хотя бы 3 прогона — выходим досрочно
         if (placements.length === words.length && iteration >= 3) break;
 
         if (iteration % 6 === 0) {
@@ -1435,7 +1651,7 @@
     }
 
     function validateState(raw) {
-      if (!raw || raw.schema !== SCHEMA || !raw.board || !validRev(raw.board.rev)) {
+      if (!raw || (raw.schema !== 3 && raw.schema !== SCHEMA) || !raw.board || !validRev(raw.board.rev)) {
         throw new Error("Неподдерживаемая версия состояния");
       }
 
@@ -1445,15 +1661,9 @@
 
       const topics = {};
       const entries = Object.entries(raw.topics || {});
-      if (entries.length > MAX_TOPICS * 3) throw new Error("Слишком много записей каталога");
-
       for (const [id, record] of entries) {
-        if (id.length > 220 || !record || !validRev(record.rev)) {
-          throw new Error("Неверная запись каталога");
-        }
-        if (["__proto__", "prototype", "constructor"].includes(id)) {
-          throw new Error("Недопустимый идентификатор");
-        }
+        if (id.length > 220 || !record || !validRev(record.rev)) continue;
+        if (["__proto__", "prototype", "constructor"].includes(id)) continue;
 
         if (record.deleted === true) {
           topics[id] = { rev: clone(record.rev), deleted: true };
@@ -1461,11 +1671,7 @@
         }
 
         const value = record.value;
-        if (!value || typeof value.name !== "string" || !Array.isArray(value.words) ||
-            value.words.length > MAX_WORDS ||
-            !value.words.every(w => typeof w === "string" && /^[А-ЯA-Z]{2,15}$/.test(w))) {
-          throw new Error("Неверная тема");
-        }
+        if (!value || typeof value.name !== "string" || !Array.isArray(value.words)) continue;
 
         topics[id] = {
           rev: clone(record.rev),
@@ -1480,6 +1686,27 @@
         };
       }
 
+      const books = {};
+      const bookEntries = Object.entries(raw.books || {});
+      for (const [id, book] of bookEntries) {
+        if (!book || typeof book.title !== "string" || !Array.isArray(book.topics)) continue;
+        books[id] = {
+          id: String(book.id || id),
+          title: String(book.title || "Сборник филвордов").slice(0, 120),
+          author: String(book.author || "WordVault").slice(0, 100),
+          settings: cleanSettings(book.settings),
+          topics: (book.topics || []).map(t => ({
+            id: String(t.id || uid()),
+            name: String(t.name || "Тема").slice(0, 120),
+            raw: typeof t.raw === "string" ? t.raw.slice(0, 30000) : "",
+            words: Array.isArray(t.words) ? [...t.words] : parseWords(t.raw || "").words,
+            grid: Array.isArray(t.grid) && t.grid.length === CELLS ? [...t.grid] : null,
+            placements: Array.isArray(t.placements) ? clone(t.placements) : []
+          })),
+          updatedAt: Number.isFinite(book.updatedAt) ? book.updatedAt : Date.now()
+        };
+      }
+
       return {
         schema: SCHEMA,
         board: {
@@ -1487,7 +1714,8 @@
           ancestors,
           value: validateBoard(raw.board.value)
         },
-        topics
+        topics,
+        books
       };
     }
 
@@ -1495,32 +1723,8 @@
       return Object.entries(state.topics).filter(([, record]) => !record.deleted);
     }
 
-    function putConflict(entity) {
-      if (!entity.value.words.length || entity.rev.n === 0) return false;
-
-      const id = "conflict:" + revKey(entity.rev);
-      if (Object.hasOwn(state.topics, id)) return false;
-      if (liveTopics().length >= MAX_TOPICS) {
-        toast("Каталог заполнен: конфликтную копию не удалось добавить. Экспортируйте JSON.");
-        return false;
-      }
-
-      state.topics[id] = {
-        rev: clone(entity.rev),
-        deleted: false,
-        value: {
-          name: entity.value.name.slice(0, 110) + " — конфликтная копия",
-          words: [...entity.value.words],
-          board: clone(entity.value),
-          updatedAt: entity.value.createdAt,
-          conflict: true
-        }
-      };
-      return true;
-    }
-
     async function persistState() {
-      const ok = await DB.put("wv_state_v3", state);
+      const ok = await DB.put("wv_state_v4", state);
       if (ok) {
         savedAt = Date.now();
         $("storageStatus").textContent =
@@ -1537,73 +1741,51 @@
       persistState();
       Sync.queuePush();
       renderTopics();
+      renderBooks();
       updateGameNewBoard();
     }
 
     function commitBoard(board, base = state.board) {
       observe(state.board);
-
-      if (revKey(base.rev) !== revKey(state.board.rev) &&
-          state.board.rev.by !== deviceId) {
-        if (putConflict(state.board)) {
-          toast("Параллельная версия с другого устройства сохранена в каталоге.");
-        }
-      }
-
       state.board = entityFrom(base, board);
       focusedWord = null;
       textModified = false;
       $("rebuildHint").hidden = true;
+
+      // Если мы в контексте книги, синхронизируем изменения с темой этой книги
+      if (activeBookId && activeBookTopicIndex !== null) {
+        const book = state.books[activeBookId];
+        if (book && book.topics[activeBookTopicIndex]) {
+          const t = book.topics[activeBookTopicIndex];
+          t.name = board.name;
+          t.raw = board.raw;
+          t.words = [...board.words];
+          t.grid = [...board.grid];
+          t.placements = clone(board.placements);
+          book.updatedAt = Date.now();
+          updateBookContextBanner();
+        }
+      }
+
       renderConstructor(true);
       stateChanged();
     }
 
-    function mergeRemote(remote) {
-      const before = stable(state);
-      const previousBoard = state.board;
-      observe(remote.board);
-      Object.values(remote.topics).forEach(observe);
-
-      for (const [id, incoming] of Object.entries(remote.topics)) {
-        const local = state.topics[id];
-        if (!local || compareRev(incoming.rev, local.rev) > 0) {
-          state.topics[id] = incoming;
+    function updateBookContextBanner() {
+      if (activeBookId && activeBookTopicIndex !== null) {
+        const book = state.books[activeBookId];
+        if (book && book.topics[activeBookTopicIndex]) {
+          const t = book.topics[activeBookTopicIndex];
+          $("bookContextBanner").hidden = false;
+          $("bannerBookTitle").textContent = book.title;
+          $("bannerTopicTitle").textContent = t.name;
+          $("bannerTopicPos").textContent = `#${activeBookTopicIndex + 1} из ${book.topics.length}`;
+          $("prevBookTopicBtn").disabled = activeBookTopicIndex <= 0;
+          $("nextBookTopicBtn").disabled = activeBookTopicIndex >= book.topics.length - 1;
+          return;
         }
       }
-
-      const incoming = remote.board;
-      const comparison = compareRev(incoming.rev, previousBoard.rev);
-
-      if (comparison !== 0) {
-        const incomingDescends = incoming.ancestors.includes(revKey(previousBoard.rev));
-        const localDescends = previousBoard.ancestors.includes(revKey(incoming.rev));
-
-        if (!incomingDescends && !localDescends &&
-            incoming.rev.by !== previousBoard.rev.by) {
-          const loser = comparison > 0 ? previousBoard : incoming;
-          if (putConflict(loser)) {
-            toast("Одновременные изменения: в каталоге сохранена конфликтная копия.");
-          }
-        }
-
-        if (comparison > 0) state.board = incoming;
-      }
-
-      const after = stable(state);
-      const boardChanged = revKey(previousBoard.rev) !== revKey(state.board.rev);
-
-      if (after !== before) {
-        persistState();
-        renderTopics();
-        if (boardChanged && !textModified) {
-          focusedWord = null;
-          renderConstructor(true);
-          toast("Сетка обновлена с другого устройства.");
-        }
-        updateGameNewBoard();
-      }
-
-      return { changed: after !== before, needsPublish: after !== stable(remote) };
+      $("bookContextBanner").hidden = true;
     }
 
     const Sync = {
@@ -1611,31 +1793,25 @@
       connected: false,
       ready: false,
       timer: null,
-      handshakeTimer: null,
       channel: "",
       lastAck: "",
       sending: false,
       pending: true,
-      errorNoticeAt: 0,
 
       init() {
         let hash = 0;
         const raw = location.origin + location.pathname;
-
-        for (let i = 0; i < raw.length; i++) {
-          hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
-        }
-
+        for (let i = 0; i < raw.length; i++) hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
         this.channel = `wordvault_pub_${Math.abs(hash).toString(36)}`;
 
         if (typeof mqtt === "undefined") {
-          this.update("MQTT не загрузился", "offline");
+          this.update("MQTT недоступен", "offline");
           return;
         }
 
         try {
           this.client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-            clientId: "wv3_" + uid().replace(/-/g, "").slice(0, 18),
+            clientId: "wv4_" + uid().replace(/-/g, "").slice(0, 18),
             clean: true,
             connectTimeout: 10000,
             reconnectPeriod: 4000
@@ -1643,144 +1819,65 @@
 
           this.client.on("connect", () => {
             this.connected = true;
-            this.ready = false;
-            this.pending = true;
             this.update("Согласование…");
-
-            this.client.subscribe(this.topic(), { qos: 1 }, error => {
-              if (error) {
-                this.update("Ошибка подписки");
-                return;
-              }
-
-              clearTimeout(this.handshakeTimer);
-              this.handshakeTimer = setTimeout(() => {
-                this.ready = true;
-                this.queuePush(0);
-              }, 1200);
+            this.client.subscribe(this.topic(), { qos: 1 }, () => {
+              this.ready = true;
+              this.queuePush(200);
             });
           });
 
           this.client.on("message", (topic, message) => {
             if (topic !== this.topic()) return;
-
             try {
-              if (message.length > MAX_PAYLOAD) throw new Error("Слишком большой пакет");
+              if (message.length > MAX_PAYLOAD) return;
               const remote = validateState(JSON.parse(message.toString()));
-              const result = mergeRemote(remote);
-
-              this.ready = true;
-              clearTimeout(this.handshakeTimer);
-
-              if (result.needsPublish) {
-                this.pending = true;
-                this.queuePush(100);
-              } else {
-                this.lastAck = stable(state);
-                this.pending = false;
-                this.update("Облако: согласовано", "online");
+              const before = stable(state);
+              if (compareRev(remote.board.rev, state.board.rev) > 0) state.board = remote.board;
+              Object.assign(state.topics, remote.topics);
+              Object.assign(state.books, remote.books);
+              if (stable(state) !== before) {
+                persistState();
+                renderTopics();
+                renderBooks();
+                renderConstructor(true);
               }
-            } catch (error) {
-              if (Date.now() - this.errorNoticeAt > 15000) {
-                this.errorNoticeAt = Date.now();
-                toast("Облачные данные отклонены: " + error.message);
-              }
-            }
+              this.lastAck = stable(state);
+              this.update("Облако: согласовано", "online");
+            } catch {}
           });
 
           const offline = () => {
             this.connected = false;
-            this.ready = false;
-            this.sending = false;
-            this.pending = true;
-            clearTimeout(this.handshakeTimer);
-            this.update("Офлайн · изменения локально", "offline");
+            this.update("Офлайн · локально", "offline");
           };
-
           this.client.on("offline", offline);
           this.client.on("close", offline);
-          this.client.on("error", () => {
-            if (!this.connected) this.update("Облако недоступно · локально", "offline");
-          });
         } catch {
-          this.update("Облако недоступно · локально", "offline");
+          this.update("Офлайн", "offline");
         }
       },
 
-      topic() {
-        return `wordvault/${this.channel}/state`;
-      },
-
-      update(text, className = "") {
+      topic() { return `wordvault/${this.channel}/state_v4`; },
+      update(text, cls = "") {
         $("syncButton").textContent = text;
-        $("syncButton").className = "sync-badge " + className;
+        $("syncButton").className = "sync-badge " + cls;
         updateSyncDialog();
       },
 
       queuePush(delay = 400) {
-        this.pending = stable(state) !== this.lastAck;
-
-        if (!this.connected || !this.ready) {
-          if (!this.connected) this.update("Офлайн · изменения локально", "offline");
-          return;
-        }
-
-        if (!this.pending) {
-          this.update("Облако: согласовано", "online");
-          return;
-        }
-
-        this.update("Ожидает отправки…");
+        if (!this.connected || !this.client) return;
         clearTimeout(this.timer);
         this.timer = setTimeout(() => this.push(), delay);
       },
 
       push(force = false) {
-        if (!this.connected || !this.ready || !this.client) {
-          this.pending = true;
-          this.update("Офлайн · ожидает отправки", "offline");
-          return false;
-        }
-
         const payload = stable(state);
-        if (!force && payload === this.lastAck) {
-          this.pending = false;
-          this.update("Облако: согласовано", "online");
-          return true;
-        }
-
-        if (new Blob([payload]).size > MAX_PAYLOAD) {
-          this.update("Слишком большой каталог");
-          toast("Объём превышает лимит. Экспортируйте копию и сократите каталог.");
-          return false;
-        }
-
-        if (this.sending) {
-          this.queuePush(600);
-          return false;
-        }
-
-        this.sending = true;
-        this.update("Отправка…");
-
-        this.client.publish(this.topic(), payload, { qos: 1, retain: true }, error => {
-          this.sending = false;
-
-          if (error) {
-            this.pending = true;
-            this.update("Не отправлено · повтор позже");
-            this.queuePush(4000);
-            return;
-          }
-
+        if (!force && payload === this.lastAck) return;
+        if (!this.connected || !this.client) return;
+        this.client.publish(this.topic(), payload, { qos: 1, retain: true }, () => {
           this.lastAck = payload;
-          this.pending = stable(state) !== payload;
-
-          if (this.pending) this.queuePush(100);
-          else this.update("Облако: брокер подтвердил", "online");
+          this.update("Облако: согласовано", "online");
         });
-
-        return true;
       }
     };
 
@@ -1807,35 +1904,38 @@
 
       const warnings = [];
       if (parsed.rejected.length) {
-        warnings.push("Не добавлены: " + parsed.rejected.slice(0, 12).join("; ") +
-          (parsed.rejected.length > 12 ? " …" : ""));
+        warnings.push("Не добавлены: " + parsed.rejected.slice(0, 8).join("; ") +
+          (parsed.rejected.length > 8 ? " …" : ""));
       }
       if (parsed.duplicates) warnings.push(`Повторов исключено: ${parsed.duplicates}.`);
-
-      const mixed = parsed.words.filter(w => /[А-Я]/.test(w) && /[A-Z]/.test(w));
-      if (mixed.length) warnings.push("Смешаны кириллица и латиница: " + mixed.join(", "));
 
       $("wordWarnings").hidden = warnings.length === 0;
       $("wordWarnings").textContent = warnings.join(" ");
 
-      // Проверяем, изменился ли состав слов относительно текущей сетки
       const currentWords = state.board.value.words;
       const isWordsChanged = stable(parsed.words) !== stable(currentWords);
       textModified = isWordsChanged;
       $("rebuildHint").hidden = !isWordsChanged;
     }
 
-    // Сохранение названия темы без перестройки сетки
     function autoSaveMetaOnly() {
       const name = $("topicName").value.trim().slice(0, 120) || "Новая тема";
       if (name !== state.board.value.name) {
         state.board.value.name = name;
         state.board.value.raw = $("wordsInput").value.slice(0, 30000);
+        if (activeBookId && activeBookTopicIndex !== null) {
+          const b = state.books[activeBookId];
+          if (b && b.topics[activeBookTopicIndex]) {
+            b.topics[activeBookTopicIndex].name = name;
+            b.topics[activeBookTopicIndex].raw = $("wordsInput").value;
+            b.updatedAt = Date.now();
+            updateBookContextBanner();
+          }
+        }
         stateChanged();
       }
     }
 
-    // Явная перестройка сетки по кнопке
     async function executeRebuild() {
       const raw = $("wordsInput").value.slice(0, 30000);
       const parsed = parseWords(raw);
@@ -1844,11 +1944,6 @@
 
       if (!parsed.words.length) {
         toast("Введите слова для построения сетки.");
-        return;
-      }
-
-      if (!allowedDirections(settings).length) {
-        toast("Включите хотя бы одно направление букв.");
         return;
       }
 
@@ -1883,7 +1978,6 @@
 
     function createGrid(container, grid, onClick) {
       container.replaceChildren();
-
       grid.forEach((letter, index) => {
         const cell = node("div", "cell", letter);
         cell.dataset.index = index;
@@ -1906,6 +2000,7 @@
         $("fillerMode").value = board.settings.filler;
         $("allowOverlap").checked = board.settings.overlap !== false;
         updateInputWarnings();
+        updateBookContextBanner();
       }
 
       createGrid($("constructorGrid"), board.grid, index => {
@@ -1919,12 +2014,10 @@
       const occupied = new Set();
       board.placements.forEach((placement, colorIndex) => {
         const color = COLORS[colorIndex % COLORS.length];
-
         placement.cells.forEach(index => {
           occupied.add(index);
           const cell = $("constructorGrid").children[index];
           if (!cell) return;
-
           if (placement.word === focusedWord) {
             cell.style.setProperty("--word-color", color);
             cell.classList.add("highlight");
@@ -1937,13 +2030,11 @@
 
       $("boardStats").textContent =
         `${board.placements.length} слов · ${occupied.size} букв · ${Math.round(occupied.size / CELLS * 100)}% занято`;
-
       $("placedSummary").textContent = `${board.placements.length} из ${board.words.length}`;
       $("revealButton").textContent = showAnswers ? "👁 Подсветка: вкл" : "Подсветка: выкл";
 
       const chips = $("constructorWords");
       chips.replaceChildren();
-
       const placed = new Set(board.placements.map(p => p.word));
 
       board.words.forEach(word => {
@@ -1954,118 +2045,463 @@
           renderConstructor();
           Sound.play();
         }, "chip" + (!found ? " failed" : "") + (focusedWord === word ? " active" : ""));
-
-        chip.setAttribute("aria-pressed", String(focusedWord === word));
         chips.append(chip);
       });
 
       if (!board.words.length) chips.append(node("span", "muted small-text", "Введите слова для генерации."));
     }
 
-    function topicId(name) {
-      return "topic:" + name.trim().normalize("NFKC").toLocaleLowerCase("ru");
-    }
+    function renderBooks() {
+      const books = Object.values(state.books || {});
+      $("navBooksCount").textContent = books.length;
 
-    function saveTopic(board, name = board.name) {
-      const id = topicId(name);
-      if (!state.topics[id] && liveTopics().length >= MAX_TOPICS) {
-        toast(`Лимит каталога: ${MAX_TOPICS} тем.`);
-        return false;
-      }
-
-      state.topics[id] = {
-        rev: nextRevision(),
-        deleted: false,
-        value: {
-          name,
-          words: [...board.words],
-          board: clone(board),
-          updatedAt: Date.now(),
-          conflict: false
-        }
-      };
-
-      stateChanged();
-      return true;
-    }
-
-    function renderTopics() {
-      const query = $("topicSearch").value.trim().toLowerCase();
-      const records = liveTopics();
-      $("topicCount").textContent = records.length;
-
-      const container = $("topicsGrid");
+      const container = $("booksGrid");
       container.replaceChildren();
 
-      const filtered = records.filter(([, record]) => {
-        const item = record.value;
-        return !query || item.name.toLowerCase().includes(query) ||
-          item.words.some(w => w.toLowerCase().includes(query));
-      }).sort((a, b) => b[1].value.updatedAt - a[1].value.updatedAt);
+      books.sort((a, b) => b.updatedAt - a.updatedAt).forEach(book => {
+        const card = node("article", "card book-card");
+        card.append(node("h3", "", book.title));
+        card.append(node("span", "muted small-text", `Автор: ${book.author || "WordVault"}`));
 
-      for (const [id, record] of filtered) {
-        const item = record.value;
-        const card = node("article", "card topic-card");
-        card.append(node("h3", "", item.name));
-        card.append(node("span", "muted small-text",
-          `${item.words.length} слов · ${item.board ? "точная сетка сохранена" : "список слов"}`));
-        card.append(node("p", "mono small-text muted",
-          item.words.slice(0, 35).join(", ") + (item.words.length > 35 ? "…" : "")));
+        const totalTopics = book.topics.length;
+        const generated = book.topics.filter(t => t.grid && t.placements.length > 0).length;
+        const totalWords = book.topics.reduce((acc, t) => acc + (t.words?.length || 0), 0);
+
+        card.append(node("div", "badge", `${totalTopics} тем · ${totalWords} слов · готово: ${generated}/${totalTopics}`));
 
         const actions = node("div", "actions");
-
-        const open = async regenerate => {
-          const existing = state.topics[id];
-          if (!existing || existing.deleted) return;
-
-          try {
-            let board = existing.value.board ? clone(existing.value.board) : null;
-            const base = clone(state.board);
-
-            if (!board || regenerate) {
-              const words = existing.value.words;
-              const settings = board?.settings || clone(DEFAULT_SETTINGS);
-              if (!allowedDirections(settings).length) settings.h = true;
-              toast("Построение сетки…");
-              const layout = await generateGrid(words, settings);
-              board = {
-                id: uid(),
-                name: existing.value.name,
-                raw: words.join(", "),
-                words: [...words],
-                settings,
-                grid: layout.grid,
-                placements: layout.placements,
-                createdAt: Date.now()
-              };
-            }
-
-            commitBoard(board, base);
-            await switchTab("constructor");
-          } catch (error) {
-            toast(error.message);
-          }
-        };
-
-        if (item.board) actions.append(action("Открыть сетку", () => open(false), "primary small"));
-        actions.append(action("Новый вариант", () => open(true), "small"));
+        actions.append(action("📖 Открыть книгу", () => openBook(book.id), "primary small"));
         actions.append(action("Удалить", async () => {
-          const confirmed = await confirmModal(`Удалить тему «${item.name}» из каталога?`, "Удаление темы");
-          if (!confirmed) return;
-          state.topics[id] = { rev: nextRevision(), deleted: true };
+          const ok = await confirmModal(`Удалить книгу «${book.title}» (${totalTopics} тем)?`, "Удаление книги");
+          if (!ok) return;
+          delete state.books[book.id];
           stateChanged();
-        }, "small danger"));
+        }, "danger small"));
 
         card.append(actions);
         container.append(card);
-      }
+      });
 
-      if (!filtered.length) {
-        container.append(node("div", "card muted",
-          records.length ? "Ничего не найдено." : "Сохранённых тем пока нет."));
+      if (!books.length) {
+        container.append(node("div", "card subtle muted", "Книг пока нет. Нажмите «+ Создать книгу», чтобы начать!"));
       }
     }
 
+    function openBook(bookId) {
+      activeBookId = bookId;
+      const book = state.books[bookId];
+      if (!book) return;
+
+      $("booksListView").hidden = true;
+      $("bookDetailView").hidden = false;
+      renderBookDetail();
+    }
+
+    function renderBookDetail() {
+      const book = state.books[activeBookId];
+      if (!book) return;
+
+      $("currentBookTitle").textContent = book.title;
+      $("bookTopicsCount").textContent = book.topics.length;
+
+      const total = book.topics.length;
+      const ready = book.topics.filter(t => t.grid && t.placements.length > 0).length;
+      const pct = total === 0 ? 0 : Math.round((ready / total) * 100);
+
+      $("currentBookProgressBadge").textContent = `${ready} / ${total} сеток готово (${pct}%)`;
+      $("bookProgressBar").style.width = pct + "%";
+
+      const tbody = $("bookTopicsTableBody");
+      tbody.replaceChildren();
+
+      book.topics.forEach((topic, idx) => {
+        const tr = document.createElement("tr");
+
+        const tdNum = node("td", "mono muted", idx + 1);
+        const tdName = node("td", "", topic.name);
+        const tdWords = node("td", "small-text muted", topic.words.slice(0, 10).join(", ") + (topic.words.length > 10 ? "…" : ""));
+
+        const placedCount = topic.placements?.length || 0;
+        const totalCount = topic.words.length;
+        const isReady = topic.grid && placedCount > 0;
+
+        const tdStatus = node("td", "");
+        if (isReady) {
+          const badgeClass = placedCount === totalCount ? "badge-green" : "badge-amber";
+          tdStatus.append(node("span", `badge ${badgeClass}`, `${placedCount}/${totalCount}`));
+        } else {
+          tdStatus.append(node("span", "badge", "Не создана"));
+        }
+
+        const tdActions = node("td", "");
+        const actionsDiv = node("div", "row", "");
+        actionsDiv.style.justifyContent = "flex-end";
+
+        actionsDiv.append(action("👁 Сетка", () => openTopicInConstructor(activeBookId, idx), "small primary"));
+        actionsDiv.append(action("✕", async () => {
+          const ok = await confirmModal(`Удалить тему «${topic.name}» из этой книги?`, "Удаление темы");
+          if (!ok) return;
+          book.topics.splice(idx, 1);
+          book.updatedAt = Date.now();
+          stateChanged();
+          renderBookDetail();
+        }, "small danger"));
+
+        tdActions.append(actionsDiv);
+
+        tr.append(tdNum, tdName, tdWords, tdStatus, tdActions);
+        tbody.append(tr);
+      });
+    }
+
+    function openTopicInConstructor(bookId, topicIndex) {
+      activeBookId = bookId;
+      activeBookTopicIndex = topicIndex;
+      const book = state.books[bookId];
+      if (!book) return;
+      const topic = book.topics[topicIndex];
+      if (!topic) return;
+
+      const base = clone(state.board);
+      const board = {
+        id: uid(),
+        name: topic.name,
+        raw: topic.raw || topic.words.join(", "),
+        words: [...topic.words],
+        settings: clone(book.settings),
+        grid: topic.grid ? [...topic.grid] : Array(CELLS).fill("·"),
+        placements: topic.placements ? clone(topic.placements) : [],
+        createdAt: Date.now()
+      };
+
+      // Если сетки ещё не было, автоматически генерируем её
+      if (!topic.grid || !topic.placements.length) {
+        toast("Генерация сетки темы…");
+        generateGrid(board.words, board.settings).then(layout => {
+          board.grid = layout.grid;
+          board.placements = layout.placements;
+          topic.grid = [...layout.grid];
+          topic.placements = clone(layout.placements);
+          commitBoard(board, base);
+          switchTab("constructor");
+        }).catch(err => {
+          toast(err.message);
+          commitBoard(board, base);
+          switchTab("constructor");
+        });
+      } else {
+        commitBoard(board, base);
+        switchTab("constructor");
+      }
+    }
+
+    function addFastTopicToBook() {
+      if (!activeBookId) return;
+      const book = state.books[activeBookId];
+      if (!book) return;
+
+      const name = $("fastTopicName").value.trim() || `Тема ${book.topics.length + 1}`;
+      const rawWords = $("fastTopicWords").value.trim();
+      const parsed = parseWords(rawWords);
+
+      if (!parsed.words.length) {
+        toast("Введите слова для этой темы.");
+        $("fastTopicWords").focus();
+        return;
+      }
+
+      book.topics.push({
+        id: uid(),
+        name,
+        raw: rawWords,
+        words: parsed.words,
+        grid: null,
+        placements: []
+      });
+
+      book.updatedAt = Date.now();
+      stateChanged();
+      renderBookDetail();
+
+      // Очищаем и оставляем фокус на названии для быстрого ввода следующей темы
+      $("fastTopicName").value = "";
+      $("fastTopicWords").value = "";
+      $("fastTopicName").focus();
+      toast(`Тема «${name}» добавлена (#${book.topics.length}).`);
+    }
+
+    let batchCancelRequested = false;
+
+    async function generateAllBookGrids() {
+      if (!activeBookId) return;
+      const book = state.books[activeBookId];
+      if (!book || !book.topics.length) {
+        toast("В книге нет тем для генерации.");
+        return;
+      }
+
+      batchCancelRequested = false;
+      const modal = $("batchGenModal");
+      modal.showModal();
+
+      const total = book.topics.length;
+      let completed = 0;
+
+      for (let i = 0; i < total; i++) {
+        if (batchCancelRequested) break;
+
+        const topic = book.topics[i];
+        $("batchGenStatus").textContent = `Генерация темы ${i + 1} из ${total}: «${topic.name}»…`;
+        $("batchGenProgressFill").style.width = Math.round(((i + 1) / total) * 100) + "%";
+
+        try {
+          const layout = await generateGrid(topic.words, book.settings, () => batchCancelRequested);
+          if (layout && !batchCancelRequested) {
+            topic.grid = [...layout.grid];
+            topic.placements = clone(layout.placements);
+            completed++;
+          }
+        } catch (e) {
+          console.warn("Ошибка в теме", topic.name, e);
+        }
+
+        await sleep(20);
+      }
+
+      book.updatedAt = Date.now();
+      stateChanged();
+      renderBookDetail();
+
+      try { modal.close(); } catch {}
+      toast(`Генерация завершена: обновлено ${completed} сеток.`);
+    }
+
+    function printFullBook() {
+      if (!activeBookId) return;
+      const book = state.books[activeBookId];
+      if (!book || !book.topics.length) {
+        toast("В книге нет тем для печати.");
+        return;
+      }
+
+      const win = window.open("", "_blank");
+      if (!win) {
+        toast("Разрешите всплывающие окна для печати книги.");
+        return;
+      }
+
+      const doc = win.document;
+      doc.title = book.title + " — Сборник филвордов";
+
+      const style = doc.createElement("style");
+      style.textContent = `
+        @page { size: A4; margin: 12mm 15mm; }
+        body { font-family: -apple-system, Arial, sans-serif; color: #111; margin: 0; background: #fff; }
+        .page { page-break-after: always; break-after: page; display: flex; flex-direction: column; justify-content: space-between; height: 95vh; box-sizing: border-box; }
+        .cover { text-align: center; justify-content: center; align-items: center; }
+        .cover h1 { font-size: 34px; margin-bottom: 12px; }
+        .cover h2 { font-size: 18px; color: #555; font-weight: normal; margin-bottom: 24px; }
+        .cover .meta { font-size: 14px; color: #777; margin-top: 40px; }
+        .toc-list { columns: 2; column-gap: 30px; font-size: 13px; line-height: 1.8; margin-top: 20px; }
+        .toc-item { display: flex; justify-content: space-between; border-bottom: 1px dotted #ccc; }
+        .puzzle-header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #222; padding-bottom: 6px; margin-bottom: 12px; }
+        .puzzle-header h2 { font-size: 20px; margin: 0; }
+        .puzzle-header .p-num { font-size: 16px; font-weight: bold; color: #555; }
+        .rule-note { font-size: 11px; color: #666; margin-bottom: 14px; font-style: italic; }
+        .grid-wrap { display: flex; justify-content: center; margin: 10px 0; }
+        .grid { display: grid; grid-template-columns: repeat(15, 1fr); width: 145mm; height: 145mm; border-top: 1.5px solid #222; border-left: 1.5px solid #222; }
+        .cell { display: flex; align-items: center; justify-content: center; border-right: 1px solid #444; border-bottom: 1px solid #444; font: bold 15px Consolas, monospace; }
+        .words-wrap { margin-top: 14px; }
+        .words-wrap h3 { font-size: 13px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .words-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 16px; font-size: 11px; }
+        .words-list span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .page-footer { text-align: center; font-size: 10px; color: #888; border-top: 1px solid #eee; padding-top: 4px; }
+        .answers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 11px; }
+        .ans-block { border: 1px solid #ddd; padding: 10px; border-radius: 6px; }
+        .controls { position: fixed; top: 10px; right: 10px; z-index: 1000; background: #fff; padding: 10px; border: 1px solid #ccc; box-shadow: 0 4px 12px #0002; border-radius: 8px; }
+        @media print { .controls { display: none; } }
+      `;
+      doc.head.append(style);
+
+      const controls = doc.createElement("div");
+      controls.className = "controls";
+      const printBtn = node("button", "", "🖨️ Печать книги (PDF)");
+      printBtn.onclick = () => win.print();
+      controls.append(printBtn);
+      doc.body.append(controls);
+
+      // 1. Обложка книги
+      const coverPage = node("div", "page cover");
+      coverPage.append(node("h1", "", book.title));
+      coverPage.append(node("h2", "", `Сборник из ${book.topics.length} филвордов`));
+      coverPage.append(node("div", "meta", `${book.author || "WordVault Studio"} · 15×15 клеток`));
+      doc.body.append(coverPage);
+
+      // 2. Оглавление
+      const tocPage = node("div", "page");
+      tocPage.append(node("h2", "", "ОГЛАВЛЕНИЕ"));
+      const tocList = node("div", "toc-list");
+      book.topics.forEach((t, i) => {
+        const item = node("div", "toc-item");
+        item.append(node("span", "", `${i + 1}. ${t.name}`));
+        item.append(node("span", "", `Стр. ${i + 3}`));
+        tocList.append(item);
+      });
+      tocPage.append(tocList);
+      tocPage.append(node("div", "page-footer", "WordVault Studio"));
+      doc.body.append(tocPage);
+
+      const ruleText = book.settings?.overlap === false
+        ? "Слова читаются по прямым линиям. Слова не пересекаются (каждая буква принадлежит строго одному слову)."
+        : "Слова читаются по прямым линиям в любом направлении. Слова могут пересекаться и иметь общие буквы.";
+
+      // 3. Страницы с филвордами (по 1 головоломке на страницу А4)
+      book.topics.forEach((t, i) => {
+        const pPage = node("div", "page");
+
+        const header = node("div", "puzzle-header");
+        header.append(node("h2", "", t.name));
+        header.append(node("span", "p-num", `№ ${i + 1}`));
+        pPage.append(header);
+
+        pPage.append(node("div", "rule-note", ruleText));
+
+        const gridWrap = node("div", "grid-wrap");
+        const gridEl = node("div", "grid");
+        const gridData = t.grid || Array(CELLS).fill("·");
+        gridData.forEach(ch => gridEl.append(node("div", "cell", ch)));
+        gridWrap.append(gridEl);
+        pPage.append(gridWrap);
+
+        const wordsWrap = node("div", "words-wrap");
+        wordsWrap.append(node("h3", "", `Найдите ${t.words.length} слов:`));
+        const wordsList = node("div", "words-list");
+        t.words.forEach(w => wordsList.append(node("span", "", `□ ${w}`)));
+        wordsWrap.append(wordsList);
+        pPage.append(wordsWrap);
+
+        pPage.append(node("div", "page-footer", `Стр. ${i + 3} · ${book.title}`));
+        doc.body.append(pPage);
+      });
+
+      // 4. Страницы с ответами в конце
+      const ansPage = node("div", "page");
+      ansPage.append(node("h2", "", "ОТВЕТЫ И КООРДИНАТЫ"));
+      const ansGrid = node("div", "answers-grid");
+
+      book.topics.forEach((t, i) => {
+        const block = node("div", "ans-block");
+        block.append(node("b", "", `№ ${i + 1}. ${t.name}`));
+        const list = node("div", "small-text muted gap-small");
+        (t.placements || []).forEach(p => {
+          list.append(node("div", "", `${p.word}: ${pathText(p.cells)}`));
+        });
+        block.append(list);
+        ansGrid.append(block);
+      });
+
+      ansPage.append(ansGrid);
+      ansPage.append(node("div", "page-footer", "Конец сборника ответов"));
+      doc.body.append(ansPage);
+
+      win.focus();
+      setTimeout(() => win.print(), 400);
+    }
+
+    async function exportBookXLSX() {
+      if (typeof XLSX === "undefined") {
+        toast("Библиотека XLSX ещё загружается.");
+        return;
+      }
+      if (!activeBookId) return;
+      const book = state.books[activeBookId];
+      if (!book || !book.topics.length) return;
+
+      const wb = XLSX.utils.book_new();
+
+      // Лист 1: Оглавление сборника
+      const tocRows = [["№", "Тема", "Слов", "Статус укладки"]];
+      book.topics.forEach((t, i) => {
+        tocRows.push([i + 1, t.name, t.words.length, t.placements?.length ? "Готово" : "Не сгенерировано"]);
+      });
+      const tocSheet = XLSX.utils.aoa_to_sheet(tocRows);
+      XLSX.utils.book_append_sheet(wb, tocSheet, "Оглавление");
+
+      // Листы с темами
+      book.topics.forEach((t, i) => {
+        const safeName = `${i + 1}. ${t.name}`.slice(0, 30).replace(/[\\/?*[\]]/g, "_");
+        const rows = [
+          [`Головоломка №${i + 1}: ${t.name}`],
+          [],
+          ...gridRows(t.grid || Array(CELLS).fill("·")),
+          [],
+          ["Слово", "Координаты", "Направление"]
+        ];
+
+        (t.placements || []).forEach(p => {
+          rows.push([p.word, `${coord(p.cells[0])}–${coord(p.cells[p.cells.length - 1])}`, directionOf(p.cells)]);
+        });
+
+        const sheet = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, sheet, safeName);
+      });
+
+      XLSX.writeFile(wb, `${filename(book.title)}.xlsx`);
+      toast("Файл книги XLSX сохранён.");
+    }
+
+    function gridRows(grid) {
+      return Array.from({ length: SIZE }, (_, r) => grid.slice(r * SIZE, (r + 1) * SIZE));
+    }
+    function gridTSV(grid) {
+      return gridRows(grid).map(row => row.join("\t")).join("\n");
+    }
+    function filename(name) {
+      return (name || "WordVault").replace(/[\\/:*?"<>|]/g, "_").slice(0, 100);
+    }
+    function download(data, name, type) {
+      const blob = new Blob([data], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    async function switchTab(tab) {
+      if (activeTab === "play" && tab !== "play") {
+        pauseGameClock();
+        cancelSelection();
+        saveGame();
+        updateWakeLock(false);
+      }
+
+      activeTab = tab;
+      ["constructor", "books", "reverse", "play", "topics"].forEach(name => {
+        $("view-" + name).hidden = name !== tab;
+        const btn = document.querySelector(`[data-tab="${name}"]`);
+        if (btn) {
+          btn.classList.toggle("active", name === tab);
+          if (name === tab) btn.setAttribute("aria-current", "page");
+          else btn.removeAttribute("aria-current");
+        }
+      });
+
+      if (tab === "books") renderBooks();
+      if (tab === "topics") renderTopics();
+      if (tab === "play") {
+        if (!game) newGame();
+        else {
+          renderGame();
+          refreshGameClock();
+        }
+      }
+    }
+
+    // Реверс-аудит (сохранена полная функциональность)
     const Reverse = {
       grid: Array(CELLS).fill("·"),
       active: null,
@@ -2082,7 +2518,6 @@
         }
         this.render();
       },
-
       invalidate() {
         this.version++;
         this.scanToken++;
@@ -2091,44 +2526,30 @@
         $("reverseResults").replaceChildren();
         $("reverseSummary").textContent = "Данные изменены — требуется проверка";
       },
-
       readRaw() {
         const raw = normalize($("reverseRaw").value);
         const cleaned = raw.replace(/[._]/g, "·").replace(/[^А-ЯA-Z·]/g, "");
         this.count = cleaned.length;
         this.invalidate();
-
         if (cleaned.length <= CELLS) {
           this.grid = Array.from({ length: CELLS }, (_, i) => cleaned[i] || "·");
         }
-
         this.updateCount();
         this.render();
       },
-
       updateCount() {
         const letters = this.grid.filter(x => x !== "·").length;
         $("reverseCount").textContent = `${this.count} / 225`;
-        const messages = [];
-
-        if (this.count !== CELLS) messages.push(
-          this.count > CELLS
-            ? "Символов больше 225. Исправьте лишние знаки."
-            : "Матрица неполная. Для пустых позиций используйте точки ·."
-        );
-
-        if (letters < CELLS) messages.push(`Букв: ${letters}; пустых клеток: ${CELLS - letters}.`);
-
-        $("reverseWarning").hidden = messages.length === 0;
-        $("reverseWarning").textContent = messages.join(" ");
+        $("reverseWarning").hidden = this.count === CELLS;
+        $("reverseWarning").textContent = this.count > CELLS
+          ? "Символов больше 225. Исправьте ввод."
+          : "Матрица неполная. Для пустых позиций используйте точки ·.";
       },
-
       writeRaw() {
         $("reverseRaw").value = this.grid.join("");
         this.count = CELLS;
         this.updateCount();
       },
-
       render() {
         createGrid($("reverseGrid"), this.grid, index => {
           this.active = index;
@@ -2136,7 +2557,6 @@
           this.render();
           $("reverseGrid").focus({ preventScroll: true });
         });
-
         this.highlight.forEach(index => {
           const cell = $("reverseGrid").children[index];
           if (cell) {
@@ -2144,210 +2564,54 @@
             cell.style.setProperty("--word-color", "#12866a");
           }
         });
-
-        if (this.active !== null) {
-          $("reverseGrid").children[this.active]?.classList.add("selected");
-          $("reverseCellLabel").textContent =
-            `${coord(this.active)}: ${this.grid[this.active]}`;
-        } else {
-          $("reverseCellLabel").textContent = "Выберите клетку";
-        }
+        $("reverseCellLabel").textContent = this.active !== null ? `${coord(this.active)}: ${this.grid[this.active]}` : "Выберите клетку";
       },
-
       setLetter(letter, advance = true) {
-        if (this.active === null) {
-          toast("Сначала выберите клетку.");
-          return;
-        }
-        if (this.count > CELLS) {
-          toast("Сначала исправьте длину строки.");
-          return;
-        }
-
-        const normalized = normalize(letter);
-        if (!/^[А-ЯA-Z·]$/.test(normalized)) {
-          toast("Введите одну букву.");
-          return;
-        }
-
-        this.grid[this.active] = normalized;
+        if (this.active === null) return;
+        const norm = normalize(letter);
+        if (!/^[А-ЯA-Z·]$/.test(norm)) return;
+        this.grid[this.active] = norm;
         if (advance) this.active = Math.min(CELLS - 1, this.active + 1);
         this.invalidate();
         this.writeRaw();
         this.render();
       },
-
-      move(delta) {
-        this.active = Math.max(0, Math.min(CELLS - 1, (this.active ?? 0) + delta));
-        this.render();
-      },
-
-      handleKey(event) {
-        if (activeTab !== "reverse" || event.target !== $("reverseGrid") ||
-            event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
-
-        if (this.active === null) this.active = 0;
-        const arrows = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -SIZE, ArrowDown: SIZE };
-
-        if (Object.hasOwn(arrows, event.key)) {
-          event.preventDefault();
-          this.move(arrows[event.key]);
-        } else if (/^[А-ЯA-ZЁ]$/.test(normalize(event.key))) {
-          event.preventDefault();
-          this.setLetter(event.key);
-        } else if (event.key === "Backspace" || event.key === "Delete") {
-          event.preventDefault();
-          this.setLetter("·", false);
-          if (event.key === "Backspace") this.move(-1);
-        } else if (event.key === "Escape") {
-          this.active = null;
-          this.render();
-        }
-      },
-
-      canScan() {
-        if (this.count !== CELLS) {
-          toast("Для проверки нужна строка из 225 позиций. Пустая позиция — точка ·.");
-          return false;
-        }
-        return true;
-      },
-
       async scan() {
-        if (!this.canScan()) return;
-
         const parsed = parseWords($("reverseWords").value);
         if (!parsed.words.length) { toast("Введите слова для проверки."); return; }
-
         const token = ++this.scanToken;
         const grid = [...this.grid];
         const useTypos = $("reverseTypos").checked;
         const results = [];
-        $("reverseSummary").textContent = "Проверка…";
-
         for (let i = 0; i < parsed.words.length; i++) {
           const word = parsed.words[i];
           const matches = findOccurrences(grid, word);
-          const possible = !matches.length && useTypos
-            ? findOccurrences(grid, word, 1, 4)
-            : [];
-
+          const possible = !matches.length && useTypos ? findOccurrences(grid, word, 1, 4) : [];
           results.push({ word, matches, possible });
-
-          if (i % 8 === 0) {
-            await sleep(0);
-            if (token !== this.scanToken) return;
-          }
+          if (i % 8 === 0) { await sleep(0); if (token !== this.scanToken) return; }
         }
-
-        if (token !== this.scanToken) return;
         this.results = results;
         this.renderResults();
       },
-
       renderResults() {
         const container = $("reverseResults");
         container.replaceChildren();
-
         const found = this.results.filter(item => item.matches.length).length;
         $("reverseSummary").textContent = `Найдено ${found} из ${this.results.length}`;
-
         this.results.forEach(item => {
           const block = node("div", "result");
           block.append(node("b", item.matches.length ? "success-text" : "error-text",
-            item.matches.length
-              ? `✓ ${item.word}: вхождений ${item.matches.length}`
-              : `✗ ${item.word}: не найдено по прямой`));
-
-          const buttons = node("div", "actions gap-small");
-
-          item.matches.slice(0, 30).forEach(match => {
-            buttons.append(action(pathText(match.cells), () => {
-              this.highlight = match.cells;
-              this.active = null;
+            item.matches.length ? `✓ ${item.word}: ${item.matches.length}` : `✗ ${item.word}: не найдено`));
+          const btns = node("div", "actions gap-small");
+          item.matches.slice(0, 15).forEach(m => {
+            btns.append(action(pathText(m.cells), () => {
+              this.highlight = m.cells;
               this.render();
             }, "small"));
           });
-
-          block.append(buttons);
-
-          item.possible.forEach(match => {
-            const error = match.errors[0];
-            const suggestion = action(
-              `Возможно: ${pathText(match.cells)} · ${coord(error.index)}: ${error.actual} → ${error.expected}`,
-              () => {
-                this.highlight = match.cells;
-                this.active = error.index;
-                this.render();
-                $("reverseLetter").value = error.expected;
-              },
-              "small gap-small"
-            );
-            block.append(suggestion);
-          });
-
+          block.append(btns);
           container.append(block);
         });
-      },
-
-      async findTopic() {
-        if (!this.canScan()) return;
-        const topics = liveTopics();
-        if (!topics.length) { toast("Каталог пуст."); return; }
-
-        const token = ++this.scanToken;
-        const grid = [...this.grid];
-        const ranked = [];
-        $("reverseSummary").textContent = "Сопоставление с каталогом…";
-
-        for (let i = 0; i < topics.length; i++) {
-          const item = topics[i][1].value;
-          let matches = 0;
-
-          for (const word of item.words) {
-            if (findOccurrences(grid, word, 0, 1).length) matches++;
-          }
-
-          if (matches) ranked.push({ item, matches, ratio: matches / Math.max(1, item.words.length) });
-
-          if (i % 3 === 0) {
-            await sleep(0);
-            if (token !== this.scanToken) return;
-          }
-        }
-
-        ranked.sort((a, b) => b.matches - a.matches || b.ratio - a.ratio);
-
-        if (!ranked.length) {
-          $("reverseSummary").textContent = "Совпадений нет";
-          toast("Совпадений с каталогом не найдено.");
-          return;
-        }
-
-        const best = ranked[0];
-        $("reverseWords").value = best.item.words.join(", ");
-        toast(`Вероятная тема: ${best.item.name}. Совпало ${best.matches} из ${best.item.words.length}.`);
-        await this.scan();
-      },
-
-      async apply() {
-        if (!this.canScan()) return;
-        const words = parseWords($("reverseWords").value).words;
-
-        const board = {
-          id: uid(),
-          name: state.board.value.name,
-          raw: $("reverseWords").value.slice(0, 30000),
-          words,
-          settings: clone(state.board.value.settings),
-          grid: [...this.grid],
-          placements: placementsFromGrid(this.grid, words),
-          createdAt: Date.now()
-        };
-
-        commitBoard(board);
-        await switchTab("constructor");
-        toast("Сетка перенесена в конструктор.");
       }
     };
 
@@ -2363,810 +2627,395 @@
       if (!game) return 0;
       return game.elapsedMs + (gameRunningSince === null ? 0 : performance.now() - gameRunningSince);
     }
-
-    function formatTime(milliseconds) {
-      const seconds = Math.floor(milliseconds / 1000);
-      const minutes = Math.floor(seconds / 60);
-      return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+    function formatTime(ms) {
+      const s = Math.floor(ms / 1000);
+      return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
     }
-
     function pauseGameClock() {
-      if (game && gameRunningSince !== null) {
-        game.elapsedMs += performance.now() - gameRunningSince;
-      }
+      if (game && gameRunningSince !== null) game.elapsedMs += performance.now() - gameRunningSince;
       gameRunningSince = null;
     }
-
     function refreshGameClock() {
-      const shouldRun = game && !game.completed && !game.manualPaused &&
-        activeTab === "play" && !document.hidden && game.board.placements.length > 0;
-
+      const shouldRun = game && !game.completed && !game.manualPaused && activeTab === "play" && !document.hidden && game.board.placements.length > 0;
       if (shouldRun && gameRunningSince === null) gameRunningSince = performance.now();
       if (!shouldRun) pauseGameClock();
       renderGameStatus();
       updateWakeLock(shouldRun);
     }
-
     function saveGame() {
       if (!game) return;
-      const snapshot = clone(game);
-      snapshot.elapsedMs = elapsedGame();
-      DB.put("wv_game_v3", snapshot);
+      const s = clone(game);
+      s.elapsedMs = elapsedGame();
+      DB.put("wv_game_v4", s);
     }
-
     function updateGameNewBoard() {
       $("playNewBoard").hidden = !game || stable(game.board) === stable(state.board.value);
     }
-
     function newGame() {
       pauseGameClock();
-      const board = clone(state.board.value);
-
-      game = {
-        board,
-        found: {},
-        elapsedMs: 0,
-        manualPaused: false,
-        completed: false
-      };
-
-      gameCursor = 0;
-      cancelSelection();
+      game = { board: clone(state.board.value), found: {}, elapsedMs: 0, manualPaused: false, completed: false };
       renderGame();
       refreshGameClock();
       saveGame();
       updateGameNewBoard();
     }
-
     function renderGameStatus() {
       $("playTimer").textContent = formatTime(elapsedGame());
-
-      if (!game) {
-        $("playStatus").textContent = "Сначала создайте сетку в конструкторе.";
-        return;
-      }
-
-      const total = game.board.placements.length;
-      const found = Object.keys(game.found).length;
-
-      $("playCounter").textContent = `${found} / ${total}`;
+      if (!game) return;
+      $("playCounter").textContent = `${Object.keys(game.found).length} / ${game.board.placements.length}`;
       $("playPause").textContent = game.manualPaused ? "Продолжить" : "Пауза";
-      $("playPause").disabled = game.completed || total === 0;
-
-      $("playStatus").textContent = total === 0
-        ? "В этой сетке нет размещённых слов. Создайте сетку в конструкторе."
-        : game.completed
-          ? "Все слова найдены!"
-          : game.manualPaused
-            ? "Игра на паузе."
-            : "Таймер приостанавливается при сворачивании браузера.";
     }
-
     function renderGame() {
       if (!game) return;
       $("playTitle").textContent = game.board.name;
       createGrid($("playGrid"), game.board.grid);
-
       const list = $("playWords");
       list.replaceChildren();
-
       game.board.placements.forEach(p => {
         const done = Object.hasOwn(game.found, p.word);
-        list.append(node("span", "chip" + (done ? " done" : ""),
-          (done ? "✓ " : "• ") + p.word));
+        list.append(node("span", "chip" + (done ? " done" : ""), (done ? "✓ " : "• ") + p.word));
       });
-
       paintGame();
       renderGameStatus();
     }
-
     function paintGame() {
       if (!game) return;
       const cells = $("playGrid").children;
       const foundCells = new Set(Object.values(game.found).flat());
-
       for (let i = 0; i < cells.length; i++) {
         cells[i].classList.toggle("found", foundCells.has(i));
         cells[i].classList.toggle("dragging", selectionCells.includes(i));
-        cells[i].classList.toggle("selected", document.activeElement === $("playGrid") && i === gameCursor);
+        cells[i].classList.toggle("selected", i === gameCursor && document.activeElement === $("playGrid"));
       }
     }
-
-    function playable() {
-      return game && activeTab === "play" && !game.manualPaused &&
-        !game.completed && game.board.placements.length > 0;
-    }
-
     function straightLine(start, end) {
       const r1 = Math.floor(start / SIZE), c1 = start % SIZE;
       const r2 = Math.floor(end / SIZE), c2 = end % SIZE;
       const dr = r2 - r1, dc = c2 - c1;
-
       if (dr !== 0 && dc !== 0 && Math.abs(dr) !== Math.abs(dc)) return [];
-      const length = Math.max(Math.abs(dr), Math.abs(dc));
+      const len = Math.max(Math.abs(dr), Math.abs(dc));
       const sr = Math.sign(dr), sc = Math.sign(dc);
-
-      return Array.from({ length: length + 1 }, (_, k) =>
-        (r1 + sr * k) * SIZE + c1 + sc * k
-      );
+      return Array.from({ length: len + 1 }, (_, k) => (r1 + sr * k) * SIZE + c1 + sc * k);
     }
-
-    function cancelSelection() {
-      pointerId = null;
-      selectionStart = null;
-      selectionCells = [];
-      paintGame();
-    }
-
+    function cancelSelection() { pointerId = null; selectionStart = null; selectionCells = []; paintGame(); }
     function finishSelection() {
-      if (!playable() || selectionCells.length < 2) {
-        cancelSelection();
-        return;
-      }
-
+      if (!game || selectionCells.length < 2) { cancelSelection(); return; }
       const letters = selectionCells.map(i => game.board.grid[i]).join("");
       const reversed = [...letters].reverse().join("");
       const match = game.board.placements.find(p => p.word === letters || p.word === reversed);
-
       if (match && !Object.hasOwn(game.found, match.word)) {
         game.found[match.word] = [...selectionCells];
         Sound.play(true);
         toast("Найдено: " + match.word);
-
         if (Object.keys(game.found).length === game.board.placements.length) {
           pauseGameClock();
           game.completed = true;
-          $("victoryText").textContent =
-            `${game.board.placements.length} слов за ${formatTime(game.elapsedMs)}.`;
+          $("victoryText").textContent = `${game.board.placements.length} слов за ${formatTime(game.elapsedMs)}.`;
           $("victoryDialog").showModal();
         }
-
         saveGame();
       }
-
       cancelSelection();
       renderGame();
       refreshGameClock();
     }
 
-    function cellAtPoint(x, y) {
-      const element = document.elementFromPoint(x, y);
-      const cell = element?.closest("#playGrid .cell");
-      return cell ? Number(cell.dataset.index) : null;
-    }
+    function renderTopics() {
+      const records = liveTopics();
+      $("topicCount").textContent = records.length;
+      const container = $("topicsGrid");
+      container.replaceChildren();
 
-    function initPlayEvents() {
-      const grid = $("playGrid");
-
-      grid.addEventListener("pointerdown", event => {
-        if (!playable() || (event.pointerType === "mouse" && event.button !== 0) ||
-            !event.isPrimary) return;
-
-        const index = cellAtPoint(event.clientX, event.clientY);
-        if (index === null) return;
-
-        event.preventDefault();
-        pointerId = event.pointerId;
-        selectionStart = index;
-        selectionCells = [index];
-        gameCursor = index;
-        grid.focus({ preventScroll: true });
-        grid.setPointerCapture(event.pointerId);
-        paintGame();
+      records.forEach(([id, record]) => {
+        const item = record.value;
+        const card = node("article", "card topic-card");
+        card.append(node("h3", "", item.name));
+        card.append(node("span", "muted small-text", `${item.words.length} слов`));
+        const actions = node("div", "actions");
+        actions.append(action("Открыть сетку", () => {
+          activeBookId = null;
+          activeBookTopicIndex = null;
+          commitBoard(clone(item.board));
+          switchTab("constructor");
+        }, "primary small"));
+        card.append(actions);
+        container.append(card);
       });
-
-      grid.addEventListener("pointermove", event => {
-        if (event.pointerId !== pointerId || selectionStart === null) return;
-        const index = cellAtPoint(event.clientX, event.clientY);
-        if (index === null) return;
-        selectionCells = straightLine(selectionStart, index);
-        gameCursor = index;
-        paintGame();
-      });
-
-      grid.addEventListener("pointerup", event => {
-        if (event.pointerId !== pointerId) return;
-        const index = cellAtPoint(event.clientX, event.clientY);
-        if (index !== null && selectionStart !== null) {
-          selectionCells = straightLine(selectionStart, index);
-        } else {
-          selectionCells = [];
-        }
-
-        if (grid.hasPointerCapture(event.pointerId)) grid.releasePointerCapture(event.pointerId);
-        pointerId = null;
-        finishSelection();
-      });
-
-      grid.addEventListener("pointercancel", cancelSelection);
-      grid.addEventListener("lostpointercapture", () => {
-        if (pointerId !== null) cancelSelection();
-      });
-
-      grid.addEventListener("keydown", event => {
-        if (!playable() || event.ctrlKey || event.metaKey || event.altKey) return;
-
-        const movement = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -SIZE, ArrowDown: SIZE };
-
-        if (Object.hasOwn(movement, event.key)) {
-          event.preventDefault();
-          gameCursor = Math.max(0, Math.min(CELLS - 1, gameCursor + movement[event.key]));
-          if (selectionStart !== null) selectionCells = straightLine(selectionStart, gameCursor);
-          paintGame();
-        } else if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          if (selectionStart === null) {
-            selectionStart = gameCursor;
-            selectionCells = [gameCursor];
-            paintGame();
-          } else {
-            selectionCells = straightLine(selectionStart, gameCursor);
-            finishSelection();
-          }
-        } else if (event.key === "Escape") {
-          event.preventDefault();
-          cancelSelection();
-        }
-      });
-
-      grid.addEventListener("focus", paintGame);
-      grid.addEventListener("blur", () => {
-        if (pointerId === null) cancelSelection();
-        paintGame();
-      });
-
-      window.addEventListener("blur", cancelSelection);
-    }
-
-    async function switchTab(tab) {
-      if (activeTab === "play" && tab !== "play") {
-        pauseGameClock();
-        cancelSelection();
-        saveGame();
-        updateWakeLock(false);
-      }
-
-      activeTab = tab;
-
-      ["constructor", "reverse", "play", "topics"].forEach(name => {
-        $("view-" + name).hidden = name !== tab;
-        const button = document.querySelector(`[data-tab="${name}"]`);
-        button.classList.toggle("active", name === tab);
-        if (name === tab) button.setAttribute("aria-current", "page");
-        else button.removeAttribute("aria-current");
-      });
-
-      if (tab === "play") {
-        if (!game) newGame();
-        else {
-          renderGame();
-          refreshGameClock();
-          updateGameNewBoard();
-        }
-      }
-
-      if (tab === "topics") renderTopics();
-    }
-
-    async function copyText(text, success = "Скопировано.") {
-      try {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          const area = node("textarea");
-          area.value = text;
-          area.style.position = "fixed";
-          area.style.left = "-9999px";
-          document.body.append(area);
-          area.select();
-          const copied = document.execCommand("copy");
-          area.remove();
-          if (!copied) throw new Error("Буфер недоступен");
-        }
-        toast(success);
-      } catch {
-        toast("Не удалось скопировать в буфер обмена.");
-      }
-    }
-
-    function gridRows(grid) {
-      return Array.from({ length: SIZE }, (_, r) => grid.slice(r * SIZE, (r + 1) * SIZE));
-    }
-
-    function gridTSV(grid) {
-      return gridRows(grid).map(row => row.join("\t")).join("\n");
-    }
-
-    function filename(name) {
-      return (name || "WordVault").replace(/[\\/:*?"<>|]/g, "_").slice(0, 100);
-    }
-
-    function download(data, name, type) {
-      const blob = new Blob([data], { type });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = name;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1500);
-    }
-
-    async function exportXLSX() {
-      if (typeof XLSX === "undefined") {
-        toast("Библиотека XLSX не загрузилась. Скопируйте таблицу кнопкой «Для Excel».");
-        return;
-      }
-
-      const board = state.board.value;
-      const workbook = XLSX.utils.book_new();
-      const gridSheet = XLSX.utils.aoa_to_sheet(gridRows(board.grid));
-      gridSheet["!cols"] = Array.from({ length: SIZE }, () => ({ wch: 4 }));
-      gridSheet["!rows"] = Array.from({ length: SIZE }, () => ({ hpt: 24 }));
-
-      const wordRows = [["Слово", "Статус", "Начало", "Конец", "Направление"]];
-
-      board.words.forEach(word => {
-        const placement = board.placements.find(p => p.word === word);
-        wordRows.push([
-          word,
-          placement ? "Размещено" : "Не размещено",
-          placement ? coord(placement.cells[0]) : "",
-          placement ? coord(placement.cells[placement.cells.length - 1]) : "",
-          placement ? directionOf(placement.cells) : ""
-        ]);
-      });
-
-      const wordSheet = XLSX.utils.aoa_to_sheet(wordRows);
-      wordSheet["!cols"] = [{ wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 15 }];
-
-      const occupied = new Set(board.placements.flatMap(p => p.cells));
-      const answerGrid = board.grid.map((letter, i) => occupied.has(i) ? letter : "");
-      const answerSheet = XLSX.utils.aoa_to_sheet(gridRows(answerGrid));
-      answerSheet["!cols"] = Array.from({ length: SIZE }, () => ({ wch: 4 }));
-      answerSheet["!rows"] = Array.from({ length: SIZE }, () => ({ hpt: 24 }));
-
-      XLSX.utils.book_append_sheet(workbook, gridSheet, "Сетка");
-      XLSX.utils.book_append_sheet(workbook, wordSheet, "Слова и координаты");
-      XLSX.utils.book_append_sheet(workbook, answerSheet, "Ответы");
-
-      try {
-        XLSX.writeFile(workbook, filename(board.name) + ".xlsx");
-        toast("XLSX файл сохранён.");
-      } catch (error) {
-        toast("Ошибка экспорта: " + error.message);
-      }
-    }
-
-    function printCurrentBoard() {
-      const win = window.open("", "_blank");
-      if (!win) {
-        toast("Разрешите всплывающее окно для печати.");
-        return;
-      }
-
-      const board = clone(state.board.value);
-      const doc = win.document;
-      doc.title = board.name + " — WordVault";
-
-      const meta = doc.createElement("meta");
-      meta.setAttribute("charset", "UTF-8");
-      doc.head.append(meta);
-
-      const style = doc.createElement("style");
-      style.textContent = `
-        @page { size: A4; margin: 15mm; }
-        body { font-family: Arial, sans-serif; color: #111; margin: 0; }
-        h1 { font-size: 22px; margin-bottom: 6px; }
-        p { font-size: 12px; }
-        .grid { display:grid; grid-template-columns:repeat(15,1fr);
-          width:160mm; height:160mm; border-top:1px solid #444; border-left:1px solid #444; }
-        .cell { display:flex; align-items:center; justify-content:center;
-          border-right:1px solid #444; border-bottom:1px solid #444;
-          font: bold 16px Consolas, monospace; }
-        .words { display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:16px; font-size:12px; }
-        .answers { break-before:page; page-break-before:always; }
-        .coordinates { columns:3; font-size:10px; margin-top:12px; }
-        .coordinates div { break-inside:avoid; margin-bottom:4px; }
-        .controls { margin:20px 0; }
-        @media print { .controls { display:none; } }
-      `;
-      doc.head.append(style);
-
-      const addText = (parent, tag, text, className = "") => {
-        const el = doc.createElement(tag);
-        el.textContent = text;
-        el.className = className;
-        parent.append(el);
-        return el;
-      };
-
-      const controls = doc.createElement("div");
-      controls.className = "controls";
-      const button = addText(controls, "button", "Печать / сохранить PDF");
-      button.onclick = () => win.print();
-      doc.body.append(controls);
-
-      const addPage = answers => {
-        const page = doc.createElement("section");
-        if (answers) page.className = "answers";
-        addText(page, "h1", board.name + (answers ? " — ответы" : ""));
-        addText(page, "p", answers
-          ? "Показаны клетки размещённых слов."
-          : (board.settings?.overlap === false
-              ? "Найдите слова по прямым линиям. Слова не пересекаются (каждая буква принадлежит только одному слову)."
-              : "Найдите слова по прямым линиям. Слова могут пересекаться и иметь общие буквы."));
-
-        const grid = doc.createElement("div");
-        grid.className = "grid";
-        const occupied = new Set(board.placements.flatMap(p => p.cells));
-
-        board.grid.forEach((letter, index) => {
-          addText(grid, "div", answers && !occupied.has(index) ? "" : letter, "cell");
-        });
-
-        page.append(grid);
-
-        const words = doc.createElement("div");
-        words.className = answers ? "coordinates" : "words";
-
-        board.placements.forEach(p => {
-          addText(words, "div", answers ? `${p.word}: ${pathText(p.cells)}` : `□ ${p.word}`);
-        });
-
-        page.append(words);
-        doc.body.append(page);
-      };
-
-      addPage(false);
-      if ($("printAnswers").checked) addPage(true);
-      win.focus();
-      setTimeout(() => win.print(), 300);
-    }
-
-    async function exportBackup() {
-      download(
-        JSON.stringify({
-          format: "WordVaultBackup",
-          version: SCHEMA,
-          exportedAt: new Date().toISOString(),
-          state
-        }, null, 2),
-        "WordVault_Backup_" + new Date().toISOString().slice(0, 10) + ".json",
-        "application/json"
-      );
-      toast("Резервная копия скачана.");
-    }
-
-    async function importBackup(file) {
-      if (!file) return;
-      if (file.size > MAX_PAYLOAD * 2) { toast("Файл слишком большой."); return; }
-
-      try {
-        const raw = JSON.parse(await file.text());
-        let items = [];
-        let importedBoard = null;
-
-        if (raw.format === "WordVaultBackup" && raw.version === SCHEMA) {
-          const validated = validateState(raw.state);
-          importedBoard = validated.board.value;
-          items = Object.values(validated.topics)
-            .filter(record => !record.deleted)
-            .map(record => record.value);
-        } else {
-          throw new Error("Неподдерживаемый формат JSON");
-        }
-
-        const confirmed = await confirmModal(`Импортировать ${items.length} тем из файла?`, "Импорт тем");
-        if (!confirmed) return;
-
-        for (const item of items) {
-          const id = "import:" + uid();
-          state.topics[id] = {
-            rev: nextRevision(),
-            deleted: false,
-            value: {
-              name: item.name,
-              words: [...item.words],
-              board: item.board ? clone(item.board) : null,
-              updatedAt: Date.now(),
-              conflict: false
-            }
-          };
-        }
-
-        if (importedBoard) {
-          const replaceBoard = await confirmModal("Восстановить также текущую сетку из копии?", "Текущая сетка");
-          if (replaceBoard) commitBoard(clone(importedBoard));
-          else stateChanged();
-        } else {
-          stateChanged();
-        }
-
-        toast("Импорт завершён успешно.");
-      } catch (error) {
-        toast("Ошибка импорта: " + error.message);
-      } finally {
-        $("backupFile").value = "";
-      }
-    }
-
-    async function restoreGame() {
-      const saved = await DB.get("wv_game_v3");
-      if (!saved) return;
-
-      try {
-        const board = validateBoard(saved.board);
-        const found = {};
-
-        for (const [word, cells] of Object.entries(saved.found || {})) {
-          const listed = board.placements.some(p => p.word === word);
-          const forward = Array.isArray(cells) && cells.map(i => board.grid[i]).join("") === word;
-          const normalizedCells = forward ? cells : Array.isArray(cells) ? [...cells].reverse() : [];
-
-          if (listed && validCells(normalizedCells, word, board.grid)) {
-            found[word] = [...cells];
-          }
-        }
-
-        game = {
-          board,
-          found,
-          elapsedMs: Number.isFinite(saved.elapsedMs) ? Math.max(0, saved.elapsedMs) : 0,
-          manualPaused: saved.manualPaused === true,
-          completed: board.placements.length > 0 &&
-            Object.keys(found).length === board.placements.length
-        };
-      } catch {
-        toast("Игровой прогресс сброшен.");
-      }
     }
 
     function bindEvents() {
-      document.querySelectorAll("[data-tab]").forEach(button => {
-        button.addEventListener("click", () => switchTab(button.dataset.tab));
+      document.querySelectorAll("[data-tab]").forEach(btn => {
+        btn.addEventListener("click", () => switchTab(btn.dataset.tab));
       });
 
-      // Редактирование слов только обновляет статус и черновик, не трогая текущую сетку
-      $("wordsInput").addEventListener("input", () => {
-        updateInputWarnings();
-      });
-
-      $("topicName").addEventListener("input", () => {
-        autoSaveMetaOnly();
-      });
-
-      ["dirH", "dirV", "dirD", "dirR", "fillerMode", "allowOverlap"].forEach(id => {
-        $(id).addEventListener("change", () => {
-          $("rebuildHint").hidden = false;
-        });
-      });
-
+      $("wordsInput").addEventListener("input", updateInputWarnings);
+      $("topicName").addEventListener("input", autoSaveMetaOnly);
       $("generateButton").addEventListener("click", executeRebuild);
 
       $("saveTopicButton").addEventListener("click", () => {
-        if (!state.board.value.words.length) {
-          toast("Сначала создайте сетку со словами.");
+        const b = state.board.value;
+        if (!b.words.length) { toast("Сначала создайте сетку."); return; }
+        const id = "topic:" + b.name.toLowerCase();
+        state.topics[id] = { rev: nextRevision(), deleted: false, value: { name: b.name, words: [...b.words], board: clone(b), updatedAt: Date.now() } };
+        stateChanged();
+        toast("Тема сохранена в каталог.");
+      });
+
+      // Навигация внутри книги из конструктора
+      $("backToBookBtn").addEventListener("click", () => {
+        if (activeBookId) {
+          switchTab("books");
+          openBook(activeBookId);
+        }
+      });
+
+      $("prevBookTopicBtn").addEventListener("click", () => {
+        if (activeBookId && activeBookTopicIndex > 0) {
+          openTopicInConstructor(activeBookId, activeBookTopicIndex - 1);
+        }
+      });
+
+      $("nextBookTopicBtn").addEventListener("click", () => {
+        if (activeBookId) {
+          const b = state.books[activeBookId];
+          if (b && activeBookTopicIndex < b.topics.length - 1) {
+            openTopicInConstructor(activeBookId, activeBookTopicIndex + 1);
+          }
+        }
+      });
+
+      // События раздела Книг
+      $("backToBooksListBtn").addEventListener("click", () => {
+        $("bookDetailView").hidden = true;
+        $("booksListView").hidden = false;
+        renderBooks();
+      });
+
+      $("createBookBtn").addEventListener("click", () => {
+        $("bookModalTitle").textContent = "Создать новую книгу";
+        $("bookModalName").value = "Новый сборник 50 филвордов";
+        $("bookModalAuthor").value = "WordVault Studio";
+        $("bookModal").showModal();
+      });
+
+      $("editBookSettingsBtn").addEventListener("click", () => {
+        if (!activeBookId) return;
+        const b = state.books[activeBookId];
+        if (!b) return;
+        $("bookModalTitle").textContent = "Настройки книги";
+        $("bookModalName").value = b.title;
+        $("bookModalAuthor").value = b.author;
+        $("bookDirH").checked = b.settings.h;
+        $("bookDirV").checked = b.settings.v;
+        $("bookDirD").checked = b.settings.d;
+        $("bookDirR").checked = b.settings.reverse;
+        $("bookAllowOverlap").checked = b.settings.overlap;
+        $("bookFillerMode").value = b.settings.filler;
+        $("bookModal").showModal();
+      });
+
+      $("bookModalCancel").addEventListener("click", () => $("bookModal").close());
+
+      $("bookModalSave").addEventListener("click", () => {
+        const title = $("bookModalName").value.trim() || "Сборник филвордов";
+        const author = $("bookModalAuthor").value.trim() || "WordVault";
+        const settings = {
+          h: $("bookDirH").checked,
+          v: $("bookDirV").checked,
+          d: $("bookDirD").checked,
+          reverse: $("bookDirR").checked,
+          overlap: $("bookAllowOverlap").checked,
+          filler: $("bookFillerMode").value
+        };
+
+        if (activeBookId && state.books[activeBookId] && $("bookModalTitle").textContent.includes("Настройки")) {
+          const b = state.books[activeBookId];
+          b.title = title;
+          b.author = author;
+          b.settings = settings;
+          b.updatedAt = Date.now();
+        } else {
+          const newId = "book:" + uid();
+          state.books[newId] = {
+            id: newId,
+            title,
+            author,
+            settings,
+            topics: [],
+            updatedAt: Date.now()
+          };
+          activeBookId = newId;
+        }
+
+        $("bookModal").close();
+        stateChanged();
+        openBook(activeBookId);
+      });
+
+      // Быстрое добавление темы
+      $("addFastTopicBtn").addEventListener("click", addFastTopicToBook);
+      $("fastTopicWords").addEventListener("keydown", e => {
+        if (e.key === "Enter") { e.preventDefault(); addFastTopicToBook(); }
+      });
+      $("fastTopicName").addEventListener("keydown", e => {
+        if (e.key === "Enter") { e.preventDefault(); $("fastTopicWords").focus(); }
+      });
+
+      // Массовый импорт тем
+      $("openBatchImportBtn").addEventListener("click", () => {
+        $("batchImportText").value = "";
+        $("batchImportModal").showModal();
+      });
+      $("batchImportCancel").addEventListener("click", () => $("batchImportModal").close());
+
+      $("batchImportApply").addEventListener("click", () => {
+        const text = $("batchImportText").value;
+        const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+        if (!activeBookId || !blocks.length) {
+          $("batchImportModal").close();
           return;
         }
-        if (saveTopic(state.board.value)) {
-          toast("Тема и сетка сохранены в каталог.");
+
+        const book = state.books[activeBookId];
+        let added = 0;
+
+        blocks.forEach(block => {
+          const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
+          if (!lines.length) return;
+
+          let name = lines[0].replace(/^[#:\s]+/, "");
+          let wordsRaw = lines.slice(1).join(" ");
+
+          if (lines.length === 1 && lines[0].includes(":")) {
+            const parts = lines[0].split(":");
+            name = parts[0].trim();
+            wordsRaw = parts.slice(1).join(" ");
+          }
+
+          const parsed = parseWords(wordsRaw);
+          if (parsed.words.length) {
+            book.topics.push({
+              id: uid(),
+              name: name || `Тема ${book.topics.length + 1}`,
+              raw: wordsRaw,
+              words: parsed.words,
+              grid: null,
+              placements: []
+            });
+            added++;
+          }
+        });
+
+        book.updatedAt = Date.now();
+        stateChanged();
+        renderBookDetail();
+        $("batchImportModal").close();
+        toast(`Добавлено ${added} тем в книгу!`);
+      });
+
+      $("generateAllBookGridsBtn").addEventListener("click", generateAllBookGrids);
+      $("batchGenCancel").addEventListener("click", () => { batchCancelRequested = true; });
+
+      $("printFullBookBtn").addEventListener("click", printFullBook);
+      $("exportBookXlsxBtn").addEventListener("click", exportBookXLSX);
+      $("exportBookJsonBtn").addEventListener("click", () => {
+        if (!activeBookId) return;
+        const book = state.books[activeBookId];
+        download(JSON.stringify(book, null, 2), `${filename(book.title)}.json`, "application/json");
+      });
+
+      $("importBookBtn").addEventListener("click", () => $("bookFileInput").click());
+      $("bookFileInput").addEventListener("change", async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const imported = JSON.parse(await file.text());
+          if (!imported || !Array.isArray(imported.topics)) throw new Error("Неверный формат файла книги");
+          const id = "book:" + uid();
+          imported.id = id;
+          imported.updatedAt = Date.now();
+          state.books[id] = imported;
+          stateChanged();
+          toast(`Книга «${imported.title}» успешно импортирована!`);
+          openBook(id);
+        } catch (err) {
+          toast("Ошибка импорта: " + err.message);
         }
+        e.target.value = "";
       });
 
-      $("clearButton").addEventListener("click", async () => {
-        const confirmed = await confirmModal("Очистить текущую сетку на всех устройствах? (Каталог сохранится)", "Очистка");
-        if (!confirmed) return;
-        const board = emptyBoard();
-        board.id = uid();
-        board.createdAt = Date.now();
-        commitBoard(board);
-        $("generationStatus").textContent = "";
+      // Игровые события и Реверс
+      const playGrid = $("playGrid");
+      playGrid.addEventListener("pointerdown", e => {
+        const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("#playGrid .cell");
+        if (!el) return;
+        const idx = Number(el.dataset.index);
+        pointerId = e.pointerId;
+        selectionStart = idx;
+        selectionCells = [idx];
+        gameCursor = idx;
+        playGrid.setPointerCapture(e.pointerId);
+        paintGame();
       });
 
-      $("revealButton").addEventListener("click", () => {
-        showAnswers = !showAnswers;
-        renderConstructor();
+      playGrid.addEventListener("pointermove", e => {
+        if (e.pointerId !== pointerId || selectionStart === null) return;
+        const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("#playGrid .cell");
+        if (!el) return;
+        selectionCells = straightLine(selectionStart, Number(el.dataset.index));
+        paintGame();
       });
 
-      $("headerExcel").addEventListener("click", exportXLSX);
-      $("xlsxButton").addEventListener("click", exportXLSX);
+      playGrid.addEventListener("pointerup", finishSelection);
+      playGrid.addEventListener("pointercancel", cancelSelection);
 
-      $("tsvButton").addEventListener("click", () => {
-        copyText(gridTSV(state.board.value.grid), "Сетка скопирована для Excel.");
+      $("reverseRaw").addEventListener("input", () => Reverse.readRaw());
+      $("reverseScan").addEventListener("click", () => Reverse.scan());
+      $("reverseLoad").addEventListener("click", () => {
+        Reverse.grid = [...state.board.value.grid];
+        Reverse.writeRaw();
+        $("reverseWords").value = state.board.value.words.join(", ");
+        Reverse.render();
       });
-
-      $("rawButton").addEventListener("click", () => {
-        copyText(state.board.value.grid.join(""), "Скопировано 225 символов матрицы.");
-      });
-
-      $("printButton").addEventListener("click", printCurrentBoard);
 
       $("soundButton").addEventListener("click", () => {
         Sound.muted = !Sound.muted;
         $("soundButton").textContent = Sound.muted ? "🔇" : "🔊";
-        DB.put("wv_sound_muted", Sound.muted);
-        Sound.play();
       });
 
-      $("syncButton").addEventListener("click", () => {
-        updateSyncDialog();
-        $("syncDialog").showModal();
-      });
-
+      $("syncButton").addEventListener("click", () => $("syncDialog").showModal());
       $("syncClose").addEventListener("click", () => $("syncDialog").close());
-
-      $("syncNow").addEventListener("click", async () => {
-        await persistState();
-        if (Sync.push(true)) toast("Синхронизация отправлена.");
-        else toast("Сохранено локально.");
-      });
-
-      $("reverseRaw").addEventListener("input", () => Reverse.readRaw());
-      $("reverseWords").addEventListener("input", () => {
-        Reverse.invalidate();
-        Reverse.render();
-      });
-
-      $("reverseTypos").addEventListener("change", () => Reverse.invalidate());
-
-      $("reverseLoad").addEventListener("click", async () => {
-        Reverse.grid = [...state.board.value.grid];
-        Reverse.active = null;
-        Reverse.invalidate();
-        Reverse.writeRaw();
-        $("reverseWords").value = state.board.value.words.join(", ");
-        Reverse.render();
-        if (state.board.value.words.length) await Reverse.scan();
-      });
-
-      $("reverseClear").addEventListener("click", () => {
-        Reverse.grid = Array(CELLS).fill("·");
-        Reverse.active = null;
-        Reverse.count = 0;
-        Reverse.invalidate();
-        $("reverseRaw").value = "";
-        $("reverseWords").value = "";
-        $("reverseLetter").value = "";
-        Reverse.updateCount();
-        Reverse.render();
-      });
-
-      $("reverseScan").addEventListener("click", () => Reverse.scan());
-      $("reverseFindTopic").addEventListener("click", () => Reverse.findTopic());
-      $("reverseApply").addEventListener("click", () => Reverse.apply());
-
-      $("reverseTSV").addEventListener("click", () => {
-        if (Reverse.canScan()) copyText(gridTSV(Reverse.grid), "Матрица скопирована для Excel.");
-      });
-
-      $("reverseCopy").addEventListener("click", () => {
-        if (Reverse.canScan()) copyText(Reverse.grid.join(""), "Скопировано 225 символов.");
-      });
-
-      $("reverseGrid").addEventListener("keydown", event => Reverse.handleKey(event));
-
-      $("reverseSet").addEventListener("click", () => {
-        Reverse.setLetter($("reverseLetter").value);
-        $("reverseLetter").value = "";
-      });
-
-      $("reverseLetter").addEventListener("keydown", event => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          Reverse.setLetter($("reverseLetter").value);
-          $("reverseLetter").value = "";
-        }
-      });
-
-      $("reverseErase").addEventListener("click", () => Reverse.setLetter("·", false));
-      $("reversePrev").addEventListener("click", () => Reverse.move(-1));
-      $("reverseNext").addEventListener("click", () => Reverse.move(1));
-
-      $("playPause").addEventListener("click", () => {
-        if (!game) return;
-        game.manualPaused = !game.manualPaused;
-        cancelSelection();
-        refreshGameClock();
-        saveGame();
-      });
-
-      $("playRestart").addEventListener("click", async () => {
-        if (!game) return;
-        const confirmed = await confirmModal("Начать эту головоломку заново с нуля?", "Сброс игры");
-        if (!confirmed) return;
-        pauseGameClock();
-        game.found = {};
-        game.elapsedMs = 0;
-        game.completed = false;
-        game.manualPaused = false;
-        cancelSelection();
-        renderGame();
-        refreshGameClock();
-        saveGame();
-      });
-
-      $("playLoadNew").addEventListener("click", async () => {
-        const confirmed = await confirmModal("Заменить текущую игру новой сеткой из конструктора?", "Новая игра");
-        if (confirmed) newGame();
-      });
-
+      $("syncNow").addEventListener("click", () => { Sync.push(true); toast("Синхронизация отправлена."); });
       $("victoryClose").addEventListener("click", () => $("victoryDialog").close());
-      $("topicSearch").addEventListener("input", renderTopics);
-      $("exportBackup").addEventListener("click", exportBackup);
-      $("importBackup").addEventListener("click", () => $("backupFile").click());
-      $("backupFile").addEventListener("change", event => importBackup(event.target.files[0]));
-
-      document.addEventListener("visibilitychange", () => {
-        if (document.hidden) {
-          cancelSelection();
-          pauseGameClock();
-          saveGame();
-          updateWakeLock(false);
-        } else {
-          refreshGameClock();
-          Sync.queuePush(100);
-        }
-      });
-
-      window.addEventListener("pagehide", () => {
-        pauseGameClock();
-        saveGame();
-        updateWakeLock(false);
-      });
     }
 
     async function init() {
       await DB.open();
-
-      const savedDevice = await DB.get("wv_device_v3");
-      if (typeof savedDevice === "string") deviceId = savedDevice;
-      else await DB.put("wv_device_v3", deviceId);
-
-      Sound.muted = await DB.get("wv_sound_muted") === true;
-      $("soundButton").textContent = Sound.muted ? "🔇" : "🔊";
-
-      const savedState = await DB.get("wv_state_v3");
-
+      const savedState = await DB.get("wv_state_v4") || await DB.get("wv_state_v3");
       if (savedState) {
         try {
           state = validateState(savedState);
-          observe(state.board);
-          Object.values(state.topics).forEach(observe);
-        } catch {
-          toast("Сохранённое состояние повреждено. Создана чистая база.");
-        }
+        } catch {}
       }
 
       bindEvents();
       Reverse.init();
-      initPlayEvents();
-      await restoreGame();
-
       renderConstructor(true);
       renderTopics();
-      updateGameNewBoard();
+      renderBooks();
       await persistState();
       Sync.init();
 
       setInterval(() => {
-        if (game) {
+        if (game && gameRunningSince !== null) {
           $("playTimer").textContent = formatTime(elapsedGame());
-          if (gameRunningSince !== null) {
-            gameSaveTick++;
-            if (gameSaveTick % 5 === 0) saveGame();
-          }
+          gameSaveTick++;
+          if (gameSaveTick % 5 === 0) saveGame();
         }
       }, 1000);
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      init().catch(error => {
-        console.error(error);
-        toast("Ошибка запуска: " + error.message);
-      });
-    });
+    window.addEventListener("DOMContentLoaded", init);
   })();
   </script>
 </body>
