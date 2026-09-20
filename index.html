@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>WordVault Studio — Конструктор и Аудит Филвордов 15x15</title>
+  <title>WordVault Studio — Автономный Конструктор и Аудит Филвордов 15x15</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -46,6 +46,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
+  <!-- Бесшовные модули облачной синхронизации (Firebase Firestore SDK) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    window._fbSDK = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, getFirestore, doc, setDoc, onSnapshot };
+    window.dispatchEvent(new CustomEvent('cloud-sdk-ready'));
+  </script>
+
   <style>
     /* Плавный скроллбар */
     ::-webkit-scrollbar {
@@ -65,13 +75,13 @@
 
     /* Стеклянные панели (Glassmorphism) */
     .glass-panel {
-      background: rgba(15, 23, 42, 0.75);
+      background: rgba(15, 23, 42, 0.78);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
     .glass-card {
-      background: rgba(22, 31, 51, 0.6);
+      background: rgba(22, 31, 51, 0.65);
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.06);
     }
@@ -92,12 +102,12 @@
     /* Мобильная сетка без горизонтальной прокрутки */
     .feelword-grid-container {
       width: 100%;
-      max-width: 500px;
+      max-width: 490px;
       aspect-ratio: 1 / 1;
       margin: 0 auto;
     }
 
-    /* Стили бланка для печати */
+    /* Бланк для печати */
     @media print {
       body {
         background: #ffffff !important;
@@ -117,7 +127,7 @@
       .print-cell {
         border: 1px solid #777777 !important;
         color: #000000 !important;
-        height: 26px !important;
+        height: 25px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -136,7 +146,7 @@
     <div class="absolute top-[50%] -right-[15%] w-[45vw] h-[45vw] rounded-full bg-gradient-to-bl from-brand-neon/10 via-brand-accent/10 to-transparent blur-3xl"></div>
   </div>
 
-  <!-- Главный контейнер интерфейса -->
+  <!-- Главный контейнер -->
   <div class="relative z-10 flex flex-col min-h-screen">
     
     <!-- Шапка приложения -->
@@ -155,28 +165,36 @@
               <span class="text-sm sm:text-base font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">WORDVAULT</span>
               <span class="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-400 border border-brand-500/30">15×15</span>
             </div>
-            <p class="text-[10px] text-slate-400 hidden md:block">Студия генерации и реверс-аудита филвордов</p>
+            <p class="text-[10px] text-slate-400 hidden md:block">Конструктор и реверс-аудит филвордов</p>
           </div>
         </div>
 
-        <!-- Переключатели вкладок -->
-        <nav class="flex items-center gap-1 bg-surface-900/90 p-1 rounded-xl border border-white/5 overflow-x-auto max-w-[55vw] sm:max-w-none">
-          <button id="navTabStudio" onclick="app.switchTab('studio')" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm whitespace-nowrap">
-            <span>⚡</span> <span class="hidden xs:inline">Конструктор</span>
+        <!-- Десктопная навигация (на ПК и планшетах) -->
+        <nav class="hidden md:flex items-center gap-1 bg-surface-900/90 p-1 rounded-xl border border-white/5">
+          <button id="navTabStudio" onclick="app.switchTab('studio')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm whitespace-nowrap">
+            <span>⚡</span> <span>Конструктор</span>
           </button>
-          <button id="navTabReverse" onclick="app.switchTab('reverse')" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
+          <button id="navTabReverse" onclick="app.switchTab('reverse')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
             <span>🔍</span> <span>Реверс 225</span>
           </button>
-          <button id="navTabPlay" onclick="app.switchTab('play')" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
-            <span>🎮</span> <span class="hidden sm:inline">Игра</span>
+          <button id="navTabPlay" onclick="app.switchTab('play')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
+            <span>🎮</span> <span>Игра</span>
           </button>
-          <button id="navTabTopics" onclick="app.switchTab('topics')" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
+          <button id="navTabTopics" onclick="app.switchTab('topics')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
             <span>📚</span> <span>Темы</span> <span id="navTopicBadge" class="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-400">0</span>
           </button>
         </nav>
 
-        <!-- Кнопки действий -->
+        <!-- Кнопки действий и фоновый индикатор автосинхронизации -->
         <div class="flex items-center gap-1.5 sm:gap-2">
+          
+          <!-- Автоматический статус связи ПК <-> Телефон (без ручных кодов и QR) -->
+          <div id="cloudSyncIndicator" title="Автоматическая синхронизация между ПК и телефоном активна" class="px-2.5 py-1.5 rounded-xl bg-surface-900/80 border border-emerald-500/30 text-xs font-bold text-slate-200 flex items-center gap-1.5 select-none shadow-sm">
+            <span id="syncDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-xs">☁️</span>
+            <span id="syncText" class="text-[11px] text-emerald-300 hidden sm:inline">Авто-облако</span>
+          </div>
+
           <button id="sfxToggleBtn" onclick="app.audio.toggle()" title="Звук вкл/выкл" class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl glass-card hover:bg-white/10 flex items-center justify-center text-xs text-slate-300">
             <span id="sfxIcon">🔊</span>
           </button>
@@ -184,12 +202,34 @@
             <span>🖨️</span> <span class="hidden md:inline">Печать</span>
           </button>
           <button onclick="app.generate()" class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-brand-500/20 flex items-center gap-1.5 active:scale-95">
-            <span id="genBtnText">Собрать</span>
+            <span>Собрать</span>
           </button>
         </div>
 
       </div>
     </header>
+
+    <!-- Мобильная фиксированная панель: 4 вкладки во всю ширину БЕЗ скролла -->
+    <div class="md:hidden sticky top-16 z-30 bg-surface-900/95 border-b border-white/10 backdrop-blur-md px-2 py-1.5">
+      <div class="grid grid-cols-4 gap-1 w-full text-center">
+        <button id="mobNavTabStudio" onclick="app.switchTab('studio')" class="py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center bg-brand-600 text-white shadow-sm">
+          <span class="text-xs">⚡</span>
+          <span class="truncate w-full text-[10px] mt-0.5">Конструктор</span>
+        </button>
+        <button id="mobNavTabReverse" onclick="app.switchTab('reverse')" class="py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center text-slate-400 hover:text-white">
+          <span class="text-xs">🔍</span>
+          <span class="truncate w-full text-[10px] mt-0.5">Реверс</span>
+        </button>
+        <button id="mobNavTabPlay" onclick="app.switchTab('play')" class="py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center text-slate-400 hover:text-white">
+          <span class="text-xs">🎮</span>
+          <span class="truncate w-full text-[10px] mt-0.5">Игра</span>
+        </button>
+        <button id="mobNavTabTopics" onclick="app.switchTab('topics')" class="py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center text-slate-400 hover:text-white relative">
+          <span class="text-xs">📚</span>
+          <span class="truncate w-full text-[10px] mt-0.5">Темы <span id="mobNavTopicBadge" class="text-[9px] px-1 rounded-full bg-slate-800 text-slate-300">0</span></span>
+        </button>
+      </div>
+    </div>
 
     <!-- Основной контент -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 lg:p-8">
@@ -211,7 +251,7 @@
                 <span id="densityBadge" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">0% букв</span>
                 <span id="langDetectedBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-800 text-slate-300 border border-white/5">RU + EN</span>
               </div>
-              <p class="text-[11px] text-slate-400">Сетка: <b class="text-slate-200">15 × 15 (225 ячеек)</b> • Слов в сетке: <b class="text-slate-200" id="statWordsCount">0</b> • Занято букв: <b class="text-slate-200" id="statLettersCount">0</b></p>
+              <p class="text-[11px] text-slate-400">Сетка: <b class="text-slate-200">15 × 15 (225 ячеек)</b> • Слов в сетке: <b class="text-slate-200" id="statWordsCount">0</b> • Букв: <b class="text-slate-200" id="statLettersCount">0</b></p>
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -234,7 +274,7 @@
             <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl relative">
               <div class="flex items-center justify-between pb-2.5 border-b border-white/10 mb-2.5">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                  <span class="w-2 h-2 rounded-full bg-brand-500"></span> Ввод слов (РУС / ENG)
+                  <span class="w-2 h-2 rounded-full bg-brand-500"></span> Ввод слов (любые разделители)
                 </label>
                 <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
                   <span id="badgeWordCounter" class="text-brand-neon font-bold">0 слов</span>
@@ -242,11 +282,11 @@
               </div>
 
               <p class="text-[11px] text-slate-400 mb-2 leading-relaxed">
-                Вводите любые русские и английские слова через запятую, пробел или новую строку. Поле сразу перестраивает филворд на лету.
+                Вводите любые русские и английские слова через запятую, пробел или новую строку. Сетка строится на лету.
               </p>
               
               <div class="relative">
-                <textarea id="wordInputArea" rows="5" oninput="app.onInputWords()" class="w-full bg-surface-900/90 border border-white/10 focus:border-brand-500 rounded-xl p-3 text-xs sm:text-sm font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition resize-none leading-relaxed" placeholder="Введите слова темы... Например: ПЛАНЕТА, ГАЛАКТИКА, ORBIT, SATELLITE, ROCKET, ЗВЕЗДА, COMET"></textarea>
+                <textarea id="wordInputArea" rows="5" oninput="app.onInputWords()" class="w-full bg-surface-900/90 border border-white/10 focus:border-brand-500 rounded-xl p-3 text-xs sm:text-sm font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition resize-none leading-relaxed" placeholder="Введите слова... Например: ПЛАНЕТА, ГАЛАКТИКА, ORBIT, SATELLITE, ROCKET, ЗВЕЗДА, COMET"></textarea>
               </div>
 
               <!-- Таблетки распознанных слов -->
@@ -263,7 +303,7 @@
               <!-- Сохранение темы в каталог -->
               <div class="mt-3 pt-3 border-t border-white/10 flex gap-2">
                 <input id="newTopicTitle" type="text" placeholder="Название темы для сохранения" class="flex-1 bg-surface-900/80 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-brand-500 font-medium" />
-                <button onclick="app.saveCurrentTopic()" class="px-3.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold transition shadow-sm whitespace-nowrap">
+                <button onclick="app.saveCurrentTopic()" class="px-3.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold transition shadow-sm whitespace-nowrap active:scale-95">
                   Сохранить тему
                 </button>
               </div>
@@ -336,7 +376,7 @@
               <!-- Слова под сеткой -->
               <div class="w-full mt-3 pt-3 border-t border-white/10">
                 <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
-                  <span class="font-semibold text-slate-300 text-[11px]">Размещенные слова (наведите для подсветки пути):</span>
+                  <span class="font-semibold text-slate-300 text-[11px]">Размещенные слова (наведите для подсветки):</span>
                   <span id="placedCountSummary" class="font-mono text-brand-neon text-[11px]">0 слов</span>
                 </div>
                 <div id="activeWordsChips" class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
@@ -350,9 +390,9 @@
             <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl">
               <div class="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
                 <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                  <span class="text-emerald-400">📊</span> Экспорт и передача в верстку
+                  <span class="text-emerald-400">📊</span> Экспорт в 1 клик
                 </h3>
-                <span class="text-[10px] text-slate-400">Копирование в 1 клик</span>
+                <span class="text-[10px] text-slate-400">Готово для верстки</span>
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -415,7 +455,7 @@
             <div>
               <h2 class="text-sm sm:text-base font-extrabold text-white">Реверс-инжиниринг и отладка печатной сетки</h2>
               <p class="text-[11px] sm:text-xs text-slate-400">
-                Вставьте набор букв (225 символов или скопированную из Excel таблицу), чтобы пересобрать матрицу, перепроверить наличие слов и обнаружить типографский брак.
+                Вставьте набор букв (225 символов или фрагмент таблицы Excel), чтобы пересобрать матрицу, перепроверить наличие слов и обнаружить типографский брак.
               </p>
             </div>
           </div>
@@ -423,7 +463,7 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
           
-          <!-- Левая колонка аудита: Ввод строки букв и слов для проверки -->
+          <!-- Левая колонка аудита -->
           <div class="lg:col-span-5 space-y-4">
             
             <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl space-y-3">
@@ -433,7 +473,7 @@
               </div>
 
               <p class="text-[11px] text-slate-400">
-                Вставьте 225 букв подряд или фрагмент таблицы Excel. Алгоритм отфильтрует пробелы, цифры и переносы строк.
+                Вставьте 225 букв подряд или фрагмент таблицы. Пробелы, цифры и переносы строк очистятся сами.
               </p>
 
               <textarea id="reverseInputRaw" rows="5" oninput="app.reverse.onInputLetters()" class="w-full bg-surface-900 border border-white/10 rounded-xl p-3 text-xs sm:text-sm font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-neon transition resize-none" placeholder="Вставьте строку из 225 букв..."></textarea>
@@ -456,24 +496,24 @@
               </div>
 
               <p class="text-[11px] text-slate-400">
-                Укажите слова, которые должны были быть заложены в филворд. Детектор проверит их наличие по всем 8 направлениям.
+                Укажите слова, которые должны были быть заложены в филворд. Детектор проверит их по всем 8 направлениям.
               </p>
 
               <textarea id="reverseInputWords" rows="4" oninput="app.reverse.onInputWords()" class="w-full bg-surface-900 border border-white/10 rounded-xl p-3 text-xs sm:text-sm font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-neon transition resize-none" placeholder="Введите слова для поиска в матрице..."></textarea>
 
               <div class="flex gap-2">
-                <button onclick="app.reverse.runAudit()" class="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-brand-neon to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition">
+                <button onclick="app.reverse.runAudit()" class="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-brand-neon to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition active:scale-95">
                   Запустить аудит матрицы
                 </button>
                 <button onclick="app.reverse.scanAllTopics()" class="px-3 py-2 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-300" title="Сверить сетку со всеми сохраненными темами">
-                  🔎 Скан по темам
+                  🔎 Скан тем
                 </button>
               </div>
             </div>
 
           </div>
 
-          <!-- Правая колонка: Реконструированная сетка и отчет об ошибках -->
+          <!-- Правая колонка аудита -->
           <div class="lg:col-span-7 space-y-4">
             
             <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-2xl flex flex-col items-center">
@@ -482,10 +522,9 @@
                 <span id="reverseMatrixStatus" class="font-mono text-[11px] text-amber-400">Ожидание 225 букв</span>
               </div>
 
-              <!-- Сетка с координатной рамкой -->
               <div class="feelword-grid-container">
                 <div id="reverseGridEl" class="grid grid-cols-15 gap-0.5 sm:gap-1 p-2 bg-surface-900/95 rounded-2xl border border-white/10 shadow-inner w-full h-full" style="grid-template-columns: repeat(15, minmax(0, 1fr));">
-                  <!-- Динамические ячейки реверса -->
+                  <!-- Ячейки реверса -->
                 </div>
               </div>
 
@@ -495,11 +534,10 @@
                   <span class="font-bold text-slate-300">Результаты аудита слов:</span>
                   <div class="flex gap-2 font-mono text-[11px]">
                     <span class="text-emerald-400">Найдено: <b id="auditFoundCount">0</b></span>
-                    <span class="text-rose-400">Не найдено (брак): <b id="auditMissingCount">0</b></span>
+                    <span class="text-rose-400">Брак (нет в сетке): <b id="auditMissingCount">0</b></span>
                   </div>
                 </div>
 
-                <!-- Чипсы найденных и отсутствующих слов -->
                 <div id="auditResultsContainer" class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
                   <span class="text-[11px] text-slate-500 italic">Запустите аудит для отображения отчета...</span>
                 </div>
@@ -524,7 +562,7 @@
             </div>
             <div>
               <h2 class="text-xs sm:text-sm font-bold text-white">Разгадывание: <span id="playTopicTitle" class="text-brand-neon font-mono">Текущий филворд</span></h2>
-              <p class="text-[11px] text-slate-400">Ведите пальцем по буквам или нажмите первую и последнюю букву слова</p>
+              <p class="text-[11px] text-slate-400">Проведите пальцем по буквам или нажмите первую и последнюю букву слова</p>
             </div>
           </div>
 
@@ -580,7 +618,7 @@
       </div>
 
       <!-- ================================================================= -->
-      <!-- ВКЛАДКА 4: КАТАЛОГ ТЕМ (ХРАНИЛИЩЕ БЕЗ LOCALSTORAGE)              -->
+      <!-- ВКЛАДКА 4: КАТАЛОГ ТЕМ                                           -->
       <!-- ================================================================= -->
       <div id="tabTopics" class="hidden space-y-4 sm:space-y-6">
         
@@ -590,7 +628,7 @@
               <h2 class="text-base sm:text-lg font-extrabold text-white">Каталог ваших тем</h2>
               <span id="vaultTotalCount" class="text-xs font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-neon border border-brand-500/30">0 тем</span>
             </div>
-            <p class="text-[11px] sm:text-xs text-slate-400 mt-1">Все темы хранятся в постоянной базе данных устройства. Они не исчезнут при закрытии сайта.</p>
+            <p class="text-[11px] sm:text-xs text-slate-400 mt-1">Все темы хранятся навсегда и автоматически синхронизируются между вашими устройствами.</p>
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
@@ -618,10 +656,6 @@
     </main>
 
   </div>
-
-  <!-- ================================================================= -->
-  <!-- МОДАЛЬНЫЕ ОКНА: TOAST, ПОДТВЕРЖДЕНИЕ И ПЕЧАТЬ                    -->
-  <!-- ================================================================= -->
 
   <!-- Toast всплывашка -->
   <div id="appToast" class="fixed bottom-5 right-5 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2.5 px-4 py-3 rounded-2xl glass-panel border border-brand-500/40 shadow-2xl text-white text-xs sm:text-sm font-medium">
@@ -659,7 +693,7 @@
           <p class="text-[11px] text-slate-500 mt-0.5">Найдите все спрятанные слова в сетке 15×15.</p>
         </div>
 
-        <div id="printGridContainer" class="print-grid mx-auto" style="width: 330px; height: 330px;">
+        <div id="printGridContainer" class="print-grid mx-auto" style="width: 320px; height: 320px;">
           <!-- Ячейки для печати -->
         </div>
 
@@ -681,33 +715,34 @@
     </div>
   </div>
 
-  <!-- ================================================================= -->
-  <!-- JAVASCRIPT: ЯДРО ГЕНЕРАТОРА, АУДИТА И ПОСТОЯННОЙ ПАМЯТИ          -->
-  <!-- ================================================================= -->
   <script>
     /**
      * ПОСТОЯННОЕ ХРАНИЛИЩЕ НА INDEXEDDB (БЕЗ LOCALSTORAGE)
-     * Сохраняет данные на устройстве навсегда даже при перезапуске браузера
+     * Данные сохраняются навсегда в памяти устройства даже при закрытии браузера
      */
     const PermanentDB = {
-      dbName: 'WordVaultStudioDB',
+      dbName: 'WordVaultStudioDB_v2',
       version: 1,
       db: null,
 
       async init() {
         return new Promise((resolve) => {
-          const req = indexedDB.open(this.dbName, this.version);
-          req.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains('store')) {
-              db.createObjectStore('store', { keyPath: 'key' });
-            }
-          };
-          req.onsuccess = (e) => {
-            this.db = e.target.result;
-            resolve(true);
-          };
-          req.onerror = () => resolve(false);
+          try {
+            const req = indexedDB.open(this.dbName, this.version);
+            req.onupgradeneeded = (e) => {
+              const db = e.target.result;
+              if (!db.objectStoreNames.contains('store')) {
+                db.createObjectStore('store', { keyPath: 'key' });
+              }
+            };
+            req.onsuccess = (e) => {
+              this.db = e.target.result;
+              resolve(true);
+            };
+            req.onerror = () => resolve(false);
+          } catch (e) {
+            resolve(false);
+          }
         });
       },
 
@@ -740,11 +775,11 @@
       }
     };
 
-    // Частотные словари для маскировки
+    // Частотные словари для реалистичного заполнения
     const FREQ_RUSSIAN = "ОЕАИНТСРВЛКМДПУЯЫЬГЗБЧЙХЖШЮЦЩЭФ";
     const FREQ_ENGLISH = "ETAOINSHRDLCUMWFGYPBVKJXQZ";
 
-    // Цвета неоновой подсветки
+    // Цветовая палитра подсветки путей
     const PALETTE = [
       { border: '#38bdf8', bg: 'rgba(56, 189, 248, 0.3)', text: '#bae6fd' },
       { border: '#818cf8', bg: 'rgba(129, 140, 248, 0.3)', text: '#c7d2fe' },
@@ -758,7 +793,6 @@
       { border: '#60a5fa', bg: 'rgba(96, 165, 250, 0.3)', text: '#bfdbfe' }
     ];
 
-    // Синтезатор звука (Web Audio API)
     class SoundEngine {
       constructor() {
         this.ctx = null;
@@ -768,6 +802,9 @@
         if (!this.ctx) {
           const AC = window.AudioContext || window.webkitAudioContext;
           if (AC) this.ctx = new AC();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
         }
       }
       toggle() {
@@ -804,18 +841,17 @@
             const gain = this.ctx.createGain();
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(freq, now + i * 0.06);
-            gain.gain.setValueAtTime(0.09, now + i * 0.06);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.3);
+            gain.gain.setValueAtTime(0.08, now + i * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.28);
             osc.connect(gain);
             gain.connect(this.ctx.destination);
             osc.start(now + i * 0.06);
-            osc.stop(now + i * 0.06 + 0.31);
+            osc.stop(now + i * 0.06 + 0.29);
           });
         } catch (e) {}
       }
     }
 
-    // Главный объект приложения
     const app = {
       width: 15,
       height: 15,
@@ -830,8 +866,17 @@
       hoveredWord: null,
       audio: new SoundEngine(),
       debounceTimer: null,
+      cloudPushTimer: null,
+      lastLocalEditTimestamp: 0,
+      isApplyingRemoteSnapshot: false,
 
-      // Состояние игры
+      // Cloud SDK references
+      fbDb: null,
+      fbAuth: null,
+      fbUser: null,
+      cloudConnected: false,
+
+      // Состояние режима решения (Play Mode)
       playState: {
         timerInterval: null,
         seconds: 0,
@@ -842,52 +887,200 @@
       },
 
       async init() {
+        window.app = this;
         await PermanentDB.init();
         await this.restorePersistedState();
         this.setupPlayEvents();
         this.reverse.init();
+        this.initCloudAutoSync();
       },
 
-      // Персистентность: чтение сохраненного состояния
+      // Инициализация бесшовной фоновой синхронизации ПК <-> Телефон
+      async initCloudAutoSync() {
+        if (!window._fbSDK) {
+          window.addEventListener('cloud-sdk-ready', () => this.initCloudAutoSync(), { once: true });
+          return;
+        }
+
+        try {
+          const cfgStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+          if (!cfgStr) {
+            this.setSyncStatus('local');
+            return;
+          }
+
+          const fbConfig = JSON.parse(cfgStr);
+          const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, getFirestore, doc, onSnapshot } = window._fbSDK;
+          
+          const fbApp = initializeApp(fbConfig);
+          this.fbAuth = getAuth(fbApp);
+          this.fbDb = getFirestore(fbApp);
+
+          const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+          if (token) {
+            const cred = await signInWithCustomToken(this.fbAuth, token);
+            this.fbUser = cred.user;
+          } else {
+            const cred = await signInAnonymously(this.fbAuth);
+            this.fbUser = cred.user;
+          }
+
+          if (!this.fbUser) return;
+
+          // Строгий путь для публичной синхронизации между устройствами
+          const appId = typeof __app_id !== 'undefined' ? __app_id : 'wordvault-app';
+          const docRef = doc(this.fbDb, 'artifacts', appId, 'public', 'data', 'cloud_vaults', 'shared_workspace');
+
+          onSnapshot(docRef, (snap) => {
+            if (snap.exists()) {
+              const data = snap.data();
+              this.applyRemoteUpdate(data);
+              this.setSyncStatus('online');
+            } else {
+              this.setSyncStatus('online');
+            }
+          }, (err) => {
+            console.warn("Cloud snapshot info:", err);
+            this.setSyncStatus('offline');
+          });
+
+          this.cloudConnected = true;
+          this.setSyncStatus('online');
+        } catch (e) {
+          console.warn("Auto-sync mode initialized locally:", e);
+          this.setSyncStatus('local');
+        }
+      },
+
+      setSyncStatus(mode) {
+        const dot = document.getElementById('syncDot');
+        const text = document.getElementById('syncText');
+        const container = document.getElementById('cloudSyncIndicator');
+        if (!dot || !text) return;
+
+        if (mode === 'online') {
+          dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+          text.innerText = "Авто-облако: онлайн";
+          text.className = "text-[11px] text-emerald-300 hidden sm:inline";
+          container.className = "px-2.5 py-1.5 rounded-xl bg-surface-900/80 border border-emerald-500/30 text-xs font-bold text-slate-200 flex items-center gap-1.5 select-none shadow-sm";
+        } else if (mode === 'offline') {
+          dot.className = "w-2 h-2 rounded-full bg-amber-400";
+          text.innerText = "Авто-облако: повтор...";
+          text.className = "text-[11px] text-amber-300 hidden sm:inline";
+        } else {
+          dot.className = "w-2 h-2 rounded-full bg-brand-neon";
+          text.innerText = "Локальная память";
+          text.className = "text-[11px] text-cyan-300 hidden sm:inline";
+        }
+      },
+
+      applyRemoteUpdate(data) {
+        if (!data || typeof data !== 'object') return;
+        if (this.isApplyingRemoteSnapshot) return;
+
+        // Если локальные изменения свежее пришедших из сети, не перезатираем
+        if (data.updatedAt && this.lastLocalEditTimestamp > data.updatedAt) {
+          return;
+        }
+
+        this.isApplyingRemoteSnapshot = true;
+        try {
+          if (data.topics && typeof data.topics === 'object') {
+            this.topics = { ...this.topics, ...data.topics };
+            this.updateBadgeCounters();
+            this.renderTopicsVault();
+            PermanentDB.set('wv_topics', this.topics);
+          }
+
+          if (data.words && Array.isArray(data.words)) {
+            const hasChanged = JSON.stringify(data.words) !== JSON.stringify(this.words) || data.topicName !== this.activeTopicName;
+            if (hasChanged) {
+              this.words = data.words;
+              this.activeTopicName = data.topicName || "Филворд";
+              document.getElementById('wordInputArea').value = this.words.join(', ');
+              document.getElementById('activeTopicBadgeName').innerText = this.activeTopicName;
+              this.updateWordPills();
+              this.generate();
+              PermanentDB.set('wv_current_state', { topicName: this.activeTopicName, words: this.words });
+              this.notify(`Синхронизировано: "${this.activeTopicName}"`);
+            }
+          }
+        } finally {
+          this.isApplyingRemoteSnapshot = false;
+        }
+      },
+
+      scheduleCloudPush() {
+        if (!this.fbDb || !this.fbUser || this.isApplyingRemoteSnapshot) return;
+        clearTimeout(this.cloudPushTimer);
+        this.cloudPushTimer = setTimeout(async () => {
+          try {
+            const { doc, setDoc } = window._fbSDK;
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'wordvault-app';
+            const docRef = doc(this.fbDb, 'artifacts', appId, 'public', 'data', 'cloud_vaults', 'shared_workspace');
+            const now = Date.now();
+            this.lastLocalEditTimestamp = now;
+
+            await setDoc(docRef, {
+              topicName: this.activeTopicName,
+              words: this.words,
+              topics: this.topics,
+              updatedAt: now
+            }, { merge: true });
+          } catch (err) {
+            console.warn("Cloud push notice:", err);
+          }
+        }, 550);
+      },
+
+      updateBadgeCounters() {
+        const count = Object.keys(this.topics).length;
+        const dBadge = document.getElementById('navTopicBadge');
+        if (dBadge) dBadge.innerText = count;
+        const mBadge = document.getElementById('mobNavTopicBadge');
+        if (mBadge) mBadge.innerText = count;
+        const vCount = document.getElementById('vaultTotalCount');
+        if (vCount) vCount.innerText = `${count} тем`;
+      },
+
       async restorePersistedState() {
         const savedTopics = await PermanentDB.get('wv_topics');
         this.topics = savedTopics && typeof savedTopics === 'object' ? savedTopics : {};
-        document.getElementById('navTopicBadge').innerText = Object.keys(this.topics).length;
+        this.updateBadgeCounters();
 
         const savedCurrent = await PermanentDB.get('wv_current_state');
         if (savedCurrent && savedCurrent.words && savedCurrent.words.length > 0) {
-          this.activeTopicName = savedCurrent.topicName || "Мой филворд";
+          this.activeTopicName = savedCurrent.topicName || "Новая тема";
           this.words = savedCurrent.words;
           document.getElementById('wordInputArea').value = this.words.join(', ');
           document.getElementById('activeTopicBadgeName').innerText = this.activeTopicName;
           this.updateWordPills();
           this.generate();
         } else {
-          // Чистый старт: пустая сетка 15х15
           this.words = [];
           this.generateBlankGrid();
         }
       },
 
       async persistState() {
+        this.lastLocalEditTimestamp = Date.now();
         await PermanentDB.set('wv_topics', this.topics);
         await PermanentDB.set('wv_current_state', {
           topicName: this.activeTopicName,
           words: this.words
         });
+        this.updateBadgeCounters();
+        this.scheduleCloudPush();
       },
 
-      // Парсер слов: РУССКИЙ И АНГЛИЙСКИЙ (длина от 2 символов)
       cleanWordTokens(text) {
         if (!text) return [];
-        // Находит все группы русских или английских букв от 2 знаков
         const upper = text.toUpperCase();
         const matches = upper.match(/[А-ЯЁA-Z]{2,}/g);
         if (!matches) return [];
         return [...new Set(matches)];
       },
 
-      // Определение основного языка темы
       detectLanguage() {
         let ruCount = 0;
         let enCount = 0;
@@ -912,7 +1105,6 @@
         return 'ru';
       },
 
-      // Обработка ввода в реальном времени с задержкой (Debounce)
       onInputWords() {
         const raw = document.getElementById('wordInputArea').value;
         this.words = this.cleanWordTokens(raw);
@@ -923,7 +1115,7 @@
         this.debounceTimer = setTimeout(() => {
           this.generate();
           this.persistState();
-        }, 320);
+        }, 300);
       },
 
       updateWordPills() {
@@ -940,7 +1132,7 @@
         this.words.forEach((w, idx) => {
           const pill = document.createElement('span');
           pill.className = 'text-[11px] font-mono px-2 py-0.5 rounded-md bg-surface-800 text-slate-200 border border-white/10 flex items-center gap-1';
-          pill.innerHTML = `<span>${w}</span><button onclick="app.removeWord(${idx})" class="text-slate-500 hover:text-rose-400 font-bold">×</button>`;
+          pill.innerHTML = `<span>${w}</span><button onclick="app.removeWord(${idx})" class="text-slate-500 hover:text-rose-400 font-bold ml-0.5">×</button>`;
           container.appendChild(pill);
         });
       },
@@ -972,7 +1164,6 @@
         this.notify('Холст очищен');
       },
 
-      // Генерация пустой сетки 15х15
       generateBlankGrid() {
         const W = this.width;
         const H = this.height;
@@ -988,7 +1179,6 @@
         document.getElementById('densityBadge').innerText = '0%';
       },
 
-      // Сборка филворда
       generate() {
         if (this.words.length === 0) {
           this.generateBlankGrid();
@@ -1018,7 +1208,6 @@
           }
         });
 
-        // Заполнение пустых клеток
         const fillerMode = document.getElementById('fillerModeSelect').value;
         let emptyCount = 0;
         let occupiedLetters = 0;
@@ -1043,7 +1232,6 @@
           }
         }
 
-        // Обновление статов
         document.getElementById('emptyCellsLabel').innerText = emptyCount;
         document.getElementById('statWordsCount').innerText = this.placedWords.length;
         document.getElementById('statLettersCount').innerText = occupiedLetters;
@@ -1092,7 +1280,7 @@
       tryFitWord(word, style, directions) {
         const W = this.width;
         const H = this.height;
-        const attempts = 350;
+        const attempts = 360;
 
         for (let a = 0; a < attempts; a++) {
           const dir = directions[Math.floor(Math.random() * directions.length)];
@@ -1218,7 +1406,6 @@
         this.renderGrid();
       },
 
-      // ЭКСПОРТ ДАННЫХ
       exportExcel() {
         if (!this.grid.length) return;
         const tsv = this.grid.map(row => row.join('\t')).join('\n');
@@ -1264,9 +1451,6 @@
         document.body.removeChild(ta);
       },
 
-      // =================================================================
-      // ПОДМОДУЛЬ: РЕВЕРС-АУДИТ (ОБРАТНЫЙ ХОД ИЗ 225 БУКВ)
-      // =================================================================
       reverse: {
         rawLetters: '',
         grid: [],
@@ -1281,7 +1465,6 @@
 
         onInputLetters() {
           const raw = document.getElementById('reverseInputRaw').value;
-          // Очистка от пробелов, знаков препинания и перевод в верхний регистр
           const cleaned = raw.toUpperCase().replace(/[^А-ЯЁA-Z]/g, '');
           this.rawLetters = cleaned;
 
@@ -1299,7 +1482,6 @@
             document.getElementById('reverseMatrixStatus').className = "font-mono text-[11px] text-amber-400";
           }
 
-          // Построение сетки 15х15
           this.grid = Array.from({ length: 15 }, () => Array(15).fill('·'));
           for (let i = 0; i < Math.min(cleaned.length, 225); i++) {
             const r = Math.floor(i / 15);
@@ -1359,10 +1541,9 @@
           }
         },
 
-        // Сканирование по 8 направлениям
         runAudit() {
           if (this.rawLetters.length < 225) {
-            app.notify(`В матрице ${this.rawLetters.length} букв из 225. Заполните полностью.`);
+            app.notify(`В матрице ${this.rawLetters.length} букв из 225.`);
           }
           if (this.auditWords.length === 0) {
             app.notify('Укажите слова для аудита!');
@@ -1421,7 +1602,6 @@
             }
           });
 
-          // Подсветка в реверс-сетке
           document.querySelectorAll('#reverseGridEl .cell-box').forEach(cell => {
             const key = `${cell.dataset.r},${cell.dataset.c}`;
             if (highlightedCoords.has(key)) {
@@ -1436,7 +1616,6 @@
             }
           });
 
-          // Отрисовка отчета
           document.getElementById('auditFoundCount').innerText = this.foundInReverse.length;
           document.getElementById('auditMissingCount').innerText = this.missingInReverse.length;
 
@@ -1461,10 +1640,9 @@
           });
 
           app.audio.playSuccess();
-          app.notify(`Аудит завершен: Найдено ${this.foundInReverse.length}, Отсутствует ${this.missingInReverse.length}`);
+          app.notify(`Аудит: Найдено ${this.foundInReverse.length}, Брак ${this.missingInReverse.length}`);
         },
 
-        // Поиск темы в каталоге, подходящей под 225 букв
         scanAllTopics() {
           const keys = Object.keys(app.topics);
           if (keys.length === 0) {
@@ -1490,12 +1668,12 @@
           });
 
           if (bestMatch && bestMatch.foundCount > 0) {
-            app.notify(`Совпадение найдено: Тема "${bestMatch.topicName}" (${bestMatch.foundCount}/${bestMatch.total} слов)!`);
+            app.notify(`Совпадение: "${bestMatch.topicName}" (${bestMatch.foundCount}/${bestMatch.total})!`);
             document.getElementById('reverseInputWords').value = app.topics[bestMatch.topicName].join(', ');
             this.onInputWords();
             this.runAudit();
           } else {
-            app.notify('Ни одна из сохраненных тем не подошла к этой матрице.');
+            app.notify('Ни одна из сохраненных тем не подошла к матрице.');
           }
         },
 
@@ -1524,9 +1702,6 @@
         }
       },
 
-      // =================================================================
-      // ИНТЕРАКТИВНЫЙ РЕЖИМ (PLAY MODE)
-      // =================================================================
       initPlayMode() {
         document.getElementById('playTopicTitle').innerText = this.activeTopicName;
         this.playState.seconds = 0;
@@ -1656,9 +1831,7 @@
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onEnd);
 
-        wrapper.addEventListener('touchstart', (e) => {
-          onStart(e);
-        }, { passive: true });
+        wrapper.addEventListener('touchstart', onStart, { passive: true });
         window.addEventListener('touchmove', onMove, { passive: true });
         window.addEventListener('touchend', onEnd);
       },
@@ -1719,7 +1892,7 @@
 
           if (this.playState.foundWords.size === this.placedWords.length && this.placedWords.length > 0) {
             clearInterval(this.playState.timerInterval);
-            this.notify(`ПОБЕДА! Филворд полностью решён за ${document.getElementById('playTimerLabel').innerText}! 🏆`);
+            this.notify(`ПОБЕДА! Филворд решён за ${document.getElementById('playTimerLabel').innerText}! 🏆`);
           }
         }
       },
@@ -1728,9 +1901,6 @@
         this.initPlayMode();
       },
 
-      // =================================================================
-      // КАТАЛОГ ТЕМ
-      // =================================================================
       saveCurrentTopic() {
         const titleInput = document.getElementById('newTopicTitle');
         const title = titleInput.value.trim();
@@ -1748,8 +1918,7 @@
         document.getElementById('activeTopicBadgeName').innerText = title;
         titleInput.value = '';
         this.persistState();
-        document.getElementById('navTopicBadge').innerText = Object.keys(this.topics).length;
-        this.notify(`Тема "${title}" сохранена навсегда!`);
+        this.notify(`Тема "${title}" сохранена!`);
       },
 
       renderTopicsVault() {
@@ -1766,7 +1935,7 @@
               <div class="text-3xl">📚</div>
               <h3 class="text-base font-bold text-white">Каталог пока пуст</h3>
               <p class="text-xs text-slate-400 max-w-md mx-auto">
-                Создайте вашу первую тему в конструкторе: введите слова, укажите название и нажмите «Сохранить тему».
+                Создайте первую тему в конструкторе: введите слова, укажите название и нажмите «Сохранить тему».
               </p>
               <button onclick="app.switchTab('studio')" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold shadow-lg">
                 Перейти в конструктор
@@ -1833,7 +2002,6 @@
             delete this.topics[name];
             this.persistState();
             this.renderTopicsVault();
-            document.getElementById('navTopicBadge').innerText = Object.keys(this.topics).length;
             this.notify(`Тема "${name}" удалена`);
           }
         );
@@ -1852,54 +2020,68 @@
       },
 
       importTopicsJSON(event) {
-        const file = event.target.files[0];
+        const file = event.target.files && event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
-            const data = JSON.parse(e.target.result);
-            if (typeof data === 'object' && Object.keys(data).length > 0) {
-              this.topics = { ...this.topics, ...data };
+            const imported = JSON.parse(e.target.result);
+            if (imported && typeof imported === 'object') {
+              this.topics = { ...this.topics, ...imported };
               this.persistState();
               this.renderTopicsVault();
-              document.getElementById('navTopicBadge').innerText = Object.keys(this.topics).length;
               this.notify('Темы успешно импортированы!');
             }
           } catch (err) {
-            this.notify('Ошибка формата JSON');
+            this.notify('Ошибка чтения JSON-файла');
           }
         };
         reader.readAsText(file);
       },
 
-      // ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
       switchTab(tab) {
         ['tabStudio', 'tabReverse', 'tabPlay', 'tabTopics'].forEach(id => {
-          document.getElementById(id).classList.add('hidden');
+          const el = document.getElementById(id);
+          if (el) el.classList.add('hidden');
         });
+
+        // Сброс классов десктопного меню
         ['navTabStudio', 'navTabReverse', 'navTabPlay', 'navTabTopics'].forEach(id => {
-          document.getElementById(id).className = "px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap";
+          const el = document.getElementById(id);
+          if (el) el.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap";
         });
+
+        // Сброс классов мобильного меню
+        ['mobNavTabStudio', 'mobNavTabReverse', 'mobNavTabPlay', 'mobNavTabTopics'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.className = "py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center text-slate-400 hover:text-white";
+        });
+
+        const activeDesktopClass = "px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm whitespace-nowrap";
+        const activeMobileClass = "py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center bg-brand-600 text-white shadow-sm";
 
         if (tab === 'studio') {
           document.getElementById('tabStudio').classList.remove('hidden');
-          document.getElementById('navTabStudio').className = "px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm whitespace-nowrap";
+          const d = document.getElementById('navTabStudio'); if (d) d.className = activeDesktopClass;
+          const m = document.getElementById('mobNavTabStudio'); if (m) m.className = activeMobileClass;
         } else if (tab === 'reverse') {
           document.getElementById('tabReverse').classList.remove('hidden');
-          document.getElementById('navTabReverse').className = "px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm whitespace-nowrap";
+          const d = document.getElementById('navTabReverse'); if (d) d.className = activeDesktopClass;
+          const m = document.getElementById('mobNavTabReverse'); if (m) m.className = activeMobileClass;
           this.reverse.renderGrid();
         } else if (tab === 'play') {
           document.getElementById('tabPlay').classList.remove('hidden');
-          document.getElementById('navTabPlay').className = "px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm whitespace-nowrap";
+          const d = document.getElementById('navTabPlay'); if (d) d.className = activeDesktopClass;
+          const m = document.getElementById('mobNavTabPlay'); if (m) m.className = activeMobileClass;
           this.initPlayMode();
         } else if (tab === 'topics') {
           document.getElementById('tabTopics').classList.remove('hidden');
-          document.getElementById('navTabTopics').className = "px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm whitespace-nowrap";
+          const d = document.getElementById('navTabTopics'); if (d) d.className = activeDesktopClass;
+          const m = document.getElementById('mobNavTabTopics'); if (m) m.className = activeMobileClass;
           this.renderTopicsVault();
         }
       },
 
-      // МОДАЛЬНОЕ ОКНО ПЕЧАТИ
       openPrintModal() {
         document.getElementById('printThemeHeading').innerText = `Тема: ${this.activeTopicName}`;
         const container = document.getElementById('printGridContainer');
@@ -1929,7 +2111,6 @@
         document.getElementById('printModal').classList.add('hidden');
       },
 
-      // УВЕДОМЛЕНИЯ И ДИАЛОГИ
       notify(msg) {
         const toast = document.getElementById('appToast');
         document.getElementById('toastMessage').innerText = msg;
@@ -1940,7 +2121,7 @@
         this.toastTimer = setTimeout(() => {
           toast.classList.remove('translate-y-0', 'opacity-100');
           toast.classList.add('translate-y-24', 'opacity-0');
-        }, 3000);
+        }, 2800);
       },
 
       showConfirm(title, message, onOk) {
@@ -1966,7 +2147,6 @@
       }
     };
 
-    // Старт при загрузке документа
     window.onload = function() {
       app.init();
     };
