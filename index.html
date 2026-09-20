@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WordVault Studio — Профессиональный Конструктор Филвордов 15x15</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              neon: '#06b6d4',
+              accent: '#ec4899'
+            },
+            surface: {
+              900: '#0b0f17',
+              850: '#0f172a',
+              800: '#161f33',
+              750: '#1e293b',
+              700: '#334155'
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          animation: {
+            'glow-pulse': 'glowPulse 3s ease-in-out infinite',
+            'gradient-shift': 'gradientShift 8s ease infinite alternate',
+          },
+          keyframes: {
+            glowPulse: {
+              '0%, 100%': { opacity: '0.4' },
+              '50%': { opacity: '0.8' },
+            },
+            gradientShift: {
+              '0%': { transform: 'scale(1) translate(0, 0)' },
+              '100%': { transform: 'scale(1.2) translate(-3%, 3%)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* Плавный скроллбар */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0f17;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #273549;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Эффект матового стекла */
+    .glass-panel {
+      background: rgba(18, 26, 43, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card {
+      background: rgba(26, 36, 56, 0.5);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* Стилизация ячеек сетки */
+    .cell-box {
+      aspect-ratio: 1 / 1;
+      user-select: none;
+      transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .cell-box:active {
+      transform: scale(0.92);
+    }
+
+    /* Стили для чистого экспорта на печать */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      .print-grid {
+        display: grid !important;
+        grid-template-columns: repeat(15, 1fr) !important;
+        border: 2px solid #000 !important;
+      }
+      .print-cell {
+        border: 1px solid #999 !important;
+        color: #000 !important;
+        font-size: 14pt !important;
+        height: 28px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-surface-900 text-slate-100 font-sans min-h-screen relative overflow-x-hidden selection:bg-brand-500 selection:text-white">
+
+  <!-- Динамические неоновые фоновые сферы -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div class="absolute -top-[20%] -left-[10%] w-[60vw] h-[60vw] rounded-full bg-gradient-to-br from-brand-600/15 via-purple-600/10 to-transparent blur-3xl animate-gradient-shift"></div>
+    <div class="absolute top-[40%] -right-[15%] w-[50vw] h-[50vw] rounded-full bg-gradient-to-bl from-brand-neon/10 via-brand-accent/10 to-transparent blur-3xl animate-gradient-shift" style="animation-duration: 12s;"></div>
+  </div>
+
+  <!-- Главный контейнер приложения -->
+  <div class="relative z-10 flex flex-col min-h-screen">
+    
+    <!-- Хедер / Верхняя панель в стиле видеохостинга/студии -->
+    <header class="sticky top-0 z-40 border-b border-white/10 glass-panel">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        
+        <!-- Логотип и брендинг -->
+        <div class="flex items-center gap-3 cursor-pointer select-none" onclick="app.switchTab('studio')">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-500 to-brand-neon flex items-center justify-center shadow-lg shadow-indigo-500/25 border border-white/20">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-base font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">WORDVAULT</span>
+              <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-400 border border-brand-500/30">STUDIO 15×15</span>
+            </div>
+            <p class="text-[11px] text-slate-400 hidden sm:block">Генератор и издательская платформа филвордов</p>
+          </div>
+        </div>
+
+        <!-- Центральные переключатели режимов (Tabs) -->
+        <nav class="flex items-center gap-1 bg-surface-850/80 p-1 rounded-xl border border-white/5 shadow-inner">
+          <button id="navTabStudio" onclick="app.switchTab('studio')" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm shadow-brand-600/30">
+            <span>⚡</span> Конструктор
+          </button>
+          <button id="navTabPlay" onclick="app.switchTab('play')" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5">
+            <span>🎮</span> Интерактив
+          </button>
+          <button id="navTabTopics" onclick="app.switchTab('topics')" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5">
+            <span>📚</span> Темы <span id="navTopicBadge" class="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-700 text-slate-300">50</span>
+          </button>
+        </nav>
+
+        <!-- Правые инструменты: Звук, Экспорт, Печать -->
+        <div class="flex items-center gap-2">
+          <button id="sfxToggleBtn" onclick="app.audio.toggle()" title="Включить / Выключить звуки" class="w-9 h-9 rounded-xl glass-card hover:bg-white/10 flex items-center justify-center text-slate-300 hover:text-white transition">
+            <span id="sfxIcon">🔊</span>
+          </button>
+          <button onclick="app.openPrintModal()" class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-200 transition">
+            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            Печать
+          </button>
+          <button onclick="app.generate()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-brand-500/20 hover:shadow-brand-500/35 transition flex items-center gap-2 active:scale-95">
+            <svg class="w-4 h-4 animate-spin hidden" id="genSpinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+            <span id="genBtnText">Собрать филворд</span>
+          </button>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- Главная рабочая область -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+      <!-- ================================================================= -->
+      <!-- ВКЛАДКА 1: СТУДИЯ / КОНСТРУКТОР (DEFAULT)                        -->
+      <!-- ================================================================= -->
+      <div id="tabStudio" class="space-y-6">
+        
+        <!-- Баннер быстрой информации -->
+        <div class="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 border border-white/10 shadow-lg">
+          <div class="flex items-center gap-3">
+            <div class="p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-sm font-bold text-white tracking-wide">Активная тема: <span id="activeTopicBadgeName" class="text-brand-400 font-mono">Космос и Галактики</span></h2>
+                <span id="densityBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Плотность: 85%</span>
+              </div>
+              <p class="text-xs text-slate-400">Сетка: <b class="text-slate-200">15 × 15 (225 клеток)</b> • Слов в теме: <b class="text-slate-200" id="statWordsCount">20</b> • Занято буквами: <b class="text-slate-200" id="statLettersCount">158</b></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="app.toggleShowAnswers()" id="btnRevealAnswers" class="px-3.5 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition flex items-center gap-2">
+              <span id="revealIcon">👁️</span>
+              <span id="revealText">Подсветка слов</span>
+            </button>
+            <button onclick="app.quickFillRandom()" class="px-3.5 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition flex items-center gap-2" title="Случайная тема из 50 заготовок">
+              <span>🎲</span> Случайная тема
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          <!-- ЛЕВАЯ КОЛОНКА: Ввод слов, пресеты, параметры -->
+          <div class="lg:col-span-5 space-y-6">
+            
+            <!-- Карточка ввода слов -->
+            <div class="glass-panel p-5 rounded-2xl border border-white/10 shadow-xl relative overflow-hidden">
+              <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-brand-500"></span> Ввод слов темы
+                </label>
+                <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+                  <span id="badgeWordCounter">20 слов</span>
+                </div>
+              </div>
+
+              <!-- Поле для ввода -->
+              <p class="text-xs text-slate-400 mb-2 leading-relaxed">
+                Вставляйте слова в произвольном формате: через запятую, пробел, новую строку или с номерами. Алгоритм сам отфильтрует знаки и выделит слова.
+              </p>
+              
+              <div class="relative">
+                <textarea id="wordInputArea" rows="6" oninput="app.onInputWords()" class="w-full bg-surface-900/90 border border-white/10 focus:border-brand-500 rounded-xl p-3.5 text-xs sm:text-sm font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition resize-none leading-relaxed" placeholder="Введите слова... Например: ПЛАНЕТА, ГАЛАКТИКА, ЗВЕЗДА, АСТЕРОИД, КОМЕТА"></textarea>
+              </div>
+
+              <!-- Таблетки распознанных слов -->
+              <div class="mt-3">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Распознанные слова (<span id="parsedTagsCount">0</span>):</span>
+                  <button onclick="app.clearWords()" class="text-[11px] text-rose-400 hover:text-rose-300 transition">Очистить</button>
+                </div>
+                <div id="parsedTagsContainer" class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 bg-surface-900/50 rounded-xl border border-white/5">
+                  <!-- Pills words -->
+                </div>
+              </div>
+
+              <!-- Быстрое сохранение в каталог -->
+              <div class="mt-4 pt-3 border-t border-white/10 flex gap-2">
+                <input id="newTopicTitle" type="text" placeholder="Название для сохранения (например: Кино)" class="flex-1 bg-surface-900/80 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-brand-500 font-medium" />
+                <button onclick="app.saveCurrentTopic()" class="px-3.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                  Сохранить
+                </button>
+              </div>
+            </div>
+
+            <!-- Параметры генератора и направления -->
+            <div class="glass-panel p-5 rounded-2xl border border-white/10 shadow-xl space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <svg class="w-4 h-4 text-brand-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                  Параметры раскладки
+                </span>
+                <span class="text-[11px] font-mono text-slate-400">15 × 15 = 225 ячеек</span>
+              </div>
+
+              <!-- Направления укладки -->
+              <div>
+                <label class="text-xs font-semibold text-slate-400 block mb-2">Направления слов в сетке:</label>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-brand-500/40 transition">
+                    <input type="checkbox" id="dirRight" checked onchange="app.generate()" class="w-4 h-4 rounded text-brand-600 bg-surface-800 border-white/20 focus:ring-0">
+                    <span class="font-medium text-slate-300">Вправо (→)</span>
+                  </label>
+                  <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-brand-500/40 transition">
+                    <input type="checkbox" id="dirDown" checked onchange="app.generate()" class="w-4 h-4 rounded text-brand-600 bg-surface-800 border-white/20 focus:ring-0">
+                    <span class="font-medium text-slate-300">Вниз (↓)</span>
+                  </label>
+                  <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-brand-500/40 transition">
+                    <input type="checkbox" id="dirDiagDown" checked onchange="app.generate()" class="w-4 h-4 rounded text-brand-600 bg-surface-800 border-white/20 focus:ring-0">
+                    <span class="font-medium text-slate-300">Диагональ (↘)</span>
+                  </label>
+                  <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-brand-500/40 transition">
+                    <input type="checkbox" id="dirReverse" checked onchange="app.generate()" class="w-4 h-4 rounded text-brand-600 bg-surface-800 border-white/20 focus:ring-0">
+                    <span class="font-medium text-slate-300">Реверс (← ↑ ↖)</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Заполнитель пустых клеток -->
+              <div class="pt-2">
+                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Алгоритм заполнения пустых ячеек:</label>
+                <select id="fillerModeSelect" onchange="app.generate()" class="w-full bg-surface-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-brand-500 font-medium">
+                  <option value="frequency">Частотный русский алфавит (естественный вид)</option>
+                  <option value="uniform">Равномерный случайный (А-Я)</option>
+                  <option value="dots">Точки / пустота (только для отладки структуры)</option>
+                </select>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- ПРАВАЯ КОЛОНКА: Интерактивная мастер-сетка 15х15 и Экспорт -->
+          <div class="lg:col-span-7 space-y-6">
+            
+            <!-- Панель сетки филворда -->
+            <div class="glass-panel p-5 rounded-2xl border border-white/10 shadow-2xl flex flex-col items-center relative">
+              
+              <!-- Информационная полоса над сеткой -->
+              <div class="w-full flex items-center justify-between mb-3 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-slate-300 uppercase tracking-wider">Сетка филворда</span>
+                  <span id="gridStatusIndicator" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    20 / 20 размещено
+                  </span>
+                </div>
+                <div class="text-slate-400 font-mono text-[11px]">
+                  Пустых ячеек: <span id="emptyCellsLabel" class="text-brand-neon font-bold">67</span>
+                </div>
+              </div>
+
+              <!-- Контейнер сетки 15x15 -->
+              <div class="w-full overflow-hidden flex justify-center py-2">
+                <div id="feelwordGrid" class="grid grid-cols-15 gap-1 p-2.5 bg-surface-900/90 rounded-2xl border border-white/10 shadow-inner max-w-full" style="grid-template-columns: repeat(15, minmax(0, 1fr)); width: 100%; max-width: 520px;">
+                  <!-- Динамические ячейки (15x15) -->
+                </div>
+              </div>
+
+              <!-- Список слов под сеткой с подсветкой при наведении -->
+              <div class="w-full mt-4 pt-3 border-t border-white/10">
+                <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+                  <span class="font-semibold text-slate-300">Слова в сетке (наведите курсор, чтобы подсветить путь):</span>
+                  <span id="placedCountSummary" class="font-mono text-brand-400">20 слов</span>
+                </div>
+                <div id="activeWordsChips" class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                  <!-- Chips -->
+                </div>
+              </div>
+
+            </div>
+
+            <!-- ПАНЕЛЬ ЭКСПОРТА (Excel, Одной строкой, Текст, JSON) -->
+            <div class="glass-panel p-5 rounded-2xl border border-white/10 shadow-xl">
+              <div class="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                  Экспорт и перенос результатов
+                </h3>
+                <span class="text-[11px] text-slate-400">1 клик для копирования</span>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                
+                <!-- Кнопка 1: Для Excel / Google Sheets -->
+                <button onclick="app.exportExcel()" class="group p-3 rounded-xl bg-gradient-to-br from-emerald-600/90 to-teal-700/90 hover:from-emerald-500 hover:to-teal-600 border border-emerald-400/30 text-white flex items-center gap-3 transition shadow-lg shadow-emerald-900/20 active:scale-95 text-left">
+                  <div class="p-2.5 rounded-lg bg-black/20 font-bold text-base text-emerald-200">📊</div>
+                  <div>
+                    <div class="text-xs font-bold">Вставить в Excel / Таблицы</div>
+                    <div class="text-[10px] text-emerald-100/70">Табуляция: заполнит ровно 15×15 ячеек</div>
+                  </div>
+                </button>
+
+                <!-- Кнопка 2: Одной сплошной строкой (225 символов) -->
+                <button onclick="app.exportLinear()" class="group p-3 rounded-xl glass-card hover:bg-white/10 border border-white/10 text-white flex items-center gap-3 transition active:scale-95 text-left">
+                  <div class="p-2.5 rounded-lg bg-brand-500/20 font-bold text-base text-brand-neon">🔤</div>
+                  <div>
+                    <div class="text-xs font-bold">Одной строкой (225 букв)</div>
+                    <div class="text-[10px] text-slate-400">Сплошной текст для скриптов и БД</div>
+                  </div>
+                </button>
+
+                <!-- Кнопка 3: Текстовая сетка -->
+                <button onclick="app.exportTextGrid()" class="group p-3 rounded-xl glass-card hover:bg-white/10 border border-white/10 text-white flex items-center gap-3 transition active:scale-95 text-left">
+                  <div class="p-2.5 rounded-lg bg-purple-500/20 font-bold text-base text-purple-300">📄</div>
+                  <div>
+                    <div class="text-xs font-bold">Сетка с пробелами</div>
+                    <div class="text-[10px] text-slate-400">Для печати текстом или вставки в Word</div>
+                  </div>
+                </button>
+
+                <!-- Кнопка 4: Список слов темы -->
+                <button onclick="app.exportWordsList()" class="group p-3 rounded-xl glass-card hover:bg-white/10 border border-white/10 text-white flex items-center gap-3 transition active:scale-95 text-left">
+                  <div class="p-2.5 rounded-lg bg-amber-500/20 font-bold text-base text-amber-300">📝</div>
+                  <div>
+                    <div class="text-xs font-bold">Список слов темы</div>
+                    <div class="text-[10px] text-slate-400">20 слов через запятую</div>
+                  </div>
+                </button>
+
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- ВКЛАДКА 2: ИНТЕРАКТИВНЫЙ РЕЖИМ РЕШЕНИЯ (PLAY MODE)               -->
+      <!-- ================================================================= -->
+      <div id="tabPlay" class="hidden space-y-6">
+        
+        <!-- Верхняя плашка управления игрой -->
+        <div class="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 border border-white/10 shadow-lg">
+          <div class="flex items-center gap-4">
+            <div class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xl font-bold">
+              🎮
+            </div>
+            <div>
+              <h2 class="text-base font-extrabold text-white flex items-center gap-2">
+                Режим разгадывания: <span id="playTopicTitle" class="text-brand-neon font-mono">Космос</span>
+              </h2>
+              <p class="text-xs text-slate-400">Зажимайте левую кнопку мыши (или ведите пальцем) по буквам, чтобы выделить найденное слово</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4">
+            <!-- Таймер -->
+            <div class="flex items-center gap-2 bg-surface-900/80 px-3.5 py-1.5 rounded-xl border border-white/10 font-mono text-sm">
+              <span class="text-slate-400">⏱️</span>
+              <span id="playTimerLabel" class="font-bold text-brand-neon">00:00</span>
+            </div>
+            <!-- Счётчик отгаданных -->
+            <div class="flex items-center gap-2 bg-surface-900/80 px-3.5 py-1.5 rounded-xl border border-white/10 font-mono text-sm">
+              <span class="text-slate-400">🏆</span>
+              <span id="playFoundScore" class="font-bold text-emerald-400">0 / 20</span>
+            </div>
+            <button onclick="app.playReset()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+              Сбросить
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          <!-- Игровая сетка (Playable grid with drag-to-select) -->
+          <div class="lg:col-span-8 flex flex-col items-center">
+            <div class="glass-panel p-5 rounded-2xl border border-white/10 shadow-2xl w-full flex flex-col items-center">
+              
+              <!-- Интерактивная сетка -->
+              <div id="interactiveGridWrapper" class="relative select-none touch-none py-2" style="max-width: 540px; width: 100%;">
+                <div id="playGrid" class="grid grid-cols-15 gap-1 p-3 bg-surface-900/90 rounded-2xl border border-white/10 shadow-2xl" style="grid-template-columns: repeat(15, minmax(0, 1fr));">
+                  <!-- Ячейки с обработчиками mousedown/mouseover/touchstart/touchmove -->
+                </div>
+              </div>
+
+              <!-- Текущее выделяемое слово -->
+              <div class="mt-4 h-8 flex items-center justify-center">
+                <span id="currentSelectionWord" class="font-mono text-base font-extrabold tracking-widest text-brand-400 bg-brand-500/10 px-4 py-1 rounded-full border border-brand-500/30 opacity-0 transition-opacity">
+                  СЛОВО
+                </span>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Список слов для поиска в игре -->
+          <div class="lg:col-span-4">
+            <div class="glass-panel p-5 rounded-2xl border border-white/10 shadow-xl space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Слова для поиска:</h3>
+                <span id="playWordsLeftBadge" class="text-xs text-brand-neon font-mono font-bold">Осталось: 20</span>
+              </div>
+              <div id="playWordsChecklist" class="flex flex-col gap-1.5 max-h-[500px] overflow-y-auto pr-1">
+                <!-- Word check items -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- ВКЛАДКА 3: ХРАНИЛИЩЕ 50 ТЕМ (TOPIC VAULT)                        -->
+      <!-- ================================================================= -->
+      <div id="tabTopics" class="hidden space-y-6">
+        
+        <!-- Заголовок каталога и быстрый поиск -->
+        <div class="glass-panel p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-white/10 shadow-lg">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-extrabold text-white">Каталог тем филвордов</h2>
+              <span id="vaultTotalCount" class="text-xs font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-neon border border-brand-500/30">50 тем</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Все 50 тем хранятся локально в браузере. Вы можете редактировать их, создавать новые или сделать резервную копию.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Поиск -->
+            <div class="relative">
+              <input id="vaultSearchInput" oninput="app.renderTopicsVault()" type="text" placeholder="Поиск темы..." class="bg-surface-900 border border-white/10 rounded-xl px-3.5 py-1.5 pl-8 text-xs text-white focus:outline-none focus:border-brand-500 w-44 sm:w-56" />
+              <svg class="w-4 h-4 text-slate-500 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+            <!-- Импорт / Экспорт JSON -->
+            <button onclick="app.exportAllTopicsJSON()" class="px-3 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition flex items-center gap-1.5">
+              <span>💾</span> Экспорт JSON
+            </button>
+            <label class="px-3 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition flex items-center gap-1.5 cursor-pointer">
+              <span>📂</span> Импорт JSON
+              <input type="file" id="importJsonInput" accept=".json" onchange="app.importTopicsJSON(event)" class="hidden" />
+            </label>
+            <button onclick="app.resetToFactoryTopics()" class="px-3 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 text-xs font-semibold transition">
+              Сброс на заводские (50 тем)
+            </button>
+          </div>
+        </div>
+
+        <!-- Сетка карточек 50 тем -->
+        <div id="topicsGridContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <!-- Карточки тем генерируются динамически -->
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- МОДАЛЬНЫЕ ОКНА И УВЕДОМЛЕНИЯ (Без вызовов alert/confirm)          -->
+  <!-- ================================================================= -->
+
+  <!-- Всплывающий стильный Toast -->
+  <div id="appToast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-3 px-4 py-3 rounded-2xl glass-panel border border-brand-500/40 shadow-2xl shadow-brand-500/20 text-white text-xs sm:text-sm font-medium">
+    <span id="toastIcon" class="text-base">✨</span>
+    <span id="toastMessage">Уведомление</span>
+  </div>
+
+  <!-- Модальное окно подтверждения (Замена confirm) -->
+  <div id="confirmModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-panel border border-white/15 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+      <div class="flex items-center gap-3 text-amber-400">
+        <div class="p-2 rounded-xl bg-amber-500/20 border border-amber-500/30">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <h3 id="confirmTitle" class="text-base font-bold text-white">Требуется подтверждение</h3>
+      </div>
+      <p id="confirmMessage" class="text-xs sm:text-sm text-slate-300 leading-relaxed">Вы уверены?</p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button id="confirmCancelBtn" class="px-4 py-2 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-300 transition">Отмена</button>
+        <button id="confirmOkBtn" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white transition shadow-lg shadow-rose-600/30">Подтвердить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно просмотра для печати (Print Preview) -->
+  <div id="printModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel border border-white/15 rounded-3xl p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] flex flex-col space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>🖨️</span> Бланк филворда для печати
+        </h3>
+        <button onclick="app.closePrintModal()" class="w-8 h-8 rounded-full glass-card hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto bg-white text-slate-900 p-6 rounded-2xl shadow-inner font-sans" id="printSheetArea">
+        <!-- Бланк для печати -->
+        <div class="text-center mb-4">
+          <h1 id="printThemeHeading" class="text-xl font-bold uppercase tracking-wider">Тема: Космос</h1>
+          <p class="text-xs text-slate-500 mt-0.5">Найдите в сетке 15×15 все 20 слов. Слова могут читаться в любом направлении.</p>
+        </div>
+
+        <div id="printGridContainer" class="grid grid-cols-15 border-2 border-slate-900 mx-auto" style="width: 390px; height: 390px; grid-template-columns: repeat(15, 1fr);">
+          <!-- Ячейки для печати -->
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-300">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Список слов для поиска:</h4>
+          <div id="printWordsListContainer" class="grid grid-cols-4 gap-2 text-xs font-mono font-semibold text-slate-800">
+            <!-- Words list for print -->
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-2">
+        <span class="text-xs text-slate-400">Формат оптимизирован под лист А4</span>
+        <div class="flex gap-2">
+          <button onclick="app.closePrintModal()" class="px-4 py-2 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-300">Закрыть</button>
+          <button onclick="window.print()" class="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-xs font-bold text-white shadow-lg shadow-brand-500/30">Распечатать / PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * БАЗА ДАННЫХ: 50 ГОТОВЫХ ТЕМ ПО 20 СЛОВ
+     * Охватывает науку, кино, ИТ, историю, природу, литературу и жизнь
+     */
+    const FACTORY_TOPICS_50 = {
+      "Космос и Галактики": ["ГАЛАКТИКА", "ПЛАНЕТА", "ТЕЛЕСКОП", "АСТЕРОИД", "КОМЕТА", "ЗВЕЗДА", "СПУТНИК", "МЕТЕОРИТ", "ОРБИТА", "КОСМОНАВТ", "ГРАВИТАЦИЯ", "ЗАТМЕНИЕ", "НЕБУЛА", "ПУЛЬСАР", "АТМОСФЕРА", "СКАФАНДР", "РАКЕТА", "СТАНЦИЯ", "ВСЕЛЕННАЯ", "КВАЗАР"],
+      "Программирование и IT": ["АЛГОРИТМ", "ИНТЕРФЕЙС", "ФРЕЙМВОРК", "КОМПИЛЯТОР", "БАГФИКС", "РЕПОЗИТОРИЙ", "СЕРВЕР", "ДЕПЛОЙ", "КОЛЛБЕК", "ФУНКЦИЯ", "ПЕРЕМЕННАЯ", "ДЕБАГГЕР", "БРАУЗЕР", "ПРОТОКОЛ", "БАЙТКОД", "ТЕРМИНАЛ", "СКРИПТ", "СТРУКТУРА", "РЕКУРСИЯ", "ИТЕРАЦИЯ"],
+      "Океан и Морские глубины": ["КОРАЛЛ", "АКУЛА", "ОСЬМИНОГ", "ДЕЛЬФИН", "МЕДУЗА", "БАПРЕМУДА", "ВПАДИНА", "РИФ", "БАТИСКАФ", "ТЕЧЕНИЕ", "ВОДОРОСЛЬ", "ПЛАСТИК", "ШТОРМ", "КАЛЬМАР", "КАШАЛОТ", "ПЛАНКТОН", "КРАБ", "ПЕРЕМЕШКА", "МАРИАНА", "ГЛУБИНА"],
+      "Архитектура и Города": ["НЕБОСКРЕБ", "КОЛОННА", "КУПОЛ", "ФАСАД", "АРКА", "БАШНЯ", "МОСТ", "ПЛОЩАДЬ", "ПРОСПЕКТ", "ФОНТАН", "ВИТРАЖ", "КАПИТЕЛЬ", "ПОРТИК", "КАТЕДРАЛ", "МОНОЛИТ", "ЭСТАКАДА", "БУЛЬВАР", "КВАРТАЛ", "ЧЕРДАК", "ФУНДАМЕНТ"],
+      "Кинематограф": ["РЕЖИССЕР", "ОПЕРАТОР", "СЦЕНАРИЙ", "МОНТАЖ", "ДУБЛЬ", "ПРЕМЬЕРА", "АКТЕР", "ХЛОПУШКА", "САУНДТРЕК", "ТИТРЫ", "ШЕДЕВР", "КАМЕО", "ПРОДЮСЕР", "СПЕЦЭФФЕКТ", "ДЕКОРАЦИЯ", "КИНОТЕАТР", "ФЕСТИВАЛЬ", "КАСТИНГ", "ЛОКАЦИЯ", "ПАВИЛЬОН"],
+      "Мировое Искусство": ["ЖИВОПИСЬ", "СКУЛЬПТУРА", "ХОЛСТ", "ПАЛИТРА", "МОЛЬБЕРТ", "ФРЕСКА", "ГРАВЮРА", "ИМПРЕССИОНИЗМ", "АВАНГАРД", "МОЗАИКА", "ПЕЙЗАЖ", "НАТЮРМОРТ", "ПОРТРЕТ", "ШЕДЕВР", "АКВАРЕЛЬ", "ГУАШЬ", "ВЫСТАВКА", "ГАЛЕРЕЯ", "МРАМОР", "ЭТЮД"],
+      "Древние Цивилизации": ["ФАРАОН", "ПИРАМИДА", "ПАПИРУС", "ГЛАДИАТОР", "АКВЕДУК", "СФИНКС", "ИМПЕРИЯ", "САРКОФАГ", "МУМИЯ", "ЛЕГИОН", "КОЛИЗЕЙ", "ЦЕЗАРЬ", "ЖРЕЦ", "КАТАКОМБЫ", "ОЛИМП", "МИФОЛОГИЯ", "ФОРУМ", "ЗАКУРИТ", "БРОНЗА", "ИЕРОГЛИФ"],
+      "Музыка и Звук": ["СИМФОНИЯ", "МЕЛОДИЯ", "ГАРМОНИЯ", "ОРКЕСТР", "ДИРИЖЕР", "ПАРТИТУРА", "АККОРД", "СКРИПКА", "РОЯЛЬ", "САКСОФОН", "БАРАБАН", "ВИОЛОНЧЕЛЬ", "РИТМ", "ТЕМБР", "РЕГИСТР", "АРИЯ", "СОНАТА", "КОНЦЕРТ", "ВИБРАЦИЯ", "ФЛЕЙТА"],
+      "Литература и Книги": ["РОМАН", "ПОВЕСТЬ", "ПРОЛОГ", "ЭПИЛОГ", "МЕТАФОРА", "ПЕРСОНАЖ", "СЮЖЕТ", "КУЛЬМИНАЦИЯ", "ИЗДАТЕЛЬ", "ТОМ", "ГЛАВА", "РИФМА", "ПОЭМА", "РУКОПИСЬ", "ФАНТАСТИКА", "ДЕТЕКТИВ", "БИБЛИОТЕКА", "БЕЛЛЕТРИСТИКА", "АВТОР", "ЦИТАТА"],
+      "Кулинария Мира": ["РЕЦЕПТ", "ИНГРЕДИЕНТ", "ПРЯНОСТЬ", "ПАСТА", "ПИЦЦА", "СУШИ", "ДЕСЕРТ", "ШОКОЛАД", "ВЫПЕЧКА", "КАРАМЕЛЬ", "СОУС", "СПЕЦИЯ", "ЛАЗАНЬЯ", "СУФЛЕ", "МАРИНАД", "БАГЕТ", "ГРИЛЬ", "КРУАССАН", "РЕСТОРАН", "ШЕФПОВАР"],
+      "Дикая Природа и Тайга": ["МЕДВЕДЬ", "ВОЛК", "РЫСЬ", "ЛИСИЦА", "СОБОЛЬ", "КЕДР", "БЕРЕЗА", "ХВОЯ", "РОДНИК", "БОЛОТО", "БЕРЛОГА", "ТРОПА", "ТЕТЕРЕВ", "ГЛУХАРЬ", "ЛИСТВЕННИЦА", "МОХ", "ТУНДРА", "ПОЛЯНА", "ШИШКА", "ЗАПОВЕДНИК"],
+      "Горы и Альпинизм": ["ВЕРШИНА", "ЭВЕРЕСТ", "ЛЕДНИК", "ПЕРЕВАЛ", "КАРАБИН", "СТРАХОВКА", "УЩЕЛЬЕ", "СКАЛА", "КАТАСТРОФА", "ЛАВИНА", "МАРШРУТ", "ВЫСОТА", "СНЕЖНИК", "ОБРЫВ", "ПАЛАТКА", "ПОДЪЕМ", "ПИК", "КИСЛОРОД", "КАСКА", "ЭДЕЛЬВЕЙС"],
+      "Наука и Физика": ["АТОМ", "ЭЛЕКТРОН", "ПРОТОН", "КВАНТ", "ФОТОН", "РЕЗОНАНС", "ЭНЕРГИЯ", "МАТЕРИЯ", "ВАКУУМ", "СКОРОСТЬ", "ЭНТРОПИЯ", "СВЕТ", "МАГНИТ", "ПОЛЕ", "РАСПАД", "ИЗЛУЧЕНИЕ", "СИЛА", "МАССА", "ИМПУЛЬС", "СПЕКТР"],
+      "Химия и Элементы": ["КИСЛОРОД", "ВОДОРОД", "УГЛЕРОД", "АЗОТ", "РЕАКЦИЯ", "МОЛЕКУЛА", "ТАБЛИЦА", "РАСТВОР", "ОСАДОК", "КАТАЛИЗАТОР", "РЕАГЕНТ", "КИСЛОТА", "ЩЕЛОЧЬ", "ПРОБИРКА", "КОЛБА", "МЕТАЛЛ", "СИНТЕЗ", "ВАЛЕНТНОСТЬ", "ЭЛЕМЕНТ", "ИЗОТОП"],
+      "Биология и Генетика": ["ДНК", "ХРОМОСОМА", "КЛЕТКА", "ОРГАНИЗМ", "МУТАЦИЯ", "ГЕНОМ", "ЭВОЛЮЦИЯ", "ФЕРМЕНТ", "БЕЛОК", "МИТОХОНДРИЯ", "СИМБИОЗ", "ВИРУС", "БАКТЕРИЯ", "ТКАНЬ", "НАСЛЕДСТВЕННОСТЬ", "ВИД", "ПОПУЛЯЦИЯ", "ФЛОРА", "ФАУНА", "БИОСФЕРА"],
+      "Медицина и Здоровье": ["ИММУНИТЕТ", "АНАТОМИЯ", "ДИАГНОЗ", "ТЕРАПИЯ", "ВАКЦИНА", "ВИТАМИН", "СЕРДЦЕ", "ПУЛЬС", "ДАВЛЕНИЕ", "ДОКТОР", "РЕЦЕПТ", "ХИРУРГИЯ", "СИМПТОМ", "ПАЦИЕНТ", "КЛИНИКА", "МИКРОСКОП", "СКАЛЬПЕЛЬ", "ТАБЛЕТКА", "РЕАБИЛИТАЦИЯ", "ЗДОРОВЬЕ"],
+      "Погода и Стихии": ["УРАГАН", "ТАЙФУН", "ЦИКЛОН", "МЕТЕЛЬ", "СНЕГОПАД", "ЛИВЕНЬ", "ГРОЗА", "МОЛНИЯ", "РАДУГА", "ТУМАН", "ЗАМОРОЗОК", "ОТТЕПЕЛЬ", "ЗАСУХА", "ГРАД", "БРИЗ", "МУССОН", "СМЕРЧ", "ПОТЕПЛЕНИЕ", "ДАВЛЕНИЕ", "ВЛАЖНОСТЬ"],
+      "География и Картография": ["ЭКВАТОР", "МЕРИДИАН", "ПАРАЛЛЕЛЬ", "ПОЛЮС", "МАТЕРИК", "ОСТРОВ", "ПОЛУОСТРОВ", "ПРОЛИВ", "ЗАЛИВ", "АРХИПЕЛАГ", "КООРДИНАТА", "МАСШТАБ", "РЕЛЬЕФ", "АТЛАС", "ГЛОБУС", "КОНТИНЕНТ", "КОМПАС", "АЗИМУТ", "РАВНИНА", "ДОЛИНА"],
+      "Автомобили и Транспорт": ["ДВИГАТЕЛЬ", "ТРАНСМИССИЯ", "ПОРШЕНЬ", "РАДИАТОР", "КАРБЮРАТОР", "СПИДОМЕТР", "ПОДВЕСКА", "ТОРМОЗ", "АККУМУЛЯТОР", "ТУРБИНА", "СЦЕПЛЕНИЕ", "БАГАЖНИК", "БАМПЕР", "АВТОМАГИСТРАЛЬ", "ПЕРЕДАЧА", "КЛАПАН", "ФАРА", "ЗАЖИГАНИЕ", "РУЛЬ", "КОЛЕСО"],
+      "Авиация и Полеты": ["САМОЛЕТ", "ВЕРТОЛЕТ", "ШТУРВАЛ", "ФЮЗЕЛЯЖ", "ИЛЛЮМИНАТОР", "ТУРБИНА", "КРЫЛО", "ШАССИ", "АВИАГОРИЗОНТ", "ЭШЕЛОН", "АЭРОПОРТ", "ДИСПЕТЧЕР", "ВЗЛЕТ", "ПОСАДКА", "ПАРАШЮТ", "ПИЛОТ", "ЛАЙНЕР", "АНГАР", "ТУРБУЛЕНТНОСТЬ", "КРЕЙСЕР"],
+      "Спорт и Олимпиада": ["ЧЕМПИОН", "МЕДАЛЬ", "РЕКОРД", "СТАДИОН", "СПРИНТ", "МАРАФОН", "АРБИТР", "ТРЕНЕР", "ПЬЕДЕСТАЛ", "ОЛИМПИАДА", "СПОРТСМЕН", "РАЗМИНКА", "ДИСТАНЦИЯ", "ФИНИШ", "СТАРТ", "КУБОК", "ТАКТИКА", "ГАНТЕЛЬ", "ШТАНГА", "ЭСТАФЕТА"],
+      "Шахматы и Стратегия": ["ГРОССМЕЙСТЕР", "КОРОЛЬ", "ФЕРЗЬ", "ЛАДЬЯ", "СЛОН", "КОНЬ", "ПЕШКА", "ГАМБИТ", "ШАХ", "МАТ", "ПАТ", "РОКИРОВКА", "ЦУГЦВАНГ", "ЦЕЙТНОТ", "ДЕБЮТ", "МИТТЕЛЬШПИЛЬ", "ЭНДШПИЛЬ", "ДИАГОНАЛЬ", "ТУРНИР", "РЕЙТИНГ"],
+      "Финансы и Экономика": ["ИНВЕСТИЦИИ", "КАПИТАЛ", "АКЦИЯ", "ОБЛИГАЦИЯ", "ДИВИДЕНД", "БАНК", "КРЕДИТ", "ДЕПОЗИТ", "ИНФЛЯЦИЯ", "ВАЛЮТА", "БИРЖА", "ТРЕЙДЕР", "ПРИБЫЛЬ", "ВЫРУЧКА", "БЮДЖЕТ", "АКТИВЫ", "ЛИКВИДНОСТЬ", "СТАРТАП", "ВЕНЧУР", "ЭКОНОМИКА"],
+      "Юриспруденция": ["КОДЕКС", "АДВОКАТ", "ПРОКУРОР", "СУДЬЯ", "ПРИГОВОР", "ИСК", "ДОГОВОР", "СТАТЬЯ", "ЮРИСТ", "ВЕРДИКТ", "СВИДЕТЕЛЬ", "ЭКСПЕРТИЗА", "ПРАВОСУДИЕ", "КОНСТИТУЦИЯ", "ЗАКОН", "НОТАРИУС", "ПРЕТЕНЗИЯ", "РЕШЕНИЕ", "ПРОЦЕСС", "ЮРИСДИКЦИЯ"],
+      "История и Эпохи": ["ХРОНИКА", "ЛЕТОПИСЬ", "ЭПОХА", "МОНАРХИЯ", "РЕВОЛЮЦИЯ", "АРХИВ", "ДИНАСТИЯ", "РАСКОПКИ", "АРТЕФАКТ", "КУЛЬТУРА", "СРЕДНЕВЕКОВЬЕ", "ВОЗРОЖДЕНИЕ", "ДЕРЖАВА", "ПОХОД", "ТРАКТАТ", "ПЛЕМЯ", "ПОСЕЛЕНИЕ", "ПАМЯТНИК", "АРХЕОЛОГИЯ", "СТОЛЕТИЕ"],
+      "Философия и Мудрость": ["МЫШЛЕНИЕ", "ДИАЛЕКТИКА", "ЭТИКА", "ЛОГИКА", "БЫТИЕ", "СОЗНАНИЕ", "ПОЗНАНИЕ", "ИСТИНА", "РАЗУМ", "ФИЛОСОФ", "ПАРАДОКС", "КОНЦЕПЦИЯ", "АКСИОМА", "ДОГМА", "МОРАЛЬ", "СУБЪЕКТ", "ОБЪЕКТ", "ДУАЛИЗМ", "ТЕОРИЯ", "СМЫСЛ"],
+      "Психология и Эмоции": ["ХАРАКТЕР", "ТЕМПЕРАМЕНТ", "ИНТУИЦИЯ", "ВОСПРИЯТИЕ", "ВНИМАНИЕ", "ПАМЯТЬ", "ЭМПАТИЯ", "МОТИВАЦИЯ", "РЕФЛЕКСИЯ", "СИНДРОМ", "ЛИЧНОСТЬ", "ЭМОЦИЯ", "СТРЕСС", "ПСИХИКА", "ТЕСТ", "ИНСАЙТ", "АРХЕТИП", "ГАРМОНИЯ", "БАЛАНС", "ТЕРАПИЯ"],
+      "Мифология и Легенды": ["ДРАКОН", "ГРИФОН", "КЕНТАВР", "ФЕНИКС", "ВАСИЛИСК", "ПЕГАС", "МИНОТАВР", "ЦИКЛОП", "РУСАЛКА", "ЕЛЬФ", "ГНОМ", "ЛЕШИЙ", "ЗЕВС", "ПОСЕЙДОН", "АИД", "ТИТАН", "ОЛИМП", "ВАЛЬХАЛЛА", "АРТЕФАКТ", "ЛЕГЕНДА"],
+      "Сад и Ботаника": ["ОРХИДЕЯ", "ТЮЛЬПАН", "РОЗА", "ГОРТЕНЗИЯ", "ЛЕПЕСТОК", "БУТОН", "СОЦВЕТИЕ", "СТЕБЕЛЬ", "КОРЕНЬ", "ТЕПЛИЦА", "ОРАНЖЕРЕЯ", "САДОВНИК", "КЛУМБА", "ПОБЕГ", "СЕМЯ", "ЧЕРЕНОК", "УДОБРЕНИЕ", "ГРУНТ", "ПОЛИВ", "БОТАНИКА"],
+      "Животный Мир Саванны": ["ЛЕВ", "ЛЕОПАРД", "СЛОН", "ЖИРАФ", "ЗЕБРА", "БЕГЕМОТ", "НОСОРОГ", "ГЕПАРД", "АНТИЛОПА", "ГИЕНА", "СТРАУС", "БАБУИН", "БОРОДАВОЧНИК", "САВАННА", "БАЙБАЧОК", "ХИЩНИК", "ПРАЙД", "ВОДОПОЙ", "МИГРАЦИЯ", "ОХОТА"],
+      "Птицы Планеты": ["ОРЕЛ", "СОКОЛ", "ЯСТРЕБ", "СОВА", "ФЛАМИНГО", "ПЕЛИКАН", "КОЛИБРИ", "ТУКАН", "ПОПУГАЙ", "ПИНГВИН", "АЛЬБАТРОС", "ЖУРАВЛЬ", "АИСТ", "ЛАСТОЧКА", "СНЕГИРЬ", "ДЯТЕЛ", "ГЛУХАРЬ", "СОЛОВЕЙ", "ВОРОН", "КУРОПАТКА"],
+      "Минералы и Самоцветы": ["АЛМАЗ", "ИЗУМРУД", "РУБИН", "САПФИР", "АМЕТИСТ", "ТОПАЗ", "МАЛАХИТ", "ЯНТАРЬ", "БИРЮЗА", "АКВАМАРИН", "КВАРЦ", "ГРАНИТ", "БАЗАЛЬТ", "СЛЮДА", "СЕЛЕНИТ", "ЯШМА", "АГАТ", "ОПАЛ", "ТУРМАЛИН", "КРИСТАЛЛ"],
+      "Театр и Сцена": ["СПЕКТАКЛЬ", "ПАРТЕР", "БЕЛЬЭТАЖ", "АНТРАКТ", "ДЕКОРАЦИЯ", "КУЛИСЫ", "ЗАНАВЕС", "БУТАФОРИЯ", "ПРЕМЬЕРА", "АКТЕР", "ДРАМАТУРГ", "СУФЛЕР", "ГРИМЕРКА", "АПЛОДИСМЕНТЫ", "ОВАЦИЯ", "ЛОЖА", "СЦЕНА", "РАМПА", "РЕПЕТИЦИЯ", "ТЕАТР"],
+      "Мода и Стиль": ["ДИЗАЙНЕР", "ПОДИУМ", "КОЛЛЕКЦИЯ", "СИЛУЭТ", "ТЕКСТИЛЬ", "ШЕЛК", "КАШЕМИР", "БАРХАТ", "ТРЕНД", "АТЕЛЬЕ", "АКСЕССУАР", "ГАРДЕРОБ", "КОСТЮМ", "ПОРТНОЙ", "ДЕФИЛЕ", "ЭЛЕГАНТНОСТЬ", "ВИНТАЖ", "СТИЛИСТ", "ЛЕКАЛО", "ФАСОН"],
+      "Школа и Образование": ["УЧЕБНИК", "ТЕТРАДЬ", "ПОРТФЕЛЬ", "ПЕРЕМЕНА", "УРОК", "УЧИТЕЛЬ", "ДИРЕКТОР", "АТТЕСТАТ", "ОЦЕНКА", "ДИКТАНТ", "ЭКЗАМЕН", "КАНИКУЛЫ", "КАБИНЕТ", "ДОСКА", "МЕЛ", "ЛИНЕЙКА", "КАРАНДАШ", "ГЛОБУС", "ЗВОНОК", "ШКОЛА"],
+      "Университет и Наука": ["СТУДЕНТ", "ПРОФЕССОР", "ЛЕКЦИЯ", "СЕМИНАР", "АУДИТОРИЯ", "СЕССИЯ", "ЗАЧЕТ", "КУРСОВАЯ", "ДИПЛОМ", "ДЕКАНАТ", "КАФЕДРА", "РЕКТОР", "СТИПЕНДИЯ", "БАКАЛАВР", "МАГИСТР", "АСПИРАНТ", "ДИССЕРТАЦИЯ", "КОНСПЕКТ", "ЛАБОРАТОРИЯ", "АКАДЕМИЯ"],
+      "Строительство и Ремонт": ["КИРПИЧ", "БЕТОН", "ЦЕМЕНТ", "ШПАКЛЕВКА", "АРМАТУРА", "ПЕРФОРАТОР", "РУЛЕТКА", "УРОВЕНЬ", "ШТУКАТУРКА", "КРАСКА", "ЛАМИНАТ", "ГИПСОКАРТОН", "МАСТЕР", "ОТДЕЛКА", "ФУНДАМЕНТ", "КРОВЛЯ", "ПЛИТКА", "ПРОРАБ", "ЧЕРТЕЖ", "ПРОЕКТ"],
+      "Инструменты Мастера": ["МОЛОТОК", "ОТВЕРТКА", "ПЛОСКОГУБЦЫ", "НОЖОВКА", "НАПИЛЬНИК", "СТАМЕСКА", "РУБАНОК", "ШУРУПОВЕРТ", "ДРЕЛЬ", "БОЛГАРКА", "ТИСКИ", "КЛЮЧ", "СТРУБЦИНА", "ШТАНГЕНЦИРКУЛЬ", "ТОПОР", "ЗУБИЛО", "ШУРУП", "СВЕРЛО", "ПАЯЛЬНИК", "ШЛИФМАШИНА"],
+      "Сельское Хозяйство": ["УРОЖАЙ", "ТРАКТОР", "КОМБАЙН", "ПШЕНИЦА", "ПОЛЕ", "ЭЛЕВАТОР", "ФЕРМЕР", "ПОСЕВ", "ПАХОТА", "БОРОЗДА", "СЕМЕНА", "ТЕПЛИЦА", "ЗЕРНО", "МЕЛЬНИЦА", "АГРОНОМ", "СЕНОКОС", "ПОЛИВ", "СИЛОС", "АМБАР", "ПЛУГ"],
+      "Морской Флот": ["КАПИТАН", "ШТУРМАН", "БОЦМАН", "МАТРОС", "КОРАБЛЬ", "ФРЕГАТ", "КОРВЕТ", "ЛИНКОР", "ПАЛУБА", "КАЮТА", "ТЮМ", "МАЧТА", "ПАРУС", "ЯКОРЬ", "ШТУРВАЛ", "КИЛЬ", "ГАВАНЬ", "ПОРТ", "МАЯК", "КОМПАС"],
+      "Военная История": ["КРЕПОСТЬ", "ОСАДА", "БАСТИОН", "РЕДУТ", "ДРУЖИНА", "ПОЛК", "СТРАТЕГИЯ", "МАНЕВР", "ПОБЕДА", "ЗНАМЯ", "АРТИЛЛЕРИЯ", "МУНДИР", "ГЕНЕРАЛ", "ШТАБ", "РАЗВЕДКА", "АТАКА", "ОБОРОНА", "ТАКТИКА", "ТРИУМФ", "ПАРАД"],
+      "Детектив и Расследования": ["СЫЩИК", "УЛИКА", "СЛЕД", "АЛИБИ", "МОТИВ", "ПОДОЗРЕВАЕМЫЙ", "ТАЙНА", "ЗАГАДКА", "ДОПРОС", "ПРОТОКОЛ", "ЭКСПЕРТ", "ОТПЕЧАТОК", "ШЕРЛОК", "ПРЕСТУПЛЕНИЕ", "ЛУПА", "ШИФР", "ПОИСК", "РАССЛЕДОВАНИЕ", "ВЕРСИЯ", "ФАКТ"],
+      "Компьютерные Игры": ["КВЕСТ", "ПЕРСОНАЖ", "УРОВЕНЬ", "ЛОКАЦИЯ", "АРТЕФАКТ", "ИНВЕНТАРЬ", "ГЕЙМПЛЕЙ", "БОСС", "ДЖОЙСТИК", "КОНСОЛЬ", "ПИКСЕЛЬ", "ГРАФИКА", "ШУТЕР", "СТРАТЕГИЯ", "РПГ", "ДОСТИЖЕНИЕ", "СЕРВЕР", "ПАТЧ", "КЛАН", "ФИНАЛ"],
+      "Робототехника и Будущее": ["КИБОРГ", "АНДРОИД", "СЕНСОР", "МАНИПУЛЯТОР", "НЕЙРОСЕТЬ", "КИБЕРНЕТИКА", "СЕРВОПРИВОД", "ПРОЦЕССОР", "АВТОНОМИЯ", "МИКРОСХЕМА", "ДАТЧИК", "ДРОН", "АЛГОРИТМ", "ИНТЕЛЛЕКТ", "РОБОТ", "СИНТЕЗ", "БИОНИКА", "ТЕХНОЛОГИЯ", "ПРОГРАММА", "БУДУЩЕЕ"],
+      "Экология Планеты": ["БИОСФЕРА", "АТМОСФЕРА", "ЗАПОВЕДНИК", "ПЕРЕРАБОТКА", "КИСЛОРОД", "БИОЛОГИЯ", "ЭНЕРГИЯ", "ЭКОЛОГИЯ", "ПРИРОДА", "РЕСУРСЫ", "КЛИМАТ", "ОЗОН", "ОЧИСТКА", "БАЛАНС", "СОХРАНЕНИЕ", "ЭКОСИСТЕМА", "ЛЕС", "ВОДА", "ЧИСТОТА", "ПЛАНЕТА"],
+      "Метро и Городской Транспорт": ["СТАНЦИЯ", "ЭСКАЛАТОР", "ПЕРЕХОД", "ТУННЕЛЬ", "ВАГОН", "РЕЛЬСЫ", "СОСТАВ", "МАШИНИСТ", "ВЕСТИБЮЛЬ", "ПЕРРОН", "ЖЕТОН", "ТУРНИКЕТ", "ДЕПО", "ЛИНИЯ", "МЕТРОПОЛИТЕН", "КАРТА", "СВЕТОФОР", "ИНТЕРВАЛ", "ПОЕЗД", "СКОРОСТЬ"],
+      "Праздники и Традиции": ["КАРНАВАЛ", "ФЕЙЕРВЕРК", "ПОДАРОК", "КОНФЕТТИ", "СЕРПАНТИН", "ТОРТ", "ПОЗДРАВЛЕНИЕ", "ГОСТИ", "ЮБИЛЕЙ", "ТОРЖЕСТВО", "ГИРЛЯНДА", "ШАМПАНСКОЕ", "СЮРПРИЗ", "УЛЫБКА", "ТРАДИЦИЯ", "ВЕСЕЛЬЕ", "ФЕСТИВАЛЬ", "КОСТЮМ", "ПРАЗДНИК", "РАДОСТЬ"],
+      "Туризм и Путешествия": ["ЧЕМОДАН", "ПАСПОРТ", "МАРШРУТ", "САМОЛЕТ", "ГОСТИНИЦА", "ЭКСКУРСИЯ", "ГИД", "ПАНОРАМА", "СУВЕНИР", "КУРОРТ", "ПЛЯЖ", "ВИЗА", "БАГАЖ", "БИЛЕТ", "ВОКЗАЛ", "ПУТЕШЕСТВИЕ", "ВПЕЧАТЛЕНИЕ", "ОТПУСК", "ПРИКЛЮЧЕНИЕ", "ФОТОГРАФИЯ"],
+      "Семья и Уютный Дом": ["ГОСТИНАЯ", "КАМИН", "ДИВАН", "ПЛЕД", "СВЕТИЛЬНИК", "КУХНЯ", "ЗАВТРАК", "УЖИН", "ЧАЙНИК", "ТРАДИЦИЯ", "РАДОСТЬ", "ЗАБОТА", "ТЕПЛО", "ДОБРОТА", "БЕСЕДА", "СЕМЬЯ", "РОДИТЕЛИ", "ДЕТИ", "УЮТ", "СЧАСТЬЕ"],
+      "Время и Хронометрия": ["СЕКУНДА", "МИНУТА", "ЧАСЫ", "МАЯТНИК", "ЦИФЕРБЛАТ", "СТРЕЛКА", "КАЛЕНДАРЬ", "СЕКУНДОМЕР", "БУДИЛЬНИК", "ХРОНОМЕТР", "МЕХАНИЗМ", "ПРУЖИНА", "ВЕЧНОСТЬ", "ЭПОХА", "МОМЕНТ", "ИНТЕРВАЛ", "ПЕРИОД", "ВРЕМЯ", "ХРОНОЛОГИЯ", "ТИКАНИЕ"]
+    };
+
+    // Частотный алфавит русского языка (для естественной маскировки)
+    const FREQ_RUSSIAN = "ОЕАИНТСРВЛКМДПУЯЫЬГЗБЧЙХЖШЮЦЩЭФЪ";
+
+    // Цвета неоновых маркеров для слов
+    const HIGHLIGHT_PALETTE = [
+      { border: '#38bdf8', bg: 'rgba(56, 189, 248, 0.25)', text: '#bae6fd' },
+      { border: '#818cf8', bg: 'rgba(129, 140, 248, 0.25)', text: '#c7d2fe' },
+      { border: '#c084fc', bg: 'rgba(192, 132, 252, 0.25)', text: '#e9d5ff' },
+      { border: '#f472b6', bg: 'rgba(244, 114, 182, 0.25)', text: '#fbcfe8' },
+      { border: '#34d399', bg: 'rgba(52, 211, 153, 0.25)', text: '#a7f3d0' },
+      { border: '#fbbf24', bg: 'rgba(251, 191, 36, 0.25)', text: '#fde68a' },
+      { border: '#2dd4bf', bg: 'rgba(45, 212, 191, 0.25)', text: '#99f6e4' },
+      { border: '#fb7185', bg: 'rgba(251, 113, 133, 0.25)', text: '#fecdd3' },
+      { border: '#a3e635', bg: 'rgba(163, 230, 53, 0.25)', text: '#d9f99d' },
+      { border: '#60a5fa', bg: 'rgba(96, 165, 250, 0.25)', text: '#bfdbfe' }
+    ];
+
+    // Синтезатор звуков на Web Audio API (без внешних файлов)
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+      }
+      toggle() {
+        this.muted = !this.muted;
+        const icon = document.getElementById('sfxIcon');
+        icon.innerText = this.muted ? '🔇' : '🔊';
+        app.notify(this.muted ? 'Звуковые эффекты выключены' : 'Звуковые эффекты включены');
+      }
+      playPop() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.05);
+          gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.05);
+        } catch (e) {}
+      }
+      playSuccess() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + i * 0.07);
+            gain.gain.setValueAtTime(0.1, now + i * 0.07);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.35);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + i * 0.07);
+            osc.stop(now + i * 0.07 + 0.36);
+          });
+        } catch (e) {}
+      }
+    }
+
+    // Основной контроллер приложения
+    const app = {
+      width: 15,
+      height: 15,
+      activeTopicName: "Космос и Галактики",
+      words: [],
+      grid: [],
+      solutionMask: [],
+      placedWords: [],
+      failedWords: [],
+      topics: {},
+      showAnswers: false,
+      hoveredWord: null,
+      audio: new SoundEngine(),
+      
+      // Игровое состояние
+      playState: {
+        active: false,
+        timerInterval: null,
+        seconds: 0,
+        foundWords: new Set(),
+        isSelecting: false,
+        startCell: null,
+        currentCells: [],
+      },
+
+      init() {
+        this.loadTopics();
+        this.loadActiveTopic(this.activeTopicName);
+        this.setupPlayEvents();
+      },
+
+      // Управление вкладками (Студия, Интерактив, Темы)
+      switchTab(tabId) {
+        document.getElementById('tabStudio').classList.add('hidden');
+        document.getElementById('tabPlay').classList.add('hidden');
+        document.getElementById('tabTopics').classList.add('hidden');
+
+        // Сброс подсветки табов
+        ['navTabStudio', 'navTabPlay', 'navTabTopics'].forEach(id => {
+          const el = document.getElementById(id);
+          el.className = "px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5";
+        });
+
+        if (tabId === 'studio') {
+          document.getElementById('tabStudio').classList.remove('hidden');
+          document.getElementById('navTabStudio').className = "px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm shadow-brand-600/30";
+        } else if (tabId === 'play') {
+          document.getElementById('tabPlay').classList.remove('hidden');
+          document.getElementById('navTabPlay').className = "px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm shadow-brand-600/30";
+          this.initPlayMode();
+        } else if (tabId === 'topics') {
+          document.getElementById('tabTopics').classList.remove('hidden');
+          document.getElementById('navTabTopics').className = "px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm shadow-brand-600/30";
+          this.renderTopicsVault();
+        }
+      },
+
+      // Очистка входных строк в массив заглавных русских слов
+      cleanWordTokens(text) {
+        if (!text) return [];
+        return [...new Set(
+          text.toUpperCase()
+            .replace(/[^А-ЯЁ]/g, ' ')
+            .split(/\s+/)
+            .filter(w => w.length >= 2)
+        )];
+      },
+
+      onInputWords() {
+        const raw = document.getElementById('wordInputArea').value;
+        this.words = this.cleanWordTokens(raw);
+        this.updateWordPills();
+      },
+
+      updateWordPills() {
+        const container = document.getElementById('parsedTagsContainer');
+        container.innerHTML = '';
+        document.getElementById('parsedTagsCount').innerText = this.words.length;
+        document.getElementById('badgeWordCounter').innerText = `${this.words.length} слов`;
+
+        this.words.forEach((w, idx) => {
+          const pill = document.createElement('span');
+          pill.className = 'text-[11px] font-mono px-2 py-0.5 rounded-md bg-surface-800 text-slate-300 border border-white/10 flex items-center gap-1';
+          pill.innerHTML = `<span>${w}</span><button onclick="app.removeWord(${idx})" class="text-slate-500 hover:text-rose-400">×</button>`;
+          container.appendChild(pill);
+        });
+      },
+
+      removeWord(index) {
+        this.words.splice(index, 1);
+        document.getElementById('wordInputArea').value = this.words.join(', ');
+        this.updateWordPills();
+        this.generate();
+      },
+
+      clearWords() {
+        this.words = [];
+        document.getElementById('wordInputArea').value = '';
+        this.updateWordPills();
+      },
+
+      // Алгоритм генератора филворда
+      generate() {
+        const spinner = document.getElementById('genSpinner');
+        const btnText = document.getElementById('genBtnText');
+        spinner.classList.remove('hidden');
+        btnText.innerText = "Формирование...";
+
+        setTimeout(() => {
+          this.executeLayout();
+          this.renderGrid();
+          this.renderChips();
+          spinner.classList.add('hidden');
+          btnText.innerText = "Собрать филворд";
+          this.audio.playPop();
+        }, 60);
+      },
+
+      getDirections() {
+        const allowR = document.getElementById('dirRight').checked;
+        const allowD = document.getElementById('dirDown').checked;
+        const allowDiag = document.getElementById('dirDiagDown').checked;
+        const allowRev = document.getElementById('dirReverse').checked;
+
+        const dirs = [];
+        if (allowR) dirs.push([0, 1]);
+        if (allowD) dirs.push([1, 0]);
+        if (allowDiag) {
+          dirs.push([1, 1]);
+          dirs.push([-1, 1]);
+        }
+        if (allowRev) {
+          if (allowR) dirs.push([0, -1]);
+          if (allowD) dirs.push([-1, 0]);
+          if (allowDiag) {
+            dirs.push([1, -1]);
+            dirs.push([-1, -1]);
+          }
+        }
+        return dirs.length ? dirs : [[0, 1], [1, 0]];
+      },
+
+      executeLayout() {
+        const W = this.width;
+        const H = this.height;
+        const directions = this.getDirections();
+
+        this.grid = Array.from({ length: H }, () => Array(W).fill(''));
+        this.solutionMask = Array.from({ length: H }, () => Array(W).fill(null));
+        this.placedWords = [];
+        this.failedWords = [];
+
+        // Сортировка: более длинные слова укладываются первыми
+        const sorted = [...this.words].sort((a, b) => b.length - a.length);
+
+        sorted.forEach((word, wordIndex) => {
+          const colorMeta = HIGHLIGHT_PALETTE[wordIndex % HIGHLIGHT_PALETTE.length];
+          const placed = this.tryFitWord(word, colorMeta, directions);
+          if (placed) {
+            this.placedWords.push({ word, coords: placed, style: colorMeta });
+          } else {
+            this.failedWords.push(word);
+          }
+        });
+
+        // Заполнение оставшихся пустых клеток
+        const fillerMode = document.getElementById('fillerModeSelect').value;
+        let emptyCount = 0;
+        let occupiedLetters = 0;
+
+        for (let r = 0; r < H; r++) {
+          for (let c = 0; c < W; c++) {
+            if (this.grid[r][c] === '') {
+              emptyCount++;
+              if (fillerMode === 'dots') {
+                this.grid[r][c] = '·';
+              } else if (fillerMode === 'uniform') {
+                this.grid[r][c] = String.fromCharCode(1040 + Math.floor(Math.random() * 32));
+              } else {
+                this.grid[r][c] = FREQ_RUSSIAN[Math.floor(Math.random() * FREQ_RUSSIAN.length)];
+              }
+            } else {
+              occupiedLetters++;
+            }
+          }
+        }
+
+        // Обновление метрик
+        document.getElementById('emptyCellsLabel').innerText = emptyCount;
+        document.getElementById('statWordsCount').innerText = this.placedWords.length;
+        document.getElementById('statLettersCount').innerText = occupiedLetters;
+        
+        const density = Math.round((occupiedLetters / (W * H)) * 100);
+        document.getElementById('densityBadge').innerText = `Плотность: ${density}%`;
+
+        const indicator = document.getElementById('gridStatusIndicator');
+        if (this.failedWords.length === 0) {
+          indicator.className = "px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
+          indicator.innerText = `${this.placedWords.length} / ${this.words.length} размещено`;
+        } else {
+          indicator.className = "px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30";
+          indicator.innerText = `Не поместилось: ${this.failedWords.length}`;
+        }
+      },
+
+      tryFitWord(word, style, directions) {
+        const W = this.width;
+        const H = this.height;
+        const attempts = 300;
+
+        for (let a = 0; a < attempts; a++) {
+          const dir = directions[Math.floor(Math.random() * directions.length)];
+          const dr = dir[0];
+          const dc = dir[1];
+
+          const startR = Math.floor(Math.random() * H);
+          const startC = Math.floor(Math.random() * W);
+
+          const endR = startR + dr * (word.length - 1);
+          const endC = startC + dc * (word.length - 1);
+
+          if (endR < 0 || endR >= H || endC < 0 || endC >= W) continue;
+
+          let ok = true;
+          for (let k = 0; k < word.length; k++) {
+            const r = startR + dr * k;
+            const c = startC + dc * k;
+            const cell = this.grid[r][c];
+            if (cell !== '' && cell !== word[k]) {
+              ok = false;
+              break;
+            }
+          }
+
+          if (ok) {
+            const coords = [];
+            for (let k = 0; k < word.length; k++) {
+              const r = startR + dr * k;
+              const c = startC + dc * k;
+              this.grid[r][c] = word[k];
+              this.solutionMask[r][c] = { word, style };
+              coords.push([r, c]);
+            }
+            return coords;
+          }
+        }
+        return null;
+      },
+
+      renderGrid() {
+        const container = document.getElementById('feelwordGrid');
+        container.innerHTML = '';
+
+        for (let r = 0; r < this.height; r++) {
+          for (let c = 0; c < this.width; c++) {
+            const letter = this.grid[r][c];
+            const mask = this.solutionMask[r][c];
+            const cell = document.createElement('div');
+            
+            cell.className = 'cell-box flex items-center justify-center text-xs sm:text-sm md:text-base font-extrabold font-mono rounded-lg border transition duration-150 cursor-default';
+            cell.innerText = letter;
+
+            const isHighlighted = this.hoveredWord && mask && mask.word === this.hoveredWord;
+            const isShown = this.showAnswers && mask;
+
+            if (isHighlighted || isShown) {
+              cell.style.backgroundColor = mask.style.bg;
+              cell.style.borderColor = mask.style.border;
+              cell.style.color = '#ffffff';
+              cell.style.boxShadow = `0 0 10px ${mask.style.border}44`;
+            } else {
+              cell.className += ' bg-surface-850/90 text-slate-200 border-white/5 hover:border-white/20';
+            }
+
+            container.appendChild(cell);
+          }
+        }
+      },
+
+      renderChips() {
+        const container = document.getElementById('activeWordsChips');
+        container.innerHTML = '';
+        document.getElementById('placedCountSummary').innerText = `${this.placedWords.length} из ${this.words.length} слов`;
+
+        this.placedWords.forEach(item => {
+          const chip = document.createElement('div');
+          chip.className = 'text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1.5';
+          
+          if (this.hoveredWord === item.word) {
+            chip.style.backgroundColor = item.style.bg;
+            chip.style.borderColor = item.style.border;
+            chip.style.color = '#ffffff';
+          } else {
+            chip.className += ' bg-surface-900/80 border-white/10 text-slate-300 hover:border-white/30';
+          }
+
+          chip.innerHTML = `
+            <span class="w-2 h-2 rounded-full" style="background-color: ${item.style.border}"></span>
+            <span>${item.word}</span>
+          `;
+
+          chip.onmouseenter = () => {
+            this.hoveredWord = item.word;
+            this.renderGrid();
+          };
+          chip.onmouseleave = () => {
+            this.hoveredWord = null;
+            this.renderGrid();
+          };
+
+          container.appendChild(chip);
+        });
+
+        // Не поместившиеся
+        this.failedWords.forEach(w => {
+          const chip = document.createElement('div');
+          chip.className = 'text-[11px] font-mono px-2 py-1 rounded-lg bg-rose-950/40 border border-rose-800/40 text-rose-400 line-through';
+          chip.title = 'Не хватило свободного места или коллизия';
+          chip.innerText = w;
+          container.appendChild(chip);
+        });
+      },
+
+      toggleShowAnswers() {
+        this.showAnswers = !this.showAnswers;
+        document.getElementById('revealText').innerText = this.showAnswers ? 'Скрыть ответы' : 'Подсветка слов';
+        document.getElementById('revealIcon').innerText = this.showAnswers ? '🙈' : '👁️';
+        this.renderGrid();
+      },
+
+      // Экспорт 1: В Excel / Google Sheets через \t
+      exportExcel() {
+        if (!this.grid.length) return;
+        const rowsTsv = this.grid.map(row => row.join('\t')).join('\n');
+        this.copyToClipboard(rowsTsv, '✓ Сетка 15×15 скопирована! Откройте Excel и нажмите Ctrl+V.');
+      },
+
+      // Экспорт 2: В одну строку (225 символов подряд)
+      exportLinear() {
+        if (!this.grid.length) return;
+        let str = '';
+        for (let r = 0; r < this.height; r++) {
+          for (let c = 0; c < this.width; c++) {
+            str += this.grid[r][c];
+          }
+        }
+        this.copyToClipboard(str, `✓ Скопировано одной сплошной строкой (${str.length} символов)!`);
+      },
+
+      // Экспорт 3: Текстовая сетка с пробелами
+      exportTextGrid() {
+        if (!this.grid.length) return;
+        const textGrid = this.grid.map(row => row.join(' ')).join('\n');
+        this.copyToClipboard(textGrid, '✓ Текстовая сетка скопирована!');
+      },
+
+      // Экспорт 4: Список слов темы
+      exportWordsList() {
+        const list = this.placedWords.map(p => p.word).join(', ');
+        this.copyToClipboard(list, '✓ Список слов темы скопирован!');
+      },
+
+      copyToClipboard(text, successMsg) {
+        // Надежное копирование в любых браузерах
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(() => {
+            this.notify(successMsg);
+          }).catch(() => {
+            this.fallbackCopy(text, successMsg);
+          });
+        } else {
+          this.fallbackCopy(text, successMsg);
+        }
+      },
+
+      fallbackCopy(text, successMsg) {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+        try {
+          document.execCommand('copy');
+          this.notify(successMsg);
+        } catch (e) {
+          this.notify('Ошибка копирования');
+        }
+        document.body.removeChild(area);
+      },
+
+      // ИНТЕРАКТИВНЫЙ РЕЖИМ (PLAY MODE)
+      initPlayMode() {
+        document.getElementById('playTopicTitle').innerText = this.activeTopicName;
+        this.playState.seconds = 0;
+        this.playState.foundWords.clear();
+        this.updatePlayTimerDisplay();
+
+        if (this.playState.timerInterval) clearInterval(this.playState.timerInterval);
+        this.playState.timerInterval = setInterval(() => {
+          this.playState.seconds++;
+          this.updatePlayTimerDisplay();
+        }, 1000);
+
+        this.renderPlayGrid();
+        this.renderPlayChecklist();
+      },
+
+      updatePlayTimerDisplay() {
+        const m = String(Math.floor(this.playState.seconds / 60)).padStart(2, '0');
+        const s = String(this.playState.seconds % 60).padStart(2, '0');
+        document.getElementById('playTimerLabel').innerText = `${m}:${s}`;
+      },
+
+      renderPlayGrid() {
+        const gridEl = document.getElementById('playGrid');
+        gridEl.innerHTML = '';
+
+        for (let r = 0; r < this.height; r++) {
+          for (let c = 0; c < this.width; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell-box flex items-center justify-center text-xs sm:text-sm md:text-base font-extrabold font-mono rounded-lg border border-white/5 bg-surface-850 text-slate-200 cursor-pointer select-none transition';
+            cell.innerText = this.grid[r][c];
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+            gridEl.appendChild(cell);
+          }
+        }
+      },
+
+      renderPlayChecklist() {
+        const container = document.getElementById('playWordsChecklist');
+        container.innerHTML = '';
+        
+        document.getElementById('playFoundScore').innerText = `${this.playState.foundWords.size} / ${this.placedWords.length}`;
+        document.getElementById('playWordsLeftBadge').innerText = `Осталось: ${this.placedWords.length - this.playState.foundWords.size}`;
+
+        this.placedWords.forEach(item => {
+          const isFound = this.playState.foundWords.has(item.word);
+          const el = document.createElement('div');
+          el.className = `px-3 py-2 rounded-xl border text-xs font-mono font-bold flex items-center justify-between transition ${
+            isFound 
+              ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300 line-through' 
+              : 'bg-surface-900/60 border-white/5 text-slate-300'
+          }`;
+          el.innerHTML = `
+            <span>${item.word}</span>
+            <span>${isFound ? '✓' : '•'}</span>
+          `;
+          container.appendChild(el);
+        });
+      },
+
+      setupPlayEvents() {
+        const gridWrapper = document.getElementById('interactiveGridWrapper');
+        
+        const getCellFromEvent = (e) => {
+          let target = e.target;
+          if (e.touches && e.touches.length > 0) {
+            const touch = e.touches[0];
+            target = document.elementFromPoint(touch.clientX, touch.clientY);
+          }
+          if (target && target.dataset && target.dataset.row !== undefined) {
+            return {
+              r: parseInt(target.dataset.row),
+              c: parseInt(target.dataset.col),
+              el: target
+            };
+          }
+          return null;
+        };
+
+        const onStart = (e) => {
+          const cell = getCellFromEvent(e);
+          if (!cell) return;
+          this.playState.isSelecting = true;
+          this.playState.startCell = cell;
+          this.playState.currentCells = [cell];
+          this.updateSelectionVisuals();
+        };
+
+        const onMove = (e) => {
+          if (!this.playState.isSelecting || !this.playState.startCell) return;
+          const cell = getCellFromEvent(e);
+          if (!cell) return;
+
+          // Проверяем прямолинейность (горизонталь, вертикаль, диагональ)
+          const dr = cell.r - this.playState.startCell.r;
+          const dc = cell.c - this.playState.startCell.c;
+
+          const stepR = dr === 0 ? 0 : dr / Math.abs(dr);
+          const stepC = dc === 0 ? 0 : dc / Math.abs(dc);
+
+          // Проверяем, образуют ли клетки линию
+          if (dr === 0 || dc === 0 || Math.abs(dr) === Math.abs(dc)) {
+            const len = Math.max(Math.abs(dr), Math.abs(dc));
+            const path = [];
+            for (let i = 0; i <= len; i++) {
+              const r = this.playState.startCell.r + stepR * i;
+              const c = this.playState.startCell.c + stepC * i;
+              const cellEl = document.querySelector(`#playGrid [data-row="${r}"][data-col="${c}"]`);
+              if (cellEl) path.push({ r, c, el: cellEl });
+            }
+            this.playState.currentCells = path;
+            this.updateSelectionVisuals();
+          }
+        };
+
+        const onEnd = () => {
+          if (!this.playState.isSelecting) return;
+          this.playState.isSelecting = false;
+          this.verifySelectedWord();
+          this.clearSelectionVisuals();
+        };
+
+        gridWrapper.addEventListener('mousedown', onStart);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onEnd);
+
+        gridWrapper.addEventListener('touchstart', onStart, { passive: false });
+        window.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('touchend', onEnd);
+      },
+
+      updateSelectionVisuals() {
+        // Очищаем временные подсветки
+        document.querySelectorAll('#playGrid .cell-box').forEach(c => {
+          if (!c.dataset.locked) {
+            c.style.backgroundColor = '';
+            c.style.borderColor = '';
+          }
+        });
+
+        let selectedWord = '';
+        this.playState.currentCells.forEach(cell => {
+          cell.el.style.backgroundColor = 'rgba(99, 102, 241, 0.4)';
+          cell.el.style.borderColor = '#818cf8';
+          selectedWord += cell.el.innerText;
+        });
+
+        const pill = document.getElementById('currentSelectionWord');
+        if (selectedWord.length > 0) {
+          pill.innerText = selectedWord;
+          pill.style.opacity = '1';
+        } else {
+          pill.style.opacity = '0';
+        }
+      },
+
+      clearSelectionVisuals() {
+        document.querySelectorAll('#playGrid .cell-box').forEach(c => {
+          if (!c.dataset.locked) {
+            c.style.backgroundColor = '';
+            c.style.borderColor = '';
+          }
+        });
+        document.getElementById('currentSelectionWord').style.opacity = '0';
+      },
+
+      verifySelectedWord() {
+        let forward = '';
+        this.playState.currentCells.forEach(c => forward += c.el.innerText);
+        const backward = forward.split('').reverse().join('');
+
+        const matched = this.placedWords.find(p => p.word === forward || p.word === backward);
+        if (matched && !this.playState.foundWords.has(matched.word)) {
+          this.playState.foundWords.add(matched.word);
+          this.audio.playSuccess();
+          this.notify(`Найдено слово: ${matched.word}! 🎉`);
+
+          // Блокируем цвет найденных ячеек
+          this.playState.currentCells.forEach(c => {
+            c.el.dataset.locked = "true";
+            c.el.style.backgroundColor = matched.style.bg;
+            c.el.style.borderColor = matched.style.border;
+            c.el.style.color = '#ffffff';
+          });
+
+          this.renderPlayChecklist();
+
+          // Проверка победы
+          if (this.playState.foundWords.size === this.placedWords.length) {
+            clearInterval(this.playState.timerInterval);
+            this.notify(`БРАВО! Вы разгадали весь филворд за ${document.getElementById('playTimerLabel').innerText}! 🏆`);
+          }
+        }
+      },
+
+      playReset() {
+        this.initPlayMode();
+      },
+
+      // УПРАВЛЕНИЕ ТЕМАМИ (50 ТЕМ В LOCALSTORAGE)
+      loadTopics() {
+        try {
+          const saved = localStorage.getItem('wordvault_topics_50');
+          if (saved) {
+            this.topics = JSON.parse(saved);
+          } else {
+            this.topics = { ...FACTORY_TOPICS_50 };
+            this.saveTopics();
+          }
+        } catch (e) {
+          this.topics = { ...FACTORY_TOPICS_50 };
+        }
+        document.getElementById('navTopicBadge').innerText = Object.keys(this.topics).length;
+      },
+
+      saveTopics() {
+        try {
+          localStorage.setItem('wordvault_topics_50', JSON.stringify(this.topics));
+        } catch (e) {}
+        document.getElementById('navTopicBadge').innerText = Object.keys(this.topics).length;
+      },
+
+      loadActiveTopic(name) {
+        if (!this.topics[name]) {
+          const firstKey = Object.keys(this.topics)[0];
+          name = firstKey || "Космос и Галактики";
+        }
+        this.activeTopicName = name;
+        document.getElementById('activeTopicBadgeName').innerText = name;
+        const wordsList = this.topics[name] || FACTORY_TOPICS_50["Космос и Галактики"];
+        this.words = [...wordsList];
+        document.getElementById('wordInputArea').value = this.words.join(', ');
+        this.updateWordPills();
+        this.generate();
+      },
+
+      renderTopicsVault() {
+        const container = document.getElementById('topicsGridContainer');
+        container.innerHTML = '';
+        const search = (document.getElementById('vaultSearchInput').value || '').toLowerCase().trim();
+
+        const keys = Object.keys(this.topics);
+        document.getElementById('vaultTotalCount').innerText = `${keys.length} тем`;
+
+        keys.forEach((topicName, idx) => {
+          if (search && !topicName.toLowerCase().includes(search)) return;
+
+          const words = this.topics[topicName];
+          const card = document.createElement('div');
+          card.className = `glass-card p-4 rounded-2xl border transition duration-200 flex flex-col justify-between group hover:border-brand-500/50 ${
+            this.activeTopicName === topicName ? 'border-brand-500/60 bg-brand-500/10' : 'border-white/10'
+          }`;
+
+          card.innerHTML = `
+            <div>
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <h4 class="text-sm font-bold text-white group-hover:text-brand-neon transition line-clamp-1">${topicName}</h4>
+                <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-surface-800 text-slate-300 border border-white/5">
+                  ${words.length} слов
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-400 font-mono line-clamp-3 leading-relaxed mb-3">
+                ${words.slice(0, 8).join(', ')}...
+              </p>
+            </div>
+            
+            <div class="flex items-center justify-between pt-2 border-t border-white/5">
+              <button onclick="app.chooseTopicFromVault('${topicName}')" class="px-3 py-1 rounded-xl bg-brand-600/80 hover:bg-brand-500 text-white text-xs font-bold transition shadow-sm">
+                Выбрать
+              </button>
+              <button onclick="app.deleteTopicPrompt('${topicName}')" class="text-slate-500 hover:text-rose-400 text-xs p-1 transition" title="Удалить тему">
+                ✕
+              </button>
+            </div>
+          `;
+
+          container.appendChild(card);
+        });
+      },
+
+      chooseTopicFromVault(topicName) {
+        this.loadActiveTopic(topicName);
+        this.switchTab('studio');
+        this.notify(`Загружена тема: "${topicName}"`);
+      },
+
+      quickFillRandom() {
+        const keys = Object.keys(this.topics);
+        const rand = keys[Math.floor(Math.random() * keys.length)];
+        this.chooseTopicFromVault(rand);
+      },
+
+      saveCurrentTopic() {
+        const titleInput = document.getElementById('newTopicTitle');
+        const title = titleInput.value.trim();
+        if (!title) {
+          this.notify('Пожалуйста, введите название темы!');
+          return;
+        }
+        if (this.words.length === 0) {
+          this.notify('Список слов пуст. Введите хотя бы несколько слов.');
+          return;
+        }
+
+        this.topics[title] = [...this.words];
+        this.saveTopics();
+        titleInput.value = '';
+        this.activeTopicName = title;
+        document.getElementById('activeTopicBadgeName').innerText = title;
+        this.notify(`Тема "${title}" успешно сохранена в каталог!`);
+      },
+
+      deleteTopicPrompt(topicName) {
+        this.showConfirm(
+          'Удалить тему?',
+          `Вы действительно хотите безвозвратно удалить тему "${topicName}"?`,
+          () => {
+            delete this.topics[topicName];
+            this.saveTopics();
+            this.renderTopicsVault();
+            this.notify(`Тема "${topicName}" удалена`);
+          }
+        );
+      },
+
+      resetToFactoryTopics() {
+        this.showConfirm(
+          'Сбросить все темы на заводские?',
+          'Все ваши изменения и новые темы будут заменены стандартными 50 темами.',
+          () => {
+            this.topics = { ...FACTORY_TOPICS_50 };
+            this.saveTopics();
+            this.renderTopicsVault();
+            this.loadActiveTopic("Космос и Галактики");
+            this.notify('Темы сброшены на 50 заводских вариантов!');
+          }
+        );
+      },
+
+      exportAllTopicsJSON() {
+        const json = JSON.stringify(this.topics, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `wordvault_50_topics_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.notify('Файл с темами скачан!');
+      },
+
+      importTopicsJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (typeof data === 'object' && Object.keys(data).length > 0) {
+              this.topics = { ...this.topics, ...data };
+              this.saveTopics();
+              this.renderTopicsVault();
+              this.notify('Темы успешно импортированы!');
+            }
+          } catch (err) {
+            this.notify('Ошибка формата JSON');
+          }
+        };
+        reader.readAsText(file);
+      },
+
+      // ПЕЧАТЬ (PRINT MODAL)
+      openPrintModal() {
+        document.getElementById('printThemeHeading').innerText = `Тема: ${this.activeTopicName}`;
+        const container = document.getElementById('printGridContainer');
+        container.innerHTML = '';
+
+        for (let r = 0; r < this.height; r++) {
+          for (let c = 0; c < this.width; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'print-cell flex items-center justify-center font-mono font-bold border border-slate-300 text-slate-900 text-sm';
+            cell.innerText = this.grid[r][c];
+            container.appendChild(cell);
+          }
+        }
+
+        const wordsContainer = document.getElementById('printWordsListContainer');
+        wordsContainer.innerHTML = '';
+        this.placedWords.forEach(item => {
+          const wEl = document.createElement('div');
+          wEl.innerText = `[ ] ${item.word}`;
+          wordsContainer.appendChild(wEl);
+        });
+
+        document.getElementById('printModal').classList.remove('hidden');
+      },
+
+      closePrintModal() {
+        document.getElementById('printModal').classList.add('hidden');
+      },
+
+      // Уведомления и подтверждения (БЕЗ alert и confirm)
+      notify(msg) {
+        const toast = document.getElementById('appToast');
+        document.getElementById('toastMessage').innerText = msg;
+        toast.classList.remove('translate-y-20', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+        
+        clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => {
+          toast.classList.remove('translate-y-0', 'opacity-100');
+          toast.classList.add('translate-y-20', 'opacity-0');
+        }, 3000);
+      },
+
+      showConfirm(title, message, onOk) {
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmMessage').innerText = message;
+        modal.classList.remove('hidden');
+
+        const okBtn = document.getElementById('confirmOkBtn');
+        const cancelBtn = document.getElementById('confirmCancelBtn');
+
+        const cleanup = () => {
+          modal.classList.add('hidden');
+          okBtn.onclick = null;
+          cancelBtn.onclick = null;
+        };
+
+        okBtn.onclick = () => {
+          cleanup();
+          if (onOk) onOk();
+        };
+        cancelBtn.onclick = cleanup;
+      }
+    };
+
+    // Старт при загрузке страницы
+    window.onload = function() {
+      app.init();
+    };
+  </script>
+</body>
+</html>
