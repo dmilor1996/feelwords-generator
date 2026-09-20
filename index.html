@@ -960,8 +960,15 @@
           this.mqttClient.on('message', (t, message) => {
             try {
               const data = JSON.parse(message.toString());
-              if (data && data.updatedAt && data.updatedAt > app.lastLocalEditTimestamp) {
-                app.applyRemoteUpdate(data);
+              if (data && data.updatedAt) {
+                if (data.updatedAt > app.lastLocalEditTimestamp) {
+                  app.applyRemoteUpdate(data);
+                  app.lastLocalEditTimestamp = data.updatedAt;
+                  PermanentDB.set('wv_last_edit_timestamp', data.updatedAt);
+                } else if (data.updatedAt < app.lastLocalEditTimestamp) {
+                  // Если локальное состояние новее облачного (например, редактировали оффлайн), обновляем облако
+                  app.scheduleCloudPush();
+                }
               }
             } catch (e) {}
           });
@@ -991,6 +998,8 @@
                 const state = JSON.parse(item.message);
                 if (state && state.updatedAt && state.updatedAt > app.lastLocalEditTimestamp) {
                   app.applyRemoteUpdate(state);
+                  app.lastLocalEditTimestamp = state.updatedAt;
+                  PermanentDB.set('wv_last_edit_timestamp', state.updatedAt);
                   break;
                 }
               }
@@ -1002,6 +1011,7 @@
       pushStateNow() {
         const now = Date.now();
         app.lastLocalEditTimestamp = now;
+        PermanentDB.set('wv_last_edit_timestamp', now);
 
         const payload = {
           topicName: app.activeTopicName,
@@ -1110,12 +1120,18 @@
 
         this.isApplyingRemoteSnapshot = true;
         try {
-          // Обновление тем каталога
+          // Полное обновление тем каталога (замена, а не слияние, чтобы удаление отражалось сразу)
           if (data.topics && typeof data.topics === 'object') {
-            this.topics = { ...this.topics, ...data.topics };
+            this.topics = { ...data.topics };
             this.updateBadgeCounters();
             this.renderTopicsVault();
             PermanentDB.set('wv_topics', this.topics);
+
+            // Если удалена тема, которая была активной на экране
+            if (this.activeTopicName !== "Новая тема" && !this.topics[this.activeTopicName] && !data.topicName) {
+              this.activeTopicName = "Новая тема";
+              document.getElementById('activeTopicBadgeName').innerText = this.activeTopicName;
+            }
           }
 
           // Обновление активного списка слов, если пользователь сейчас не печатает
@@ -1125,8 +1141,8 @@
           if (data.words && Array.isArray(data.words) && !isUserTyping) {
             const hasChanged = JSON.stringify(data.words) !== JSON.stringify(this.words) || (data.topicName && data.topicName !== this.activeTopicName);
             if (hasChanged) {
-              this.words = data.words;
-              this.activeTopicName = data.topicName || "Филворд";
+              this.words = [...data.words];
+              this.activeTopicName = data.topicName || "Новая тема";
               document.getElementById('wordInputArea').value = this.words.join(', ');
               document.getElementById('activeTopicBadgeName').innerText = this.activeTopicName;
               this.updateWordPills();
@@ -1159,6 +1175,8 @@
       },
 
       async restorePersistedState() {
+        this.lastLocalEditTimestamp = (await PermanentDB.get('wv_last_edit_timestamp')) || 0;
+
         const savedTopics = await PermanentDB.get('wv_topics');
         this.topics = savedTopics && typeof savedTopics === 'object' ? savedTopics : {};
         this.updateBadgeCounters();
@@ -1179,6 +1197,7 @@
 
       async persistState() {
         this.lastLocalEditTimestamp = Date.now();
+        await PermanentDB.set('wv_last_edit_timestamp', this.lastLocalEditTimestamp);
         await PermanentDB.set('wv_topics', this.topics);
         await PermanentDB.set('wv_current_state', {
           topicName: this.activeTopicName,
@@ -2115,6 +2134,10 @@
           `Вы уверены, что хотите удалить тему "${name}"?`,
           () => {
             delete this.topics[name];
+            if (this.activeTopicName === name) {
+              this.activeTopicName = "Новая тема";
+              document.getElementById('activeTopicBadgeName').innerText = this.activeTopicName;
+            }
             this.persistState();
             this.renderTopicsVault();
             this.notify(`Тема "${name}" удалена`);
