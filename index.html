@@ -1,785 +1,906 @@
 <!DOCTYPE html>
 <html lang="ru" class="dark">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>WordVault Studio — Автономный Конструктор и Аудит Филвордов 15x15</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>WordVault Studio — Генератор и Аудит Филвордов</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- MQTT WebSocket Client CDN для автоматической синхронизации ПК и смартфона -->
+  <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  <!-- Конфетти для победного экрана в игре -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
           colors: {
+            surface: {
+              950: '#07090e',
+              900: '#0b0f17',
+              850: '#111726',
+              800: '#161f33',
+              700: '#1e293b',
+              600: '#334155'
+            },
             brand: {
-              50: '#eef2ff',
-              400: '#818cf8',
               500: '#6366f1',
               600: '#4f46e5',
-              700: '#4338ca',
-              neon: '#06b6d4',
+              neon: '#38bdf8',
               accent: '#ec4899',
               emerald: '#10b981'
-            },
-            surface: {
-              950: '#070a0f',
-              900: '#0b0f17',
-              850: '#0f172a',
-              800: '#161f33',
-              750: '#1e293b',
-              700: '#334155'
             }
           },
           fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'Consolas', 'monospace']
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+            sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif']
           }
         }
       }
     }
   </script>
 
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <!-- Надежный WebSocket MQTT клиент для бесшовной кросс-платформенной синхронизации -->
-  <script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
-
   <style>
-    /* Плавный скроллбар */
+    /* Плавные переходы и скроллбар */
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background-color: #07090e;
+      color: #f1f5f9;
+      font-family: 'Inter', system-ui, sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
     ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
+      width: 6px;
+      height: 6px;
     }
     ::-webkit-scrollbar-track {
       background: #0b0f17;
     }
     ::-webkit-scrollbar-thumb {
-      background: #273549;
+      background: #1e293b;
       border-radius: 9999px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: #4f46e5;
+      background: #334155;
     }
 
-    /* Стеклянные панели (Glassmorphism) */
-    .glass-panel {
-      background: rgba(15, 23, 42, 0.78);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+    /* Эффект матового стекла */
+    .glass-card {
+      background: rgba(17, 23, 38, 0.75);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
-    .glass-card {
-      background: rgba(22, 31, 51, 0.65);
+    .glass-card-subtle {
+      background: rgba(11, 15, 23, 0.65);
       backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
-    /* Ячейка сетки: идеальный квадрат с адаптивным шрифтом */
+    /* Ячейка сетки филворда: идеальный квадрат с адаптивным масштабированием */
     .cell-box {
       aspect-ratio: 1 / 1;
       user-select: none;
       -webkit-user-select: none;
       touch-action: manipulation;
-      transition: background-color 0.12s ease, transform 0.1s ease, border-color 0.12s ease;
-      font-size: clamp(9px, 2.5vw, 15px);
+      transition: background-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+      font-size: clamp(10px, 2.7vw, 15px);
     }
     .cell-box:active {
-      transform: scale(0.93);
+      transform: scale(0.94);
     }
 
-    /* Мобильная сетка без горизонтальной прокрутки */
+    /* Двойное супер-выделение для выбранного слова (Super Highlight Glow) */
+    @keyframes doublePulseGlow {
+      0%, 100% {
+        box-shadow: 0 0 0 2px #ffffff, 0 0 14px currentColor, 0 0 28px currentColor;
+      }
+      50% {
+        box-shadow: 0 0 0 3px #ffffff, 0 0 22px currentColor, 0 0 38px currentColor;
+      }
+    }
+    .animate-double-pulse {
+      animation: doublePulseGlow 1.2s infinite ease-in-out;
+    }
+
+    /* Адаптивный квадратный контейнер филворда */
     .feelword-grid-container {
       width: 100%;
-      max-width: 490px;
-      aspect-ratio: 1 / 1;
+      max-width: 540px;
       margin: 0 auto;
+      aspect-ratio: 1 / 1;
     }
 
-    /* Бланк для печати */
-    @media print {
-      body {
-        background: #ffffff !important;
-        color: #000000 !important;
-      }
-      .no-print {
-        display: none !important;
-      }
-      .print-only {
-        display: block !important;
-      }
-      .print-grid {
-        display: grid !important;
-        grid-template-columns: repeat(15, 1fr) !important;
-        border: 2px solid #000000 !important;
-      }
-      .print-cell {
-        border: 1px solid #777777 !important;
-        color: #000000 !important;
-        height: 25px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-family: monospace !important;
-        font-weight: bold !important;
-      }
+    /* Фоновые неоновые световые пятна */
+    .ambient-glow-1 {
+      position: fixed;
+      top: -10%;
+      left: -10%;
+      width: 45vw;
+      height: 45vw;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .ambient-glow-2 {
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 50vw;
+      height: 50vw;
+      background: radial-gradient(circle, rgba(236, 72, 153, 0.08) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Анимация победного всплывающего окна */
+    @keyframes modalPopIn {
+      0% { opacity: 0; transform: scale(0.92) translateY(12px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .animate-pop-in {
+      animation: modalPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
   </style>
 </head>
+<body class="relative flex flex-col justify-between selection:bg-brand-500 selection:text-white">
 
-<body class="bg-surface-950 text-slate-100 font-sans min-h-screen relative overflow-x-hidden selection:bg-brand-500 selection:text-white">
+  <div class="ambient-glow-1"></div>
+  <div class="ambient-glow-2"></div>
 
-  <!-- Фоновое свечение -->
-  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
-    <div class="absolute -top-[15%] -left-[10%] w-[55vw] h-[55vw] rounded-full bg-gradient-to-br from-brand-600/15 via-indigo-600/10 to-transparent blur-3xl"></div>
-    <div class="absolute top-[50%] -right-[15%] w-[45vw] h-[45vw] rounded-full bg-gradient-to-bl from-brand-neon/10 via-brand-accent/10 to-transparent blur-3xl"></div>
+  <!-- Верхняя шапка платформы -->
+  <header class="relative z-30 w-full border-b border-white/10 glass-card px-3 sm:px-6 py-2.5 sm:py-3 sticky top-0">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+      
+      <!-- Логотип и заголовок -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-brand-600 via-brand-500 to-brand-neon flex items-center justify-center shadow-lg shadow-brand-500/25 flex-shrink-0">
+          <span class="text-white font-extrabold text-sm sm:text-base font-mono">15²</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-white flex items-center gap-1.5">
+              WordVault <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-neon border border-brand-500/30">PRO</span>
+            </h1>
+          </div>
+          <p class="text-[10px] text-slate-400 hidden sm:block">Студия генерации, реверс-аудита и синхронизации филвордов</p>
+        </div>
+      </div>
+
+      <!-- Центральный статус автосинхронизации -->
+      <div class="flex items-center gap-2">
+        <div id="cloudSyncStatusBadge" onclick="app.openSyncInfoModal()" class="px-2.5 py-1 rounded-full text-[11px] font-mono flex items-center gap-1.5 bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 cursor-pointer hover:bg-emerald-500/20 transition active:scale-95" title="Нажмите для проверки параметров синхронизации">
+          <span class="relative flex h-2 w-2">
+            <span id="syncDotPing" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span id="syncDot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span id="cloudStatusText" class="font-semibold truncate max-w-[130px] sm:max-w-[180px]">Авто-облако: онлайн</span>
+        </div>
+      </div>
+
+      <!-- Правая панель действий -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <!-- Кнопка звука -->
+        <button onclick="app.audio.toggleMute()" id="btnToggleSound" class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl glass-card-subtle text-xs font-semibold text-slate-300 hover:text-white border border-white/10 transition flex items-center gap-1 active:scale-95" title="Включить / выключить звук">
+          <span id="soundIcon">🔊</span>
+          <span class="hidden md:inline text-[11px]" id="soundText">Звук</span>
+        </button>
+
+        <!-- Быстрый экспорт в Excel -->
+        <button onclick="app.exportExcel()" class="px-2.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold transition shadow-md shadow-brand-600/30 flex items-center gap-1.5 active:scale-95">
+          <span>📊</span>
+          <span class="hidden sm:inline">В Excel</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Мобильное меню: фиксированная 4-колоночная сетка без горизонтального скролла -->
+  <div class="relative z-20 w-full glass-card border-b border-white/10 px-2 py-1.5 sm:hidden">
+    <div class="grid grid-cols-4 gap-1 w-full text-center">
+      <button onclick="app.switchTab('constructor')" id="mTabBtn-constructor" class="py-1.5 rounded-lg text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 bg-brand-600/30 text-brand-neon border border-brand-500/40">
+        <span class="text-sm">⚡</span>
+        <span class="text-[10px] leading-tight">Конструктор</span>
+      </button>
+      <button onclick="app.switchTab('reverse')" id="mTabBtn-reverse" class="py-1.5 rounded-lg text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white">
+        <span class="text-sm">🔍</span>
+        <span class="text-[10px] leading-tight">Реверс</span>
+      </button>
+      <button onclick="app.switchTab('play')" id="mTabBtn-play" class="py-1.5 rounded-lg text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white">
+        <span class="text-sm">🎮</span>
+        <span class="text-[10px] leading-tight">Игра</span>
+      </button>
+      <button onclick="app.switchTab('topics')" id="mTabBtn-topics" class="py-1.5 rounded-lg text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white relative">
+        <span class="text-sm">📚</span>
+        <span class="text-[10px] leading-tight">Темы</span>
+        <span id="mTopicsBadge" class="absolute top-1 right-2 w-2 h-2 rounded-full bg-brand-neon hidden"></span>
+      </button>
+    </div>
   </div>
 
-  <!-- Главный контейнер -->
-  <div class="relative z-10 flex flex-col min-h-screen">
-    
-    <!-- Шапка приложения -->
-    <header class="sticky top-0 z-40 border-b border-white/10 glass-panel">
-      <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
-        
-        <!-- Логотип -->
-        <div class="flex items-center gap-2.5 cursor-pointer select-none" onclick="app.switchTab('studio')">
-          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-500 to-brand-neon flex items-center justify-center shadow-lg shadow-indigo-500/25 border border-white/20">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h7" />
-            </svg>
-          </div>
-          <div>
-            <div class="flex items-center gap-1.5">
-              <span class="text-sm sm:text-base font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">WORDVAULT</span>
-              <span class="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-400 border border-brand-500/30">15×15</span>
-            </div>
-            <p class="text-[10px] text-slate-400 hidden md:block">Конструктор и реверс-аудит филвордов</p>
-          </div>
-        </div>
-
-        <!-- Десктопная навигация -->
-        <nav class="hidden md:flex items-center gap-1 bg-surface-900/90 p-1 rounded-xl border border-white/5">
-          <button id="navTabStudio" onclick="app.switchTab('studio')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm whitespace-nowrap">
-            <span>⚡</span> <span>Конструктор</span>
-          </button>
-          <button id="navTabReverse" onclick="app.switchTab('reverse')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
-            <span>🔍</span> <span>Реверс 225</span>
-          </button>
-          <button id="navTabPlay" onclick="app.switchTab('play')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
-            <span>🎮</span> <span>Игра</span>
-          </button>
-          <button id="navTabTopics" onclick="app.switchTab('topics')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
-            <span>📚</span> <span>Темы</span> <span id="navTopicBadge" class="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-400">0</span>
-          </button>
-        </nav>
-
-        <!-- Кнопки действий и интерактивный статус автосинхронизации -->
-        <div class="flex items-center gap-1.5 sm:gap-2">
-          
-          <!-- Автоматический статус связи ПК <-> Телефон -->
-          <div id="cloudSyncIndicator" onclick="app.openSyncInfoModal()" title="Нажмите для просмотра настроек синхронизации" class="px-2.5 py-1.5 rounded-xl bg-surface-900/80 border border-emerald-500/30 text-xs font-bold text-slate-200 flex items-center gap-1.5 select-none shadow-sm cursor-pointer hover:border-emerald-400/60 transition active:scale-95">
-            <span id="syncDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="text-xs">☁️</span>
-            <span id="syncText" class="text-[11px] text-emerald-300 hidden sm:inline">Авто-облако: онлайн</span>
-          </div>
-
-          <button id="sfxToggleBtn" onclick="app.audio.toggle()" title="Звук вкл/выкл" class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl glass-card hover:bg-white/10 flex items-center justify-center text-xs text-slate-300">
-            <span id="sfxIcon">🔊</span>
-          </button>
-          <button onclick="app.openPrintModal()" title="Печать" class="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-200">
-            <span>🖨️</span> <span class="hidden md:inline">Печать</span>
-          </button>
-          <button onclick="app.generate()" class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-brand-500/20 flex items-center gap-1.5 active:scale-95">
-            <span>Собрать</span>
-          </button>
-        </div>
-
+  <!-- Десктопная панель навигации -->
+  <div class="relative z-20 w-full glass-card-subtle border-b border-white/5 px-6 py-2 hidden sm:block">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <button onclick="app.switchTab('constructor')" id="tabBtn-constructor" class="px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-brand-600/25 text-brand-neon border border-brand-500/40 shadow-sm">
+          <span>⚡</span> <span>Конструктор филворда</span>
+        </button>
+        <button onclick="app.switchTab('reverse')" id="tabBtn-reverse" class="px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-white/5 border border-transparent">
+          <span>🔍</span> <span>Реверс-аудит (225 букв)</span>
+        </button>
+        <button onclick="app.switchTab('play')" id="tabBtn-play" class="px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-white/5 border border-transparent">
+          <span>🎮</span> <span>Интерактивная игра</span>
+        </button>
+        <button onclick="app.switchTab('topics')" id="tabBtn-topics" class="px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-white/5 border border-transparent">
+          <span>📚</span> <span>Каталог тем</span>
+          <span id="dTopicsCountBadge" class="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] font-mono text-slate-300">0</span>
+        </button>
       </div>
-    </header>
 
-    <!-- Мобильная фиксированная панель: 4 вкладки во всю ширину БЕЗ скролла -->
-    <div class="md:hidden sticky top-16 z-30 bg-surface-900/95 border-b border-white/10 backdrop-blur-md px-2 py-1.5">
-      <div class="grid grid-cols-4 gap-1 w-full text-center">
-        <button id="mobNavTabStudio" onclick="app.switchTab('studio')" class="py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center bg-brand-600 text-white shadow-sm">
-          <span class="text-xs">⚡</span>
-          <span class="truncate w-full text-[10px] mt-0.5">Конструктор</span>
-        </button>
-        <button id="mobNavTabReverse" onclick="app.switchTab('reverse')" class="py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center text-slate-400 hover:text-white">
-          <span class="text-xs">🔍</span>
-          <span class="truncate w-full text-[10px] mt-0.5">Реверс</span>
-        </button>
-        <button id="mobNavTabPlay" onclick="app.switchTab('play')" class="py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center text-slate-400 hover:text-white">
-          <span class="text-xs">🎮</span>
-          <span class="truncate w-full text-[10px] mt-0.5">Игра</span>
-        </button>
-        <button id="mobNavTabTopics" onclick="app.switchTab('topics')" class="py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center text-slate-400 hover:text-white relative">
-          <span class="text-xs">📚</span>
-          <span class="truncate w-full text-[10px] mt-0.5">Темы <span id="mobNavTopicBadge" class="text-[9px] px-1 rounded-full bg-slate-800 text-slate-300">0</span></span>
-        </button>
+      <div class="flex items-center gap-2 text-xs text-slate-400 font-mono">
+        <span>Сетка: <b class="text-slate-200">15 × 15</b> (225 клеток)</span>
       </div>
     </div>
+  </div>
 
-    <!-- Основной контент -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 lg:p-8">
+  <!-- Основной контент страниц -->
+  <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-6 pb-20">
 
-      <!-- ================================================================= -->
-      <!-- ВКЛАДКА 1: КОНСТРУКТОР СТУДИИ                                    -->
-      <!-- ================================================================= -->
-      <div id="tabStudio" class="space-y-4 sm:space-y-6">
-        
-        <!-- Инфо-полоса статуса темы -->
-        <div class="glass-panel p-3.5 sm:p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 border border-white/10 shadow-lg">
-          <div class="flex items-center gap-3">
-            <div class="p-2 sm:p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
-              <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            </div>
-            <div>
-              <div class="flex items-center gap-2">
-                <h2 class="text-xs sm:text-sm font-bold text-white">Тема: <span id="activeTopicBadgeName" class="text-brand-neon font-mono">Новая тема</span></h2>
-                <span id="densityBadge" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">0% букв</span>
-                <span id="langDetectedBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-800 text-slate-300 border border-white/5">RU + EN</span>
-              </div>
-              <p class="text-[11px] text-slate-400">Сетка: <b class="text-slate-200">15 × 15 (225 ячеек)</b> • Слов в сетке: <b class="text-slate-200" id="statWordsCount">0</b> • Букв: <b class="text-slate-200" id="statLettersCount">0</b></p>
-            </div>
+    <!-- ======================================================== -->
+    <!-- РАЗДЕЛ 1: КОНСТРУКТОР ФИЛВОРДОВ -->
+    <!-- ======================================================== -->
+    <section id="view-constructor" class="space-y-4">
+      
+      <!-- Верхняя информационная плашка темы -->
+      <div class="glass-card rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-500/15 border border-brand-500/30 flex items-center justify-center text-lg">
+            🏷️
           </div>
-          <div class="flex items-center gap-2">
-            <button onclick="app.toggleShowAnswers()" id="btnRevealAnswers" class="px-3 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition flex items-center gap-1.5">
-              <span id="revealIcon">👁️</span>
-              <span id="revealText">Подсветка</span>
-            </button>
-            <button onclick="app.clearCurrentBoard()" class="px-3 py-1.5 rounded-xl bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 border border-rose-800/30 text-xs font-semibold transition">
-              Очистить
-            </button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
-          
-          <!-- ЛЕВАЯ ПАНЕЛЬ: Ввод слов, параметры -->
-          <div class="lg:col-span-5 space-y-4 sm:space-y-6">
-            
-            <!-- Карточка ввода слов (поддержка РУС + АНГЛ) -->
-            <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl relative">
-              <div class="flex items-center justify-between pb-2.5 border-b border-white/10 mb-2.5">
-                <label class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                  <span class="w-2 h-2 rounded-full bg-brand-500"></span> Ввод слов (любые разделители)
-                </label>
-                <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-                  <span id="badgeWordCounter" class="text-brand-neon font-bold">0 слов</span>
-                </div>
-              </div>
-
-              <p class="text-[11px] text-slate-400 mb-2 leading-relaxed">
-                Вводите любые русские и английские слова через запятую, пробел или новую строку. Сетка строится на лету.
-              </p>
-              
-              <div class="relative">
-                <textarea id="wordInputArea" rows="5" oninput="app.onInputWords()" class="w-full bg-surface-900/90 border border-white/10 focus:border-brand-500 rounded-xl p-3 text-xs sm:text-sm font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition resize-none leading-relaxed" placeholder="Введите слова... Например: ПЛАНЕТА, ГАЛАКТИКА, ORBIT, SATELLITE, ROCKET, ЗВЕЗДА, COMET"></textarea>
-              </div>
-
-              <!-- Таблетки распознанных слов -->
-              <div class="mt-2.5">
-                <div class="flex items-center justify-between mb-1">
-                  <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Распознано слов (<span id="parsedTagsCount">0</span>):</span>
-                  <button onclick="app.clearWordsOnly()" class="text-[10px] text-rose-400 hover:text-rose-300">Очистить список</button>
-                </div>
-                <div id="parsedTagsContainer" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 bg-surface-900/60 rounded-xl border border-white/5">
-                  <span class="text-[11px] text-slate-500 italic">Слова пока не введены...</span>
-                </div>
-              </div>
-
-              <!-- Сохранение темы в каталог -->
-              <div class="mt-3 pt-3 border-t border-white/10 flex gap-2">
-                <input id="newTopicTitle" type="text" placeholder="Название темы для сохранения" class="flex-1 bg-surface-900/80 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-brand-500 font-medium" />
-                <button onclick="app.saveCurrentTopic()" class="px-3.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold transition shadow-sm whitespace-nowrap active:scale-95">
-                  Сохранить тему
-                </button>
-              </div>
-            </div>
-
-            <!-- Параметры укладки слов -->
-            <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl space-y-3">
-              <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Направления слов</span>
-                <span class="text-[11px] font-mono text-slate-400">15 × 15</span>
-              </div>
-
-              <div class="grid grid-cols-2 gap-2 text-xs">
-                <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-brand-500/40 transition">
-                  <input type="checkbox" id="dirRight" checked onchange="app.generate()" class="w-4 h-4 rounded text-brand-600 bg-surface-800 border-white/20">
-                  <span class="font-medium text-slate-300">Вправо (→)</span>
-                </label>
-                <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-brand-500/40 transition">
-                  <input type="checkbox" id="dirDown" checked onchange="app.generate()" class="w-4 h-4 rounded text-brand-600 bg-surface-800 border-white/20">
-                  <span class="font-medium text-slate-300">Вниз (↓)</span>
-                </label>
-                <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-brand-500/40 transition">
-                  <input type="checkbox" id="dirDiagDown" checked onchange="app.generate()" class="w-4 h-4 rounded text-brand-600 bg-surface-800 border-white/20">
-                  <span class="font-medium text-slate-300">Диагональ (↘)</span>
-                </label>
-                <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-brand-500/40 transition">
-                  <input type="checkbox" id="dirReverse" checked onchange="app.generate()" class="w-4 h-4 rounded text-brand-600 bg-surface-800 border-white/20">
-                  <span class="font-medium text-slate-300">Реверс (← ↑ ↖)</span>
-                </label>
-              </div>
-
-              <div class="pt-1">
-                <label class="text-[11px] font-semibold text-slate-400 block mb-1">Заполнение пустых ячеек:</label>
-                <select id="fillerModeSelect" onchange="app.generate()" class="w-full bg-surface-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-brand-500">
-                  <option value="frequency">Частотный алфавит (авто: РУС / ENG)</option>
-                  <option value="uniform">Равномерный случайный (А-Я / A-Z)</option>
-                  <option value="dots">Точки (·) для контроля укладки</option>
-                </select>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- ПРАВАЯ ПАНЕЛЬ: Интерактивная мастер-сетка 15х15 и Экспорт -->
-          <div class="lg:col-span-7 space-y-4 sm:space-y-6">
-            
-            <div class="glass-panel p-3.5 sm:p-5 rounded-2xl border border-white/10 shadow-2xl flex flex-col items-center">
-              
-              <div class="w-full flex items-center justify-between mb-2.5 text-xs">
-                <div class="flex items-center gap-2">
-                  <span class="font-bold text-slate-300 uppercase tracking-wider text-[11px]">Матрица филворда</span>
-                  <span id="gridStatusIndicator" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-white/5">
-                    0 слов
-                  </span>
-                </div>
-                <div class="text-slate-400 font-mono text-[11px]">
-                  Пустых: <span id="emptyCellsLabel" class="text-brand-neon font-bold">225</span>
-                </div>
-              </div>
-
-              <!-- Адаптивный контейнер сетки 15x15 -->
-              <div class="w-full flex justify-center py-1">
-                <div class="feelword-grid-container">
-                  <div id="feelwordGrid" class="grid grid-cols-15 gap-0.5 sm:gap-1 p-2 sm:p-2.5 bg-surface-900/95 rounded-2xl border border-white/10 shadow-inner w-full h-full" style="grid-template-columns: repeat(15, minmax(0, 1fr));">
-                    <!-- 225 ячеек -->
-                  </div>
-                </div>
-              </div>
-
-              <!-- Слова под сеткой -->
-              <div class="w-full mt-3 pt-3 border-t border-white/10">
-                <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
-                  <span class="font-semibold text-slate-300 text-[11px]">Размещенные слова (наведите для подсветки):</span>
-                  <span id="placedCountSummary" class="font-mono text-brand-neon text-[11px]">0 слов</span>
-                </div>
-                <div id="activeWordsChips" class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
-                  <!-- Чипсы слов -->
-                </div>
-              </div>
-
-            </div>
-
-            <!-- Блок быстрого копирования и экспорта -->
-            <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl">
-              <div class="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                  <span class="text-emerald-400">📊</span> Экспорт в 1 клик
-                </h3>
-                <span class="text-[10px] text-slate-400">Готово для верстки</span>
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                
-                <!-- Экспорт в Excel через табуляцию -->
-                <button onclick="app.exportExcel()" class="p-2.5 sm:p-3 rounded-xl bg-gradient-to-br from-emerald-600/90 to-teal-700/90 hover:from-emerald-500 hover:to-teal-600 text-white flex items-center gap-2.5 transition shadow-lg shadow-emerald-900/20 active:scale-95 text-left border border-emerald-400/30">
-                  <div class="p-2 rounded-lg bg-black/20 font-bold text-sm text-emerald-200">📊</div>
-                  <div>
-                    <div class="text-xs font-bold">Вставить в Excel / Таблицы</div>
-                    <div class="text-[10px] text-emerald-100/70">Табуляция: заполнит ровно 15×15 ячеек</div>
-                  </div>
-                </button>
-
-                <!-- 225 букв одной строкой -->
-                <button onclick="app.exportLinear()" class="p-2.5 sm:p-3 rounded-xl glass-card hover:bg-white/10 border border-white/10 text-white flex items-center gap-2.5 transition active:scale-95 text-left">
-                  <div class="p-2 rounded-lg bg-brand-500/20 font-bold text-sm text-brand-neon">🔤</div>
-                  <div>
-                    <div class="text-xs font-bold">Одной строкой (225 букв)</div>
-                    <div class="text-[10px] text-slate-400">Сплошной массив для скриптов</div>
-                  </div>
-                </button>
-
-                <!-- Сетка с пробелами -->
-                <button onclick="app.exportTextGrid()" class="p-2.5 sm:p-3 rounded-xl glass-card hover:bg-white/10 border border-white/10 text-white flex items-center gap-2.5 transition active:scale-95 text-left">
-                  <div class="p-2 rounded-lg bg-purple-500/20 font-bold text-sm text-purple-300">📄</div>
-                  <div>
-                    <div class="text-xs font-bold">Текстовая сетка</div>
-                    <div class="text-[10px] text-slate-400">15 строк с пробелами для Word</div>
-                  </div>
-                </button>
-
-                <!-- Список слов темы -->
-                <button onclick="app.exportWordsList()" class="p-2.5 sm:p-3 rounded-xl glass-card hover:bg-white/10 border border-white/10 text-white flex items-center gap-2.5 transition active:scale-95 text-left">
-                  <div class="p-2 rounded-lg bg-amber-500/20 font-bold text-sm text-amber-300">📝</div>
-                  <div>
-                    <div class="text-xs font-bold">Список слов темы</div>
-                    <div class="text-[10px] text-slate-400">Все слова через запятую</div>
-                  </div>
-                </button>
-
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-
-      </div>
-
-      <!-- ================================================================= -->
-      <!-- ВКЛАДКА 2: РЕВЕРС-АУДИТ И ПРОВЕРКА НАБОРА БУКВ (ОБРАТНЫЙ ХОД)    -->
-      <!-- ================================================================= -->
-      <div id="tabReverse" class="hidden space-y-4 sm:space-y-6">
-        
-        <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-lg">
-          <div class="flex items-center gap-3">
-            <div class="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-brand-neon text-xl">
-              🔍
-            </div>
-            <div>
-              <h2 class="text-sm sm:text-base font-extrabold text-white">Реверс-инжиниринг и отладка печатной сетки</h2>
-              <p class="text-[11px] sm:text-xs text-slate-400">
-                Вставьте набор букв (225 символов или фрагмент таблицы Excel), чтобы пересобрать матрицу, перепроверить наличие слов и обнаружить типографский брак.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
-          
-          <!-- Левая колонка аудита -->
-          <div class="lg:col-span-5 space-y-4">
-            
-            <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl space-y-3">
-              <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Входной набор букв</label>
-                <span id="reverseCharCounter" class="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-white/5">0 / 225</span>
-              </div>
-
-              <p class="text-[11px] text-slate-400">
-                Вставьте 225 букв подряд или фрагмент таблицы. Пробелы, цифры и переносы строк очистятся сами.
-              </p>
-
-              <textarea id="reverseInputRaw" rows="5" oninput="app.reverse.onInputLetters()" class="w-full bg-surface-900 border border-white/10 rounded-xl p-3 text-xs sm:text-sm font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-neon transition resize-none" placeholder="Вставьте строку из 225 букв..."></textarea>
-
-              <div class="flex gap-2">
-                <button onclick="app.reverse.pasteCurrentGenerated()" class="flex-1 px-3 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-300 transition">
-                  Вставить из конструктора
-                </button>
-                <button onclick="app.reverse.clear()" class="px-3 py-1.5 rounded-xl bg-rose-950/30 text-rose-300 border border-rose-800/30 text-xs font-semibold">
-                  Очистить
-                </button>
-              </div>
-            </div>
-
-            <!-- Слова для поиска и сверки -->
-            <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl space-y-3">
-              <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Слова для аудита сетки</label>
-                <span id="auditWordsCount" class="text-xs font-mono text-brand-neon">0 слов</span>
-              </div>
-
-              <p class="text-[11px] text-slate-400">
-                Укажите слова, которые должны были быть заложены в филворд. Детектор проверит их по всем 8 направлениям.
-              </p>
-
-              <textarea id="reverseInputWords" rows="4" oninput="app.reverse.onInputWords()" class="w-full bg-surface-900 border border-white/10 rounded-xl p-3 text-xs sm:text-sm font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-neon transition resize-none" placeholder="Введите слова для поиска в матрице..."></textarea>
-
-              <div class="flex gap-2">
-                <button onclick="app.reverse.runAudit()" class="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-brand-neon to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition active:scale-95">
-                  Запустить аудит матрицы
-                </button>
-                <button onclick="app.reverse.scanAllTopics()" class="px-3 py-2 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-300" title="Сверить сетку со всеми сохраненными темами">
-                  🔎 Скан тем
-                </button>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Правая колонка аудита -->
-          <div class="lg:col-span-7 space-y-4">
-            
-            <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-2xl flex flex-col items-center">
-              <div class="w-full flex items-center justify-between mb-2 text-xs">
-                <span class="font-bold text-slate-300 uppercase tracking-wider text-[11px]">Реконструированная сетка (15×15)</span>
-                <span id="reverseMatrixStatus" class="font-mono text-[11px] text-amber-400">Ожидание 225 букв</span>
-              </div>
-
-              <div class="feelword-grid-container">
-                <div id="reverseGridEl" class="grid grid-cols-15 gap-0.5 sm:gap-1 p-2 bg-surface-900/95 rounded-2xl border border-white/10 shadow-inner w-full h-full" style="grid-template-columns: repeat(15, minmax(0, 1fr));">
-                  <!-- Ячейки реверса -->
-                </div>
-              </div>
-
-              <!-- Отчет аудита -->
-              <div class="w-full mt-4 pt-3 border-t border-white/10 space-y-3">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="font-bold text-slate-300">Результаты аудита слов:</span>
-                  <div class="flex gap-2 font-mono text-[11px]">
-                    <span class="text-emerald-400">Найдено: <b id="auditFoundCount">0</b></span>
-                    <span class="text-rose-400">Брак (нет в сетке): <b id="auditMissingCount">0</b></span>
-                  </div>
-                </div>
-
-                <div id="auditResultsContainer" class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
-                  <span class="text-[11px] text-slate-500 italic">Запустите аудит для отображения отчета...</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-
-      </div>
-
-      <!-- ================================================================= -->
-      <!-- ВКЛАДКА 3: ИНТЕРАКТИВНЫЙ РЕЖИМ РЕШЕНИЯ (PLAY MODE)               -->
-      <!-- ================================================================= -->
-      <div id="tabPlay" class="hidden space-y-4 sm:space-y-6">
-        
-        <div class="glass-panel p-3.5 sm:p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 border border-white/10 shadow-lg">
-          <div class="flex items-center gap-3">
-            <div class="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 text-lg">
-              🎮
-            </div>
-            <div>
-              <h2 class="text-xs sm:text-sm font-bold text-white">Разгадывание: <span id="playTopicTitle" class="text-brand-neon font-mono">Текущий филворд</span></h2>
-              <p class="text-[11px] text-slate-400">Проведите пальцем по буквам или нажмите первую и последнюю букву слова</p>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2 sm:gap-3">
-            <div class="flex items-center gap-1.5 bg-surface-900/90 px-3 py-1.5 rounded-xl border border-white/10 font-mono text-xs">
-              <span>⏱️</span> <span id="playTimerLabel" class="font-bold text-brand-neon">00:00</span>
-            </div>
-            <div class="flex items-center gap-1.5 bg-surface-900/90 px-3 py-1.5 rounded-xl border border-white/10 font-mono text-xs">
-              <span>🏆</span> <span id="playFoundScore" class="font-bold text-emerald-400">0 / 0</span>
-            </div>
-            <button onclick="app.playReset()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300">
-              Сброс
-            </button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
-          
-          <div class="lg:col-span-8 flex flex-col items-center">
-            <div class="glass-panel p-3.5 sm:p-5 rounded-2xl border border-white/10 shadow-2xl w-full flex flex-col items-center">
-              
-              <div id="interactiveGridWrapper" class="feelword-grid-container relative select-none">
-                <div id="playGrid" class="grid grid-cols-15 gap-0.5 sm:gap-1 p-2 bg-surface-900/95 rounded-2xl border border-white/10 shadow-2xl w-full h-full" style="grid-template-columns: repeat(15, minmax(0, 1fr));">
-                  <!-- Ячейки игры -->
-                </div>
-              </div>
-
-              <!-- Выделяемое слово -->
-              <div class="mt-3 h-7 flex items-center justify-center">
-                <span id="currentSelectionWord" class="font-mono text-xs sm:text-sm font-extrabold tracking-widest text-brand-neon bg-brand-500/10 px-3.5 py-0.5 rounded-full border border-brand-500/30 opacity-0 transition-opacity">
-                  СЛОВО
-                </span>
-              </div>
-
-            </div>
-          </div>
-
-          <!-- Список слов для поиска -->
-          <div class="lg:col-span-4">
-            <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl space-y-3">
-              <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Слова для поиска:</h3>
-                <span id="playWordsLeftBadge" class="text-xs text-brand-neon font-mono font-bold">Осталось: 0</span>
-              </div>
-              <div id="playWordsChecklist" class="flex flex-col gap-1.5 max-h-[460px] overflow-y-auto pr-1">
-                <!-- Чеклист -->
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-      </div>
-
-      <!-- ================================================================= -->
-      <!-- ВКЛАДКА 4: КАТАЛОГ ТЕМ                                           -->
-      <!-- ================================================================= -->
-      <div id="tabTopics" class="hidden space-y-4 sm:space-y-6">
-        
-        <div class="glass-panel p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-white/10 shadow-lg">
           <div>
             <div class="flex items-center gap-2">
-              <h2 class="text-base sm:text-lg font-extrabold text-white">Каталог ваших тем</h2>
-              <span id="vaultTotalCount" class="text-xs font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-neon border border-brand-500/30">0 тем</span>
+              <input type="text" id="topicNameInput" oninput="app.onTopicNameChange(this.value)" placeholder="Введите название темы..." value="Новая тема" class="bg-transparent text-white font-extrabold text-sm sm:text-base focus:outline-none border-b border-transparent focus:border-brand-neon transition px-1 py-0.5 w-48 sm:w-64" />
+              <span id="langDetectionBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-neon border border-brand-500/20">РУС / ENG</span>
             </div>
-            <p class="text-[11px] sm:text-xs text-slate-400 mt-1">Все темы хранятся навсегда и автоматически синхронизируются между вашими устройствами.</p>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2">
-            <div class="relative flex-1 sm:flex-none">
-              <input id="vaultSearchInput" oninput="app.renderTopicsVault()" type="text" placeholder="Поиск темы..." class="w-full bg-surface-900 border border-white/10 rounded-xl px-3 py-1.5 pl-8 text-xs text-white focus:outline-none focus:border-brand-500 sm:w-48" />
-              <span class="absolute left-2.5 top-2 text-slate-500 text-xs">🔍</span>
-            </div>
-            <button onclick="app.exportAllTopicsJSON()" class="px-3 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition flex items-center gap-1.5">
-              <span>💾</span> Экспорт JSON
-            </button>
-            <label class="px-3 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition flex items-center gap-1.5 cursor-pointer">
-              <span>📂</span> Импорт JSON
-              <input type="file" id="importJsonInput" accept=".json" onchange="app.importTopicsJSON(event)" class="hidden" />
-            </label>
+            <p class="text-[11px] text-slate-400">Сетка: <b class="text-slate-200">15 × 15 (225 ячеек)</b> • Слов в сетке: <b class="text-slate-200" id="statWordsCount">0</b> • Занято букв: <b class="text-slate-200" id="statLettersCount">0</b></p>
           </div>
         </div>
 
-        <!-- Сетка карточек тем -->
-        <div id="topicsGridContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          <!-- Карточки тем -->
-        </div>
-
-      </div>
-
-    </main>
-
-  </div>
-
-  <!-- Toast всплывашка -->
-  <div id="appToast" class="fixed bottom-5 right-5 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2.5 px-4 py-3 rounded-2xl glass-panel border border-brand-500/40 shadow-2xl text-white text-xs sm:text-sm font-medium">
-    <span id="toastIcon">✨</span>
-    <span id="toastMessage">Уведомление</span>
-  </div>
-
-  <!-- Модальное окно статуса облака и прямой ссылки -->
-  <div id="syncInfoModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4">
-    <div class="glass-panel border border-white/15 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4">
-      
-      <div class="flex items-center justify-between pb-2.5 border-b border-white/10">
+        <!-- Кнопки управления подсветкой и очисткой -->
         <div class="flex items-center gap-2">
-          <div class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 text-base">☁️</div>
-          <div>
-            <h3 class="text-sm font-extrabold text-white">Автоматическое облако</h3>
-            <p class="text-[10px] text-slate-400">Связь компьютера и смартфона в реальном времени</p>
-          </div>
+          <!-- Кнопка подсветки ответов: ВКЛЮЧЕНА ПО УМОЛЧАНИЮ -->
+          <button onclick="app.toggleShowAnswers()" id="btnRevealAnswers" class="px-3 py-1.5 rounded-xl bg-brand-600/30 border border-brand-400 text-brand-neon text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-brand-500/20 active:scale-95">
+            <span id="revealIcon">👁️</span>
+            <span id="revealText">Подсветка: ВКЛ</span>
+          </button>
+          <button onclick="app.clearCurrentBoard()" class="px-3 py-1.5 rounded-xl bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 border border-rose-800/30 text-xs font-semibold transition active:scale-95">
+            Очистить
+          </button>
         </div>
-        <button onclick="app.closeSyncInfoModal()" class="w-7 h-7 rounded-full glass-card hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
       </div>
 
-      <div class="bg-surface-900/90 border border-white/10 rounded-2xl p-3.5 space-y-2">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Канал синхронизации:</span>
-          <span id="displayChannelKey" class="text-xs font-mono font-bold text-brand-neon">wv_default</span>
+      <!-- Основная рабочая сетка: Слева матрица 15х15, справа панель слов и настроек -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+        
+        <!-- Колонка 1 (Сетка 15х15) -->
+        <div class="lg:col-span-7 flex flex-col items-center">
+          <div class="w-full glass-card rounded-2xl p-2.5 sm:p-4 shadow-2xl relative">
+            
+            <!-- Заголовок панели сетки с бейджами плотности -->
+            <div class="flex items-center justify-between mb-2 sm:mb-3 px-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="text-xs font-bold text-slate-200">Матрица филворда 15 × 15</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="gridStatusIndicator" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-white/10">0 / 0 размещено</span>
+                <span id="densityBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-brand-500/15 text-brand-neon border border-brand-500/30">0% букв</span>
+              </div>
+            </div>
+
+            <!-- Сама сетка 15х15 -->
+            <div class="feelword-grid-container relative">
+              <div id="feelwordGrid" class="w-full h-full grid grid-cols-15 gap-0.5 sm:gap-1 bg-surface-950/80 p-1 rounded-xl border border-white/10 shadow-inner">
+                <!-- 225 ячеек генерируются через JavaScript -->
+              </div>
+            </div>
+
+            <!-- Подсказка под сеткой -->
+            <div class="mt-2.5 px-1 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
+              <div class="flex items-center gap-1">
+                <span>💡 Нажмите на любую букву или слово для <b>двойного супер-выделения 🎯</b></span>
+              </div>
+              <div>
+                <span>Свободных ячеек: <b id="emptyCellsLabel" class="text-slate-200">225</b></span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Список активных слов в филворде (чипсы) -->
+          <div class="w-full mt-3 glass-card-subtle rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-slate-300">Слова в сетке (нажмите для подсветки):</span>
+              <span id="placedCountSummary" class="text-[11px] font-mono text-slate-400">0 из 0</span>
+            </div>
+            <div id="activeWordsChips" class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
+              <span class="text-[11px] text-slate-500 italic">Слова появятся здесь сразу после ввода...</span>
+            </div>
+          </div>
         </div>
-        <p class="text-[11px] text-slate-300 leading-relaxed">
-          Все ваши темы и слова синхронизируются автоматически через быстрый реалтайм-мост. Вам не нужно вводить пароли или коды.
+
+        <!-- Колонка 2 (Поле ввода слов и параметры) -->
+        <div class="lg:col-span-5 space-y-3 sm:space-y-4">
+          
+          <!-- Карточка ввода слов -->
+          <div class="glass-card rounded-2xl p-3.5 sm:p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm">✍️</span>
+                <span class="text-xs font-bold text-slate-200">Ввод слов для темы</span>
+              </div>
+              <span id="wordCounterBadge" class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-surface-800 text-slate-300 border border-white/5">0 слов</span>
+            </div>
+
+            <textarea id="wordsInput" oninput="app.onWordsInput(this.value)" rows="6" placeholder="Вставьте или напечатайте слова через запятую, пробел или с новой строки...
+Например:
+ГАЛАКТИКА, ТЕЛЕСКОП, КВАЗАР, НЕБУЛА, ОРБИТА, ПЛАНЕТА, АСТЕРОИД, СПУТНИК..." class="w-full bg-surface-950/80 text-slate-100 text-xs font-mono p-3 rounded-xl border border-white/10 focus:border-brand-neon focus:ring-1 focus:ring-brand-neon focus:outline-none transition leading-relaxed resize-y"></textarea>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <button onclick="app.generate()" class="flex-1 min-w-[140px] px-4 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-neon text-white font-bold text-xs transition shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 active:scale-95">
+                <span>🔄</span>
+                <span>Перестроить сетку</span>
+              </button>
+              <button onclick="app.saveCurrentToCatalog()" class="px-3.5 py-2 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 font-bold text-xs transition flex items-center gap-1.5 active:scale-95">
+                <span>💾</span>
+                <span>Сохранить в тему</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Настройки размещения и заполнителя -->
+          <div class="glass-card rounded-2xl p-3.5 sm:p-4 space-y-3">
+            <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <span>⚙️</span> Настройки направлений слов
+            </span>
+
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-white/20 transition">
+                <input type="checkbox" id="dirH" checked onchange="app.generate()" class="rounded text-brand-600 focus:ring-0">
+                <span class="text-slate-300 text-[11px]">Горизонтально (→)</span>
+              </label>
+              <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-white/20 transition">
+                <input type="checkbox" id="dirV" checked onchange="app.generate()" class="rounded text-brand-600 focus:ring-0">
+                <span class="text-slate-300 text-[11px]">Вертикально (↓)</span>
+              </label>
+              <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-white/20 transition">
+                <input type="checkbox" id="dirD" checked onchange="app.generate()" class="rounded text-brand-600 focus:ring-0">
+                <span class="text-slate-300 text-[11px]">Диагонали (↘ ↗)</span>
+              </label>
+              <label class="flex items-center gap-2 p-2 rounded-xl bg-surface-900/60 border border-white/5 cursor-pointer hover:border-white/20 transition">
+                <input type="checkbox" id="dirR" checked onchange="app.generate()" class="rounded text-brand-600 focus:ring-0">
+                <span class="text-slate-300 text-[11px]">Реверс (← ↑ ↖ ↙)</span>
+              </label>
+            </div>
+
+            <!-- Режим заполнения пустых клеток -->
+            <div class="pt-1">
+              <label class="block text-[11px] text-slate-400 mb-1.5">Заполнение пустых ячеек матрицы:</label>
+              <select id="fillerModeSelect" onchange="app.generate()" class="w-full bg-surface-900/80 text-xs text-slate-200 p-2 rounded-xl border border-white/10 focus:border-brand-neon focus:outline-none">
+                <option value="freq" selected>Частотные буквы алфавита (естественный филворд)</option>
+                <option value="uniform">Равномерные случайные буквы (А-Я / A-Z)</option>
+                <option value="dots">Точки (·) — только размещенные слова</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Блок быстрого экспорта -->
+          <div class="glass-card rounded-2xl p-3.5 sm:p-4 space-y-2">
+            <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <span>📤</span> Экспорт и копирование в буфер
+            </span>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button onclick="app.exportExcel()" class="p-2 rounded-xl glass-card-subtle hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition flex flex-col items-center gap-1 active:scale-95">
+                <span class="text-base">📊</span>
+                <span class="text-[11px]">Для Excel (таб)</span>
+              </button>
+              <button onclick="app.exportRaw225()" class="p-2 rounded-xl glass-card-subtle hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition flex flex-col items-center gap-1 active:scale-95">
+                <span class="text-base">🔤</span>
+                <span class="text-[11px]">Строка 225 букв</span>
+              </button>
+              <button onclick="app.printBoard()" class="p-2 rounded-xl glass-card-subtle hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition flex flex-col items-center gap-1 active:scale-95">
+                <span class="text-base">🖨️</span>
+                <span class="text-[11px]">Печать / PDF</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- РАЗДЕЛ 2: РЕВЕРС-АУДИТ (ОТ 225 БУКВ К СЛОВАМ И ТЕМЕ) -->
+    <!-- ======================================================== -->
+    <section id="view-reverse" class="hidden space-y-4">
+      
+      <!-- Шапка реверса -->
+      <div class="glass-card rounded-2xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-lg">
+            🔍
+          </div>
+          <div>
+            <h2 class="text-sm sm:text-base font-extrabold text-white">Реверс-инжиниринг и аудит верстки</h2>
+            <p class="text-[11px] text-slate-400">Проверка готовой матрицы 15×15: выявление брака печати, поиск опечаток и поиск темы</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="app.reverse.applyToConstructor()" class="px-3 py-1.5 rounded-xl bg-brand-600/30 hover:bg-brand-600/50 text-brand-neon border border-brand-500/40 text-xs font-bold transition flex items-center gap-1 active:scale-95">
+            <span>⚡</span>
+            <span>Вставить в конструктор</span>
+          </button>
+          <button onclick="app.reverse.clear()" class="px-3 py-1.5 rounded-xl bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 border border-rose-800/30 text-xs font-semibold transition active:scale-95">
+            Очистить
+          </button>
+        </div>
+      </div>
+
+      <!-- Рабочая область реверса -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+        
+        <!-- Колонка 1: Сетка реверса 15х15 с координатами A-O и 1-15 -->
+        <div class="lg:col-span-7 flex flex-col items-center">
+          <div class="w-full glass-card rounded-2xl p-2.5 sm:p-4 shadow-2xl">
+            
+            <div class="flex items-center justify-between mb-2 px-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+                <span class="text-xs font-bold text-slate-200">Аудиторская сетка 15 × 15 с координатами</span>
+              </div>
+              <span id="reverseCellStatus" class="text-[11px] font-mono text-slate-400">Кликните по ячейке для правки</span>
+            </div>
+
+            <!-- Контейнер сетки с шахматной разметкой колонок A-O и строк 1-15 -->
+            <div class="w-full max-w-[540px] mx-auto">
+              
+              <!-- Буквы колонок A-O -->
+              <div class="grid grid-cols-15 gap-0.5 sm:gap-1 pl-6 sm:pl-7 pr-1 pb-1 text-center font-mono text-[9px] sm:text-[10px] text-slate-500 font-bold">
+                <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span><span>J</span><span>K</span><span>L</span><span>M</span><span>N</span><span>O</span>
+              </div>
+
+              <div class="flex">
+                <!-- Номера строк 1-15 -->
+                <div class="grid grid-rows-15 gap-0.5 sm:gap-1 pr-1.5 sm:pr-2 font-mono text-[9px] sm:text-[10px] text-slate-500 font-bold text-right items-center select-none">
+                  <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span>
+                </div>
+
+                <!-- Сама матрица реверса -->
+                <div class="flex-1 aspect-square">
+                  <div id="reverseGrid" class="w-full h-full grid grid-cols-15 gap-0.5 sm:gap-1 bg-surface-950/90 p-1 rounded-xl border border-white/10 shadow-inner">
+                    <!-- Генерируется из JS -->
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <p class="mt-2 text-center text-[10px] text-slate-500">
+              💡 Можно кликнуть на любую букву и напечатать нужную клавишей на клавиатуре для быстрого исправления опечатки.
+            </p>
+
+          </div>
+
+          <!-- Результат проверки слов в реверсе -->
+          <div class="w-full mt-3 glass-card-subtle rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-slate-300">Результат сканирования слов:</span>
+              <span id="reverseFoundSummary" class="text-[11px] font-mono text-slate-400">Ожидание проверки...</span>
+            </div>
+            <div id="reverseChipsContainer" class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
+              <span class="text-[11px] text-slate-500 italic">Введите набор букв и слова для сверки...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Колонка 2: Вставка строки 225 букв и инструменты поиска -->
+        <div class="lg:col-span-5 space-y-4">
+          
+          <!-- Шаг 1: Вставка 225 букв -->
+          <div class="glass-card rounded-2xl p-3.5 sm:p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <span>1️⃣</span> Набор 225 букв (строка или Excel)
+              </span>
+              <span id="reverseCountBadge" class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 border border-amber-500/30">0 / 225</span>
+            </div>
+
+            <textarea id="reverseRawInput" oninput="app.reverse.onInputRaw(this.value)" rows="5" placeholder="Вставьте сюда 225 букв из макета или скопируйте таблицу из Excel...
+Любые разделители, пробелы и табуляции будут очищены автоматически." class="w-full bg-surface-950/80 text-slate-100 text-xs font-mono p-3 rounded-xl border border-white/10 focus:border-purple-400 focus:outline-none transition leading-relaxed resize-y"></textarea>
+
+            <div class="flex gap-2">
+              <button onclick="app.reverse.loadCurrentFromConstructor()" class="flex-1 px-3 py-1.5 rounded-xl glass-card-subtle hover:bg-white/10 text-xs font-semibold text-slate-300 border border-white/10 transition active:scale-95">
+                Загрузить из Конструктора
+              </button>
+            </div>
+          </div>
+
+          <!-- Шаг 2: Вставка слов для сверки -->
+          <div class="glass-card rounded-2xl p-3.5 sm:p-4 space-y-3">
+            <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+              <span>2️⃣</span> Предполагаемые слова для сверки
+            </span>
+
+            <textarea id="reverseWordsInput" rows="4" placeholder="Введите слова, которые должны присутствовать в этой сетке (через запятую или пробел)..." class="w-full bg-surface-950/80 text-slate-100 text-xs font-mono p-3 rounded-xl border border-white/10 focus:border-purple-400 focus:outline-none transition leading-relaxed resize-y"></textarea>
+
+            <div class="flex flex-col sm:flex-row gap-2">
+              <button onclick="app.reverse.scanWords()" class="flex-1 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition shadow-lg shadow-purple-600/25 flex items-center justify-center gap-1.5 active:scale-95">
+                <span>🔎</span>
+                <span>Сверить слова (8 направлений)</span>
+              </button>
+              <button onclick="app.reverse.scanAllCatalogTopics()" class="px-3.5 py-2 rounded-xl bg-brand-600/30 hover:bg-brand-600/50 text-brand-neon border border-brand-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95" title="Автоматически сопоставить с темами в каталоге">
+                <span>📚</span>
+                <span>Автопоиск темы</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Копирование исправленной матрицы -->
+          <div class="glass-card rounded-2xl p-3.5 sm:p-4 space-y-2">
+            <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <span>📋</span> Копирование проверенной матрицы
+            </span>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="app.reverse.copyTabDelimited()" class="p-2 rounded-xl glass-card-subtle hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition active:scale-95">
+                Вставить в Excel (таб)
+              </button>
+              <button onclick="app.reverse.copyRaw225()" class="p-2 rounded-xl glass-card-subtle hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition active:scale-95">
+                Строка 225 букв
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- РАЗДЕЛ 3: ИНТЕРАКТИВНЫЙ РЕЖИМ РАЗГАДЫВАНИЯ -->
+    <!-- ======================================================== -->
+    <section id="view-play" class="hidden space-y-4">
+      
+      <!-- Панель игры с таймером и счетом -->
+      <div class="glass-card rounded-2xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-lg">
+            🎮
+          </div>
+          <div>
+            <h2 class="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+              <span id="playTopicTitle">Текущий филворд</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">ИГРА</span>
+            </h2>
+            <p class="text-[11px] text-slate-400">Выделяйте слова курсором мыши или ведите пальцем по экрану</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <!-- Секундомер -->
+          <div class="px-3 py-1.5 rounded-xl bg-surface-900 border border-white/10 font-mono text-xs text-slate-200 flex items-center gap-1.5">
+            <span>⏱️</span>
+            <span id="playTimerText">00:00</span>
+          </div>
+          <!-- Счетчик найденного -->
+          <div class="px-3 py-1.5 rounded-xl bg-brand-500/20 border border-brand-500/30 font-mono text-xs text-brand-neon font-bold">
+            Найдено: <span id="playFoundCounter">0 / 0</span>
+          </div>
+          <button onclick="app.playRestart()" class="px-3 py-1.5 rounded-xl glass-card-subtle hover:bg-white/10 text-xs font-semibold text-slate-300 border border-white/10 transition active:scale-95">
+            Заново
+          </button>
+        </div>
+      </div>
+
+      <!-- Игровое поле и чеклист слов -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+        
+        <div class="lg:col-span-7 flex flex-col items-center">
+          <div class="w-full glass-card rounded-2xl p-2.5 sm:p-4 shadow-2xl">
+            <div class="feelword-grid-container">
+              <div id="playGrid" class="w-full h-full grid grid-cols-15 gap-0.5 sm:gap-1 bg-surface-950/90 p-1 rounded-xl border border-white/10 select-none touch-none">
+                <!-- Ячейки для режима игры -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 space-y-3">
+          <div class="glass-card rounded-2xl p-4">
+            <h3 class="text-xs font-bold text-slate-200 mb-2.5 flex items-center justify-between">
+              <span>Список слов для поиска:</span>
+              <span id="playRemainingCount" class="text-[11px] font-mono text-slate-400">Осталось: 0</span>
+            </h3>
+            <div id="playWordChecklist" class="flex flex-wrap gap-1.5 max-h-96 overflow-y-auto pr-1">
+              <!-- Чекбоксы слов -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- РАЗДЕЛ 4: КАТАЛОГ И БИБЛИОТЕКА ТЕМ -->
+    <!-- ======================================================== -->
+    <section id="view-topics" class="hidden space-y-4">
+      
+      <div class="glass-card rounded-2xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-500/15 border border-brand-500/30 flex items-center justify-center text-lg">
+            📚
+          </div>
+          <div>
+            <h2 class="text-sm sm:text-base font-extrabold text-white">Каталог и библиотека ваших тем</h2>
+            <p class="text-[11px] text-slate-400">Все сохраненные темы сохраняются навсегда и синхронизируются на всех ваших устройствах</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="app.exportTopicsJSON()" class="px-3 py-1.5 rounded-xl glass-card-subtle hover:bg-white/10 text-xs font-semibold text-slate-200 border border-white/10 transition active:scale-95">
+            💾 Экспорт JSON
+          </button>
+          <label class="px-3 py-1.5 rounded-xl bg-brand-600/30 hover:bg-brand-600/50 text-brand-neon border border-brand-500/40 text-xs font-bold transition cursor-pointer active:scale-95">
+            📥 Импорт JSON
+            <input type="file" id="jsonFileInput" accept=".json" onchange="app.importTopicsJSON(event)" class="hidden">
+          </label>
+        </div>
+      </div>
+
+      <!-- Поиск по темам -->
+      <div class="glass-card-subtle rounded-xl p-2.5 flex items-center gap-2">
+        <span class="text-slate-400 pl-2">🔎</span>
+        <input type="text" id="topicSearchInput" oninput="app.renderTopicsCatalog()" placeholder="Поиск по названию темы или словам..." class="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none" />
+      </div>
+
+      <!-- Карточки тем -->
+      <div id="topicsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        <!-- Генерируются динамически -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Контейнер для стильных всплывающих тостов (вместо browser alert) -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-3"></div>
+
+  <!-- Модальное окно синхронизации -->
+  <div id="syncInfoModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl max-w-md w-full p-5 space-y-4 border border-white/15 animate-pop-in">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">☁️</span>
+          <h3 class="text-sm font-bold text-white">Статус реалтайм-синхронизации</h3>
+        </div>
+        <button onclick="app.closeSyncInfoModal()" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+      </div>
+
+      <div class="space-y-2.5 text-xs text-slate-300">
+        <p>Синхронизация между ПК и телефоном работает <b>полностью автоматически</b> через защищенный брокер MQTT WebSockets с поддержкой удержания состояния (Retained State).</p>
+        
+        <div class="p-3 rounded-xl bg-surface-950/80 border border-white/10 font-mono space-y-1 text-[11px]">
+          <div class="flex justify-between">
+            <span class="text-slate-400">Канал (Room Hash):</span>
+            <span id="modalChannelName" class="text-brand-neon font-bold">wv-main</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">Протокол:</span>
+            <span class="text-emerald-400">WSS MQTT (EMQX)</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">Постоянная база:</span>
+            <span class="text-purple-400">IndexedDB (Навсегда)</span>
+          </div>
+        </div>
+
+        <p class="text-[11px] text-slate-400">
+          💡 Любое изменение (ввод слов, удаление или сохранение темы) автоматически отправляется на другое устройство без необходимости сканировать QR-коды.
         </p>
       </div>
 
-      <div class="space-y-2 pt-1">
-        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-300 block">Прямая ссылка для телефона:</label>
-        <div class="flex gap-2">
-          <input id="syncDirectUrlInput" readonly type="text" class="flex-1 bg-surface-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 focus:outline-none" />
-          <button onclick="app.copyDirectSyncUrl()" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-xs font-bold text-white transition active:scale-95 whitespace-nowrap">
-            Копировать
-          </button>
-        </div>
-      </div>
-
-      <div class="flex items-center justify-between pt-2 border-t border-white/10">
-        <button onclick="app.syncEngine.fetchRemoteNow()" class="px-3.5 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-300">
-          🔄 Запросить из облака
+      <div class="flex gap-2 pt-2">
+        <button onclick="app.syncEngine.forcePushState(); app.closeSyncInfoModal();" class="flex-1 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs transition active:scale-95">
+          Отправить текущее состояние
         </button>
-        <button onclick="app.syncEngine.pushStateNow()" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-lg active:scale-95">
-          ⚡ Отправить сейчас
+        <button onclick="app.closeSyncInfoModal()" class="px-4 py-2 rounded-xl glass-card-subtle text-slate-300 text-xs font-semibold hover:bg-white/10 transition">
+          Закрыть
         </button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Модалка подтверждения (без window.confirm) -->
-  <div id="confirmModal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="glass-panel border border-white/15 rounded-2xl p-5 sm:p-6 max-w-sm w-full shadow-2xl space-y-3">
-      <h3 id="confirmTitle" class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-        <span class="text-amber-400">⚠️</span> Подтверждение
-      </h3>
-      <p id="confirmMessage" class="text-xs text-slate-300 leading-relaxed"></p>
-      <div class="flex items-center justify-end gap-2 pt-2">
-        <button id="confirmCancelBtn" class="px-3.5 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-300">Отмена</button>
-        <button id="confirmOkBtn" class="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white shadow-lg">Удалить</button>
       </div>
     </div>
   </div>
 
-  <!-- Модалка бланка для печати -->
-  <div id="printModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4">
-    <div class="glass-panel border border-white/15 rounded-3xl p-4 sm:p-6 max-w-2xl w-full shadow-2xl max-h-[92vh] flex flex-col space-y-3">
-      <div class="flex items-center justify-between pb-2 border-b border-white/10">
-        <h3 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-          <span>🖨️</span> Бланк филворда для печати
-        </h3>
-        <button onclick="app.closePrintModal()" class="w-7 h-7 rounded-full glass-card hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
+  <!-- Модальное окно победы в игре -->
+  <div id="victoryModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-3xl max-w-sm w-full p-6 text-center space-y-4 border border-brand-neon/30 animate-pop-in shadow-2xl shadow-brand-neon/20">
+      <div class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-300 text-3xl flex items-center justify-center mx-auto border border-emerald-500/30">
+        🏆
+      </div>
+      <div>
+        <h3 class="text-lg font-extrabold text-white">Филворд разгадан!</h3>
+        <p class="text-xs text-slate-300 mt-1">Отличная работа! Все слова найдены в сетке 15×15.</p>
       </div>
 
-      <div class="flex-1 overflow-y-auto bg-white text-slate-900 p-4 sm:p-6 rounded-2xl shadow-inner font-sans" id="printSheetArea">
-        <div class="text-center mb-3">
-          <h1 id="printThemeHeading" class="text-lg sm:text-xl font-bold uppercase tracking-wider">Тема: Филворд</h1>
-          <p class="text-[11px] text-slate-500 mt-0.5">Найдите все спрятанные слова в сетке 15×15.</p>
+      <div class="p-3 rounded-xl bg-surface-950/80 border border-white/10 font-mono text-xs flex justify-around">
+        <div>
+          <span class="text-[10px] text-slate-400 block">Время:</span>
+          <b id="victoryTimeVal" class="text-brand-neon text-sm">01:45</b>
         </div>
-
-        <div id="printGridContainer" class="print-grid mx-auto" style="width: 320px; height: 320px;">
-          <!-- Ячейки для печати -->
-        </div>
-
-        <div class="mt-4 pt-3 border-t border-slate-300">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Список слов:</h4>
-          <div id="printWordsListContainer" class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px] font-mono font-semibold text-slate-800">
-            <!-- Список слов -->
-          </div>
+        <div>
+          <span class="text-[10px] text-slate-400 block">Слов:</span>
+          <b id="victoryWordsVal" class="text-emerald-400 text-sm">20 / 20</b>
         </div>
       </div>
 
-      <div class="flex items-center justify-between pt-1">
-        <span class="text-[11px] text-slate-400">Формат А4</span>
-        <div class="flex gap-2">
-          <button onclick="app.closePrintModal()" class="px-3.5 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-300">Закрыть</button>
-          <button onclick="window.print()" class="px-4 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-xs font-bold text-white shadow-lg">Печать / PDF</button>
-        </div>
-      </div>
+      <button onclick="app.closeVictoryModal()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-brand-neon text-white font-bold text-xs shadow-lg shadow-brand-500/25 transition active:scale-95">
+        Продолжить
+      </button>
     </div>
   </div>
 
   <script>
-    /**
-     * ПОСТОЯННОЕ ХРАНИЛИЩЕ НА INDEXEDDB (БЕЗ LOCALSTORAGE)
-     * Данные сохраняются навсегда в памяти устройства даже при закрытии браузера
-     */
+    // Цветовая палитра для слов (20 контрастных премиальных неоновых оттенков)
+    const PALETTE = [
+      { bg: 'rgba(59, 130, 246, 0.40)', border: '#3b82f6', text: '#93c5fd' }, // Blue
+      { bg: 'rgba(16, 185, 129, 0.40)', border: '#10b981', text: '#6ee7b7' }, // Emerald
+      { bg: 'rgba(236, 72, 153, 0.40)', border: '#ec4899', text: '#f472b6' }, // Pink
+      { bg: 'rgba(245, 158, 11, 0.40)', border: '#f59e0b', text: '#fcd34d' }, // Amber
+      { bg: 'rgba(139, 92, 246, 0.40)', border: '#8b5cf6', text: '#c4b5fd' }, // Purple
+      { bg: 'rgba(20, 184, 166, 0.40)', border: '#14b8a6', text: '#5eead4' }, // Teal
+      { bg: 'rgba(239, 68, 68, 0.40)',  border: '#ef4444', text: '#fca5a5' }, // Red
+      { bg: 'rgba(6, 182, 212, 0.40)',  border: '#06b6d4', text: '#67e8f9' }, // Cyan
+      { bg: 'rgba(168, 85, 247, 0.40)', border: '#a855f7', text: '#d8b4fe' }, // Violet
+      { bg: 'rgba(234, 179, 8, 0.40)',  border: '#eab308', text: '#fde047' }, // Yellow
+      { bg: 'rgba(99, 102, 241, 0.40)', border: '#6366f1', text: '#a5b4fc' }, // Indigo
+      { bg: 'rgba(244, 63, 94, 0.40)',  border: '#f43f5e', text: '#fda4af' }, // Rose
+      { bg: 'rgba(34, 197, 94, 0.40)',  border: '#22c55e', text: '#86efac' }, // Green
+      { bg: 'rgba(217, 70, 239, 0.40)', border: '#d946ef', text: '#f0abfc' }, // Fuchsia
+      { bg: 'rgba(249, 115, 22, 0.40)', border: '#f97316', text: '#fdba74' }, // Orange
+      { bg: 'rgba(56, 189, 248, 0.40)', border: '#38bdf8', text: '#bae6fd' }, // Sky
+      { bg: 'rgba(132, 204, 22, 0.40)', border: '#84cc16', text: '#bef264' }, // Lime
+      { bg: 'rgba(147, 51, 234, 0.40)', border: '#9333ea', text: '#d8b4fe' }, // Deep Purple
+      { bg: 'rgba(20, 184, 166, 0.45)', border: '#2dd4bf', text: '#99f6e4' }, // Bright Teal
+      { bg: 'rgba(244, 114, 182, 0.40)',border: '#f472b6', text: '#fbcfe8' }  // Light Pink
+    ];
+
+    // Частотные буквы для гармоничного заполнения пустых ячеек (русский и английский)
+    const FREQ_RUSSIAN = "ОЕАИНТСРВЛКМДПУЯЫЬГЗБЧЙХЖШЮЦЩЭФ";
+    const FREQ_ENGLISH = "ETAOINSHRDLCUMWFGYPBVKJXQZ";
+
+    // Встроенный аудиосинтезатор (Web Audio API — без внешних mp3)
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.isMuted = false;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      toggleMute() {
+        this.isMuted = !this.isMuted;
+        const icon = document.getElementById('soundIcon');
+        const text = document.getElementById('soundText');
+        if (icon) icon.innerText = this.isMuted ? '🔇' : '🔊';
+        if (text) text.innerText = this.isMuted ? 'Без звука' : 'Звук';
+      }
+      playPop() {
+        if (this.isMuted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.09);
+        } catch (e) {}
+      }
+      playSuccess() {
+        if (this.isMuted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+            gain.gain.setValueAtTime(0.1, now + idx * 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.25);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + idx * 0.05);
+            osc.stop(now + idx * 0.05 + 0.26);
+          });
+        } catch (e) {}
+      }
+      playFanfare() {
+        if (this.isMuted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+          notes.forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * 0.1);
+            gain.gain.setValueAtTime(0.15, this.ctx.currentTime + i * 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + i * 0.1 + 0.4);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(this.ctx.currentTime + i * 0.1);
+            osc.stop(this.ctx.currentTime + i * 0.1 + 0.42);
+          });
+        } catch (e) {}
+      }
+    }
+
+    // Постоянная база данных на базе IndexedDB (сохранение навсегда без localStorage)
     const PermanentDB = {
-      dbName: 'WordVaultStudioDB_v3',
-      version: 1,
+      dbName: 'WordVault_Permanent_DB',
+      storeName: 'app_state',
       db: null,
 
       async init() {
         return new Promise((resolve) => {
+          const request = indexedDB.open(this.dbName, 1);
+          request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(this.storeName)) {
+              db.createObjectStore(this.storeName);
+            }
+          };
+          request.onsuccess = (e) => {
+            this.db = e.target.result;
+            resolve(true);
+          };
+          request.onerror = () => resolve(false);
+        });
+      },
+
+      async set(key, value) {
+        if (!this.db) await this.init();
+        return new Promise((resolve) => {
           try {
-            const req = indexedDB.open(this.dbName, this.version);
-            req.onupgradeneeded = (e) => {
-              const db = e.target.result;
-              if (!db.objectStoreNames.contains('store')) {
-                db.createObjectStore('store', { keyPath: 'key' });
-              }
-            };
-            req.onsuccess = (e) => {
-              this.db = e.target.result;
-              resolve(true);
-            };
-            req.onerror = () => resolve(false);
+            const tx = this.db.transaction([this.storeName], 'readwrite');
+            const store = tx.objectStore(this.storeName);
+            store.put(value, key);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
           } catch (e) {
             resolve(false);
           }
@@ -790,278 +911,122 @@
         if (!this.db) await this.init();
         return new Promise((resolve) => {
           try {
-            const tx = this.db.transaction('store', 'readonly');
-            const req = tx.objectStore('store').get(key);
-            req.onsuccess = () => resolve(req.result ? req.result.val : null);
+            const tx = this.db.transaction([this.storeName], 'readonly');
+            const store = tx.objectStore(this.storeName);
+            const req = store.get(key);
+            req.onsuccess = () => resolve(req.result);
             req.onerror = () => resolve(null);
           } catch (e) {
             resolve(null);
           }
         });
-      },
-
-      async set(key, val) {
-        if (!this.db) await this.init();
-        return new Promise((resolve) => {
-          try {
-            const tx = this.db.transaction('store', 'readwrite');
-            tx.objectStore('store').put({ key, val });
-            tx.oncomplete = () => resolve(true);
-            tx.onerror = () => resolve(false);
-          } catch (e) {
-            resolve(false);
-          }
-        });
       }
     };
 
-    // Частотные словари для реалистичного заполнения
-    const FREQ_RUSSIAN = "ОЕАИНТСРВЛКМДПУЯЫЬГЗБЧЙХЖШЮЦЩЭФ";
-    const FREQ_ENGLISH = "ETAOINSHRDLCUMWFGYPBVKJXQZ";
-
-    // Цветовая палитра подсветки путей
-    const PALETTE = [
-      { border: '#38bdf8', bg: 'rgba(56, 189, 248, 0.3)', text: '#bae6fd' },
-      { border: '#818cf8', bg: 'rgba(129, 140, 248, 0.3)', text: '#c7d2fe' },
-      { border: '#c084fc', bg: 'rgba(192, 132, 252, 0.3)', text: '#e9d5ff' },
-      { border: '#f472b6', bg: 'rgba(244, 114, 182, 0.3)', text: '#fbcfe8' },
-      { border: '#34d399', bg: 'rgba(52, 211, 153, 0.3)', text: '#a7f3d0' },
-      { border: '#fbbf24', bg: 'rgba(251, 191, 36, 0.3)', text: '#fde68a' },
-      { border: '#2dd4bf', bg: 'rgba(45, 212, 191, 0.3)', text: '#99f6e4' },
-      { border: '#fb7185', bg: 'rgba(251, 113, 133, 0.3)', text: '#fecdd3' },
-      { border: '#a3e635', bg: 'rgba(163, 230, 53, 0.3)', text: '#d9f99d' },
-      { border: '#60a5fa', bg: 'rgba(96, 165, 250, 0.3)', text: '#bfdbfe' }
-    ];
-
-    class SoundEngine {
-      constructor() {
-        this.ctx = null;
-        this.muted = false;
-      }
-      init() {
-        if (!this.ctx) {
-          const AC = window.AudioContext || window.webkitAudioContext;
-          if (AC) this.ctx = new AC();
-        }
-        if (this.ctx && this.ctx.state === 'suspended') {
-          this.ctx.resume();
-        }
-      }
-      toggle() {
-        this.muted = !this.muted;
-        document.getElementById('sfxIcon').innerText = this.muted ? '🔇' : '🔊';
-        app.notify(this.muted ? 'Звук выключен' : 'Звук включен');
-      }
-      playPop() {
-        if (this.muted) return;
-        this.init();
-        if (!this.ctx) return;
-        try {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(360, this.ctx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(640, this.ctx.currentTime + 0.04);
-          gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-          gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start();
-          osc.stop(this.ctx.currentTime + 0.04);
-        } catch (e) {}
-      }
-      playSuccess() {
-        if (this.muted) return;
-        this.init();
-        if (!this.ctx) return;
-        try {
-          const now = this.ctx.currentTime;
-          [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(freq, now + i * 0.06);
-            gain.gain.setValueAtTime(0.08, now + i * 0.06);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.28);
-            osc.connect(gain);
-            gain.connect(this.ctx.destination);
-            osc.start(now + i * 0.06);
-            osc.stop(now + i * 0.06 + 0.29);
-          });
-        } catch (e) {}
-      }
-    }
-
-    /**
-     * ДВУХУРОВНЕВЫЙ ОБЛАЧНЫЙ СИНХРОНИЗАТОР
-     * 1. Реалтайм-мост через защищенный WebSocket MQTT (EMQX / HiveMQ) с Retained Messages.
-     * 2. Резервный канал HTTPS REST (ntfy) для мгновенной доставки состояния при первом открытии.
-     */
+    // Движок автоматической синхронизации ПК и смартфона по защищенному MQTT WebSocket
     const CloudSyncEngine = {
-      mqttClient: null,
-      channelKey: '',
-      connected: false,
-      lastPushedTimestamp: 0,
+      client: null,
+      channel: 'wv-main-room',
+      isConnected: false,
+
+      // Вычисление уникального канала на основе URL страницы (одинаковый на ПК и телефоне)
+      deriveChannel() {
+        try {
+          const raw = window.location.origin + window.location.pathname;
+          let hash = 0;
+          for (let i = 0; i < raw.length; i++) {
+            hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+            hash |= 0;
+          }
+          const safeHash = Math.abs(hash).toString(36);
+          this.channel = `wordvault_pub_${safeHash}`;
+        } catch (e) {
+          this.channel = 'wordvault_pub_default';
+        }
+        const modalChan = document.getElementById('modalChannelName');
+        if (modalChan) modalChan.innerText = this.channel;
+      },
 
       init() {
-        this.channelKey = this.computeChannelKey();
-        const displayKey = document.getElementById('displayChannelKey');
-        if (displayKey) displayKey.innerText = this.channelKey;
-        
-        const urlInput = document.getElementById('syncDirectUrlInput');
-        if (urlInput) {
-          const cleanUrl = window.location.origin + window.location.pathname + '#' + this.channelKey;
-          urlInput.value = cleanUrl;
-        }
-
-        this.connectMQTT();
-        this.fetchRestFallback();
-      },
-
-      computeChannelKey() {
-        // Если передан хэш в адресе (например #myname)
-        if (window.location.hash && window.location.hash.length > 2) {
-          return window.location.hash.replace('#', '').trim().toLowerCase().replace(/[^a-zA-Z0-9_]/g, '');
-        }
-        // Если хостинг на GitHub Pages или домене
-        const host = window.location.hostname || '';
-        const path = (window.location.pathname || '').replace(/\/index\.html$/, '').replace(/\/$/, '');
-        if (host && !host.includes('localhost') && host !== '127.0.0.1' && !host.includes('192.168.') && window.location.protocol !== 'file:') {
-          const slug = (host + path).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-          return 'wv_' + slug;
-        }
-        // Стандартный общий хаб
-        return 'wv_studio_vault';
-      },
-
-      connectMQTT() {
-        if (typeof mqtt === 'undefined') {
-          console.warn("MQTT library not ready, falling back to REST");
-          return;
-        }
+        this.deriveChannel();
+        if (typeof mqtt === 'undefined') return;
 
         try {
-          const clientId = 'wv_' + Math.random().toString(36).substring(2, 10);
-          const topic = `wordvault_v3/${this.channelKey}`;
-
-          this.mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
-            clientId,
+          // Подключение к публичному защищенному брокеру EMQX
+          const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
+          const clientId = 'wv_' + Math.random().toString(16).substring(2, 10);
+          
+          this.client = mqtt.connect(brokerUrl, {
+            clientId: clientId,
             clean: true,
-            connectTimeout: 6000,
+            connectTimeout: 5000,
             reconnectPeriod: 4000
           });
 
-          this.mqttClient.on('connect', () => {
-            this.connected = true;
-            this.setIndicatorStatus(true);
-            this.mqttClient.subscribe(topic, { qos: 1 });
+          this.client.on('connect', () => {
+            this.isConnected = true;
+            this.updateBadge(true);
+            this.client.subscribe(`wordvault/${this.channel}/state`, { qos: 1 });
           });
 
-          this.mqttClient.on('message', (t, message) => {
+          this.client.on('message', (topic, message) => {
             try {
-              const data = JSON.parse(message.toString());
-              if (data && data.updatedAt) {
-                if (data.updatedAt > app.lastLocalEditTimestamp) {
-                  app.applyRemoteUpdate(data);
-                  app.lastLocalEditTimestamp = data.updatedAt;
-                  PermanentDB.set('wv_last_edit_timestamp', data.updatedAt);
-                } else if (data.updatedAt < app.lastLocalEditTimestamp) {
-                  // Если локальное состояние новее облачного (например, редактировали оффлайн), обновляем облако
-                  app.scheduleCloudPush();
-                }
+              const payload = JSON.parse(message.toString());
+              if (payload && payload.timestamp && payload.timestamp > app.lastLocalEditTimestamp) {
+                app.applyRemoteState(payload);
               }
-            } catch (e) {}
+            } catch (err) {}
           });
 
-          this.mqttClient.on('error', () => {
-            this.setIndicatorStatus(false);
+          this.client.on('error', () => {
+            this.isConnected = false;
+            this.updateBadge(false);
           });
 
-          this.mqttClient.on('offline', () => {
-            this.setIndicatorStatus(false);
+          this.client.on('offline', () => {
+            this.isConnected = false;
+            this.updateBadge(false);
           });
-        } catch (err) {
-          console.warn("MQTT connection error:", err);
+
+        } catch (e) {
+          this.updateBadge(false);
         }
       },
 
-      async fetchRestFallback() {
+      updateBadge(online) {
+        const text = document.getElementById('cloudStatusText');
+        const dot = document.getElementById('syncDot');
+        const ping = document.getElementById('syncDotPing');
+        if (!text || !dot) return;
+
+        if (online) {
+          text.innerText = 'Авто-облако: онлайн';
+          dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
+          if (ping) ping.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+        } else {
+          text.innerText = 'Облако: связь...';
+          dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-amber-500';
+          if (ping) ping.className = 'hidden';
+        }
+      },
+
+      // Отправка состояния с флагом retain: true (брокер хранит последнее состояние навсегда)
+      pushState(stateData) {
+        if (!this.client || !this.isConnected) return;
         try {
-          const res = await fetch(`https://ntfy.sh/${this.channelKey}/json?poll=1`);
-          if (!res.ok) return;
-          const text = await res.text();
-          const lines = text.trim().split('\n');
-          for (let i = lines.length - 1; i >= 0; i--) {
-            try {
-              const item = JSON.parse(lines[i]);
-              if (item.event === 'message' && item.message) {
-                const state = JSON.parse(item.message);
-                if (state && state.updatedAt && state.updatedAt > app.lastLocalEditTimestamp) {
-                  app.applyRemoteUpdate(state);
-                  app.lastLocalEditTimestamp = state.updatedAt;
-                  PermanentDB.set('wv_last_edit_timestamp', state.updatedAt);
-                  break;
-                }
-              }
-            } catch (e) {}
-          }
+          const topic = `wordvault/${this.channel}/state`;
+          const payload = JSON.stringify(stateData);
+          this.client.publish(topic, payload, { qos: 1, retain: true });
         } catch (e) {}
       },
 
-      pushStateNow() {
-        const now = Date.now();
-        app.lastLocalEditTimestamp = now;
-        PermanentDB.set('wv_last_edit_timestamp', now);
-
-        const payload = {
-          topicName: app.activeTopicName,
-          words: app.words,
-          topics: app.topics,
-          updatedAt: now
-        };
-
-        const json = JSON.stringify(payload);
-        const topic = `wordvault_v3/${this.channelKey}`;
-
-        // 1. Отправка в MQTT с флагом Retain (брокер запоминает последнее состояние для новых подключений)
-        if (this.mqttClient && this.connected) {
-          this.mqttClient.publish(topic, json, { qos: 1, retain: true });
-        }
-
-        // 2. Резервная отправка через HTTP POST на ntfy
-        fetch(`https://ntfy.sh/${this.channelKey}`, {
-          method: 'POST',
-          body: json,
-          headers: { 'Cache': 'yes' }
-        }).catch(() => {});
-
-        app.notify('⚡ Изменения отправлены в облако!');
-      },
-
-      fetchRemoteNow() {
-        this.fetchRestFallback();
-        app.notify('Запрошено обновление из облака...');
-      },
-
-      setIndicatorStatus(isOnline) {
-        const dot = document.getElementById('syncDot');
-        const text = document.getElementById('syncText');
-        const container = document.getElementById('cloudSyncIndicator');
-        if (!dot || !text || !container) return;
-
-        if (isOnline) {
-          dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
-          text.innerText = "Авто-облако: онлайн";
-          text.className = "text-[11px] text-emerald-300 hidden sm:inline";
-          container.className = "px-2.5 py-1.5 rounded-xl bg-surface-900/80 border border-emerald-500/30 text-xs font-bold text-slate-200 flex items-center gap-1.5 select-none shadow-sm cursor-pointer hover:border-emerald-400/60 transition active:scale-95";
-        } else {
-          dot.className = "w-2 h-2 rounded-full bg-amber-400";
-          text.innerText = "Ожидание сети...";
-          text.className = "text-[11px] text-amber-300 hidden sm:inline";
-        }
+      forcePushState() {
+        app.saveCurrentStateToPersistent();
+        app.notify('Снимок филворда отправлен в облако!');
       }
     };
 
+    // Основное приложение
     const app = {
       width: 15,
       height: 15,
@@ -1072,8 +1037,9 @@
       placedWords: [],
       failedWords: [],
       topics: {},
-      showAnswers: false,
+      showAnswers: true, // ПО УМОЛЧАНИЮ ВКЛЮЧЕНА
       hoveredWord: null,
+      focusedWord: null,
       audio: new SoundEngine(),
       debounceTimer: null,
       cloudPushTimer: null,
@@ -1081,7 +1047,7 @@
       isApplyingRemoteSnapshot: false,
       syncEngine: CloudSyncEngine,
 
-      // Состояние режима решения (Play Mode)
+      // Состояние игры (Интерактив)
       playState: {
         timerInterval: null,
         seconds: 0,
@@ -1098,8 +1064,20 @@
         this.setupPlayEvents();
         this.reverse.init();
         this.syncEngine.init();
+        this.updateRevealButtonState();
 
-        // Обработка клавиатуры для редактирования ячеек реверса
+        // Снятие фокусировки со слова при тапе в пустое место
+        window.addEventListener('click', (e) => {
+          if (!e.target.closest('#feelwordGrid') && !e.target.closest('#activeWordsChips')) {
+            if (this.focusedWord) {
+              this.focusedWord = null;
+              this.renderGrid();
+              this.renderChips();
+            }
+          }
+        });
+
+        // Прямое редактирование матрицы реверса с клавиатуры
         window.addEventListener('keydown', (e) => {
           this.reverse.handleKeyDown(e);
         });
@@ -1108,208 +1086,107 @@
       openSyncInfoModal() {
         document.getElementById('syncInfoModal').classList.remove('hidden');
       },
-
       closeSyncInfoModal() {
         document.getElementById('syncInfoModal').classList.add('hidden');
       },
-
-      copyDirectSyncUrl() {
-        const input = document.getElementById('syncDirectUrlInput');
-        if (!input) return;
-        this.copyToClipboard(input.value, '✓ Прямая ссылка для телефона скопирована!');
+      closeVictoryModal() {
+        document.getElementById('victoryModal').classList.add('hidden');
       },
 
-      applyRemoteUpdate(data) {
-        if (!data || typeof data !== 'object') return;
-        if (this.isApplyingRemoteSnapshot) return;
-
-        this.isApplyingRemoteSnapshot = true;
-        try {
-          // Полное обновление тем каталога (замена, а не слияние, чтобы удаление отражалось сразу)
-          if (data.topics && typeof data.topics === 'object') {
-            this.topics = { ...data.topics };
-            this.updateBadgeCounters();
-            this.renderTopicsVault();
-            PermanentDB.set('wv_topics', this.topics);
-
-            // Если удалена тема, которая была активной на экране
-            if (this.activeTopicName !== "Новая тема" && !this.topics[this.activeTopicName] && !data.topicName) {
-              this.activeTopicName = "Новая тема";
-              document.getElementById('activeTopicBadgeName').innerText = this.activeTopicName;
-            }
+      switchTab(tabId) {
+        ['constructor', 'reverse', 'play', 'topics'].forEach(t => {
+          const view = document.getElementById(`view-${t}`);
+          const dBtn = document.getElementById(`tabBtn-${t}`);
+          const mBtn = document.getElementById(`mTabBtn-${t}`);
+          if (view) view.classList.add('hidden');
+          if (dBtn) {
+            dBtn.className = 'px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-white/5 border border-transparent';
           }
-
-          // Обновление активного списка слов, если пользователь сейчас не печатает
-          const activeEl = document.activeElement;
-          const isUserTyping = activeEl && activeEl.id === 'wordInputArea';
-
-          if (data.words && Array.isArray(data.words) && !isUserTyping) {
-            const hasChanged = JSON.stringify(data.words) !== JSON.stringify(this.words) || (data.topicName && data.topicName !== this.activeTopicName);
-            if (hasChanged) {
-              this.words = [...data.words];
-              this.activeTopicName = data.topicName || "Новая тема";
-              document.getElementById('wordInputArea').value = this.words.join(', ');
-              document.getElementById('activeTopicBadgeName').innerText = this.activeTopicName;
-              this.updateWordPills();
-              this.generate();
-              PermanentDB.set('wv_current_state', { topicName: this.activeTopicName, words: this.words });
-              this.notify(`☁️ Получены данные из облака: "${this.activeTopicName}"`);
-            }
+          if (mBtn) {
+            mBtn.className = 'py-1.5 rounded-lg text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white';
           }
-        } finally {
-          this.isApplyingRemoteSnapshot = false;
-        }
-      },
-
-      scheduleCloudPush() {
-        if (this.isApplyingRemoteSnapshot) return;
-        clearTimeout(this.cloudPushTimer);
-        this.cloudPushTimer = setTimeout(() => {
-          this.syncEngine.pushStateNow();
-        }, 500);
-      },
-
-      updateBadgeCounters() {
-        const count = Object.keys(this.topics).length;
-        const dBadge = document.getElementById('navTopicBadge');
-        if (dBadge) dBadge.innerText = count;
-        const mBadge = document.getElementById('mobNavTopicBadge');
-        if (mBadge) mBadge.innerText = count;
-        const vCount = document.getElementById('vaultTotalCount');
-        if (vCount) vCount.innerText = `${count} тем`;
-      },
-
-      async restorePersistedState() {
-        this.lastLocalEditTimestamp = (await PermanentDB.get('wv_last_edit_timestamp')) || 0;
-
-        const savedTopics = await PermanentDB.get('wv_topics');
-        this.topics = savedTopics && typeof savedTopics === 'object' ? savedTopics : {};
-        this.updateBadgeCounters();
-
-        const savedCurrent = await PermanentDB.get('wv_current_state');
-        if (savedCurrent && savedCurrent.words && savedCurrent.words.length > 0) {
-          this.activeTopicName = savedCurrent.topicName || "Новая тема";
-          this.words = savedCurrent.words;
-          document.getElementById('wordInputArea').value = this.words.join(', ');
-          document.getElementById('activeTopicBadgeName').innerText = this.activeTopicName;
-          this.updateWordPills();
-          this.generate();
-        } else {
-          this.words = [];
-          this.generateBlankGrid();
-        }
-      },
-
-      async persistState() {
-        this.lastLocalEditTimestamp = Date.now();
-        await PermanentDB.set('wv_last_edit_timestamp', this.lastLocalEditTimestamp);
-        await PermanentDB.set('wv_topics', this.topics);
-        await PermanentDB.set('wv_current_state', {
-          topicName: this.activeTopicName,
-          words: this.words
         });
-        this.updateBadgeCounters();
-        this.scheduleCloudPush();
+
+        const activeView = document.getElementById(`view-${tabId}`);
+        const activeDBtn = document.getElementById(`tabBtn-${tabId}`);
+        const activeMBtn = document.getElementById(`mTabBtn-${tabId}`);
+
+        if (activeView) activeView.classList.remove('hidden');
+        if (activeDBtn) {
+          activeDBtn.className = 'px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-brand-600/25 text-brand-neon border border-brand-500/40 shadow-sm';
+        }
+        if (activeMBtn) {
+          activeMBtn.className = 'py-1.5 rounded-lg text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 bg-brand-600/30 text-brand-neon border border-brand-500/40';
+        }
+
+        if (tabId === 'play') {
+          this.playInit();
+        } else if (tabId === 'topics') {
+          this.renderTopicsCatalog();
+        } else if (tabId === 'reverse') {
+          this.reverse.render();
+        }
       },
 
-      cleanWordTokens(text) {
-        if (!text) return [];
-        const upper = text.toUpperCase();
-        const matches = upper.match(/[А-ЯЁA-Z]{2,}/g);
-        if (!matches) return [];
-        return [...new Set(matches)];
+      // Парсинг и очистка слов (поддержка русского А-Я, Ё и английского A-Z)
+      cleanWordTokens(rawText) {
+        if (!rawText) return [];
+        const cleaned = rawText
+          .toUpperCase()
+          .replace(/Ё/g, 'Е')
+          .replace(/[^А-ЯA-Z\n\r,;\s0-9-]/g, ' ')
+          .replace(/[0-9-]/g, ' ');
+
+        const tokens = cleaned.split(/[\s,;\n\r]+/).filter(w => w.length >= 2 && w.length <= 15);
+        return [...new Set(tokens)];
       },
 
       detectLanguage() {
-        let ruCount = 0;
-        let enCount = 0;
-        this.words.forEach(w => {
-          for (let char of w) {
-            if (/[А-ЯЁ]/.test(char)) ruCount++;
-            else if (/[A-Z]/.test(char)) enCount++;
-          }
-        });
-        const badge = document.getElementById('langDetectedBadge');
-        if (enCount > 0 && ruCount === 0) {
-          badge.innerText = "ENG";
+        const str = this.words.join('');
+        const ruCount = (str.match(/[А-Я]/g) || []).length;
+        const enCount = (str.match(/[A-Z]/g) || []).length;
+        const badge = document.getElementById('langDetectionBadge');
+        if (!badge) return 'ru';
+
+        if (enCount > ruCount) {
+          badge.innerText = 'ENG (A-Z)';
+          badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20';
           return 'en';
-        } else if (ruCount > 0 && enCount === 0) {
-          badge.innerText = "РУС";
-          return 'ru';
         } else if (ruCount > 0 && enCount > 0) {
-          badge.innerText = "РУС + ENG";
+          badge.innerText = 'РУС + ENG';
+          badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20';
           return 'mixed';
+        } else {
+          badge.innerText = 'РУС (А-Я)';
+          badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-neon border border-brand-500/20';
+          return 'ru';
         }
-        badge.innerText = "RU / EN";
-        return 'ru';
       },
 
-      onInputWords() {
-        const raw = document.getElementById('wordInputArea').value;
-        this.words = this.cleanWordTokens(raw);
-        this.updateWordPills();
-        this.detectLanguage();
+      onTopicNameChange(val) {
+        this.activeTopicName = val.trim() || 'Новая тема';
+        this.scheduleAutoSaveAndSync();
+      },
+
+      onWordsInput(rawText) {
+        this.words = this.cleanWordTokens(rawText);
+        document.getElementById('wordCounterBadge').innerText = `${this.words.length} слов`;
 
         clearTimeout(this.debounceTimer);
         this.debounceTimer = setTimeout(() => {
           this.generate();
-          this.persistState();
-        }, 300);
-      },
-
-      updateWordPills() {
-        const container = document.getElementById('parsedTagsContainer');
-        container.innerHTML = '';
-        document.getElementById('parsedTagsCount').innerText = this.words.length;
-        document.getElementById('badgeWordCounter').innerText = `${this.words.length} слов`;
-
-        if (this.words.length === 0) {
-          container.innerHTML = '<span class="text-[11px] text-slate-500 italic">Слова пока не введены...</span>';
-          return;
-        }
-
-        this.words.forEach((w, idx) => {
-          const pill = document.createElement('span');
-          pill.className = 'text-[11px] font-mono px-2 py-0.5 rounded-md bg-surface-800 text-slate-200 border border-white/10 flex items-center gap-1';
-          pill.innerHTML = `<span>${w}</span><button onclick="app.removeWord(${idx})" class="text-slate-500 hover:text-rose-400 font-bold ml-0.5">×</button>`;
-          container.appendChild(pill);
-        });
-      },
-
-      removeWord(idx) {
-        this.words.splice(idx, 1);
-        document.getElementById('wordInputArea').value = this.words.join(', ');
-        this.updateWordPills();
-        this.generate();
-        this.persistState();
-      },
-
-      clearWordsOnly() {
-        this.words = [];
-        document.getElementById('wordInputArea').value = '';
-        this.updateWordPills();
-        this.generateBlankGrid();
-        this.persistState();
-      },
-
-      clearCurrentBoard() {
-        this.words = [];
-        this.activeTopicName = "Новая тема";
-        document.getElementById('wordInputArea').value = '';
-        document.getElementById('activeTopicBadgeName').innerText = this.activeTopicName;
-        this.updateWordPills();
-        this.generateBlankGrid();
-        this.persistState();
-        this.notify('Холст очищен');
+          this.scheduleAutoSaveAndSync();
+        }, 320);
       },
 
       generateBlankGrid() {
         const W = this.width;
         const H = this.height;
         this.grid = Array.from({ length: H }, () => Array(W).fill('·'));
-        this.solutionMask = Array.from({ length: H }, () => Array(W).fill(null));
+        this.solutionMask = Array.from({ length: H }, () => Array.from({ length: W }, () => []));
         this.placedWords = [];
         this.failedWords = [];
+        this.focusedWord = null;
         this.renderGrid();
         this.renderChips();
         document.getElementById('emptyCellsLabel').innerText = 225;
@@ -1330,7 +1207,7 @@
         const lang = this.detectLanguage();
 
         this.grid = Array.from({ length: H }, () => Array(W).fill(''));
-        this.solutionMask = Array.from({ length: H }, () => Array(W).fill(null));
+        this.solutionMask = Array.from({ length: H }, () => Array.from({ length: W }, () => []));
         this.placedWords = [];
         this.failedWords = [];
 
@@ -1393,46 +1270,52 @@
       },
 
       getDirections() {
-        const allowR = document.getElementById('dirRight').checked;
-        const allowD = document.getElementById('dirDown').checked;
-        const allowDiag = document.getElementById('dirDiagDown').checked;
-        const allowRev = document.getElementById('dirReverse').checked;
-
         const dirs = [];
-        if (allowR) dirs.push([0, 1]);
-        if (allowD) dirs.push([1, 0]);
-        if (allowDiag) {
+        const h = document.getElementById('dirH').checked;
+        const v = document.getElementById('dirV').checked;
+        const d = document.getElementById('dirD').checked;
+        const r = document.getElementById('dirR').checked;
+
+        if (h) dirs.push([0, 1]);
+        if (v) dirs.push([1, 0]);
+        if (d) {
           dirs.push([1, 1]);
-          dirs.push([-1, 1]);
+          dirs.push([1, -1]);
         }
-        if (allowRev) {
-          if (allowR) dirs.push([0, -1]);
-          if (allowD) dirs.push([-1, 0]);
-          if (allowDiag) {
-            dirs.push([1, -1]);
+        if (r) {
+          if (h) dirs.push([0, -1]);
+          if (v) dirs.push([-1, 0]);
+          if (d) {
             dirs.push([-1, -1]);
+            dirs.push([-1, 1]);
           }
         }
-        return dirs.length ? dirs : [[0, 1], [1, 0]];
+        return dirs.length > 0 ? dirs : [[0, 1], [1, 0]];
       },
 
       tryFitWord(word, style, directions) {
         const W = this.width;
         const H = this.height;
-        const attempts = 360;
+        const maxAttempts = 220;
 
-        for (let a = 0; a < attempts; a++) {
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
           const dir = directions[Math.floor(Math.random() * directions.length)];
           const dr = dir[0];
           const dc = dir[1];
 
-          const startR = Math.floor(Math.random() * H);
-          const startC = Math.floor(Math.random() * W);
+          let minR = 0, maxR = H - 1;
+          let minC = 0, maxC = W - 1;
 
-          const endR = startR + dr * (word.length - 1);
-          const endC = startC + dc * (word.length - 1);
+          if (dr > 0) maxR = H - word.length;
+          else if (dr < 0) minR = word.length - 1;
 
-          if (endR < 0 || endR >= H || endC < 0 || endC >= W) continue;
+          if (dc > 0) maxC = W - word.length;
+          else if (dc < 0) minC = word.length - 1;
+
+          if (minR > maxR || minC > maxC) continue;
+
+          const startR = minR + Math.floor(Math.random() * (maxR - minR + 1));
+          const startC = minC + Math.floor(Math.random() * (maxC - minC + 1));
 
           let ok = true;
           for (let k = 0; k < word.length; k++) {
@@ -1451,7 +1334,11 @@
               const r = startR + dr * k;
               const c = startC + dc * k;
               this.grid[r][c] = word[k];
-              this.solutionMask[r][c] = { word, style };
+              // Сохраняем слово в массив ячейки: не затираем предыдущие слова при пересечениях
+              if (!this.solutionMask[r][c]) {
+                this.solutionMask[r][c] = [];
+              }
+              this.solutionMask[r][c].push({ word, style });
               coords.push([r, c]);
             }
             return coords;
@@ -1462,36 +1349,82 @@
 
       renderGrid() {
         const container = document.getElementById('feelwordGrid');
+        if (!container) return;
         container.innerHTML = '';
+
+        const activeWord = this.focusedWord || this.hoveredWord;
 
         for (let r = 0; r < this.height; r++) {
           for (let c = 0; c < this.width; c++) {
             const letter = this.grid[r][c] || '·';
-            const mask = this.solutionMask[r][c];
+            const maskList = (this.solutionMask[r] && this.solutionMask[r][c]) ? this.solutionMask[r][c] : [];
             const cell = document.createElement('div');
             
-            cell.className = 'cell-box flex items-center justify-center font-extrabold font-mono rounded-md sm:rounded-lg border transition duration-150 cursor-default';
+            cell.className = 'cell-box flex items-center justify-center font-extrabold font-mono rounded-md sm:rounded-lg border transition duration-150 cursor-pointer relative';
             cell.innerText = letter;
+            cell.dataset.r = r;
+            cell.dataset.c = c;
 
-            const isHovered = this.hoveredWord && mask && mask.word === this.hoveredWord;
-            const isShown = this.showAnswers && mask;
+            // Проверяем, принадлежит ли ячейка активному (выделенному) слову
+            const activeMatch = activeWord ? maskList.find(m => m.word === activeWord) : null;
+            const hasWords = maskList.length > 0;
 
-            if (isHovered || isShown) {
-              cell.style.backgroundColor = mask.style.bg;
-              cell.style.borderColor = mask.style.border;
+            if (activeMatch) {
+              // ДВОЙНОЕ УСИЛЕННОЕ ПОДСВЕЧИВАНИЕ (Super Highlight / Pop)
+              cell.style.backgroundColor = activeMatch.style.border;
+              cell.style.borderColor = '#ffffff';
               cell.style.color = '#ffffff';
-              cell.style.boxShadow = `0 0 8px ${mask.style.border}55`;
+              cell.style.boxShadow = `0 0 0 2px #ffffff, 0 0 16px ${activeMatch.style.border}, 0 0 26px ${activeMatch.style.border}cc`;
+              cell.style.transform = 'scale(1.12)';
+              cell.style.zIndex = '25';
+              cell.classList.add('animate-double-pulse');
+            } else if (this.showAnswers && hasWords) {
+              // Стандартная подсветка ответа (не затирает буквы на пересечениях)
+              const primary = maskList[0];
+              cell.style.backgroundColor = primary.style.bg;
+              cell.style.borderColor = primary.style.border;
+              cell.style.color = '#ffffff';
+              cell.style.boxShadow = `0 0 8px ${primary.style.border}55`;
+              cell.style.transform = '';
+              cell.style.zIndex = '';
+              cell.classList.remove('animate-double-pulse');
             } else {
               cell.className += ' bg-surface-850/90 text-slate-200 border-white/5';
+              cell.style.backgroundColor = '';
+              cell.style.borderColor = '';
+              cell.style.color = '';
+              cell.style.boxShadow = '';
+              cell.style.transform = '';
+              cell.style.zIndex = '';
+              cell.classList.remove('animate-double-pulse');
             }
+
+            // Тап / клик по ячейке: подсвечивает соответствующее слово
+            cell.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (maskList.length > 0) {
+                const curIdx = maskList.findIndex(m => m.word === this.focusedWord);
+                if (curIdx === -1) {
+                  this.setFocusedWord(maskList[0].word);
+                } else if (curIdx < maskList.length - 1) {
+                  this.setFocusedWord(maskList[curIdx + 1].word);
+                } else {
+                  this.setFocusedWord(null);
+                }
+              } else {
+                this.setFocusedWord(null);
+              }
+            });
 
             container.appendChild(cell);
           }
         }
+        this.updateRevealButtonState();
       },
 
       renderChips() {
         const container = document.getElementById('activeWordsChips');
+        if (!container) return;
         container.innerHTML = '';
         document.getElementById('placedCountSummary').innerText = `${this.placedWords.length} из ${this.words.length} слов`;
 
@@ -1502,9 +1435,18 @@
 
         this.placedWords.forEach(item => {
           const chip = document.createElement('div');
-          chip.className = 'text-[11px] font-mono font-semibold px-2 py-0.5 rounded-lg border transition cursor-pointer flex items-center gap-1.5';
+          const isFocused = this.focusedWord === item.word;
+          const isHovered = this.hoveredWord === item.word;
+
+          chip.className = 'text-[11px] font-mono font-semibold px-2.5 py-1 rounded-xl border transition-all duration-150 cursor-pointer flex items-center gap-1.5 select-none active:scale-95';
           
-          if (this.hoveredWord === item.word) {
+          if (isFocused) {
+            chip.style.backgroundColor = item.style.border;
+            chip.style.borderColor = '#ffffff';
+            chip.style.color = '#ffffff';
+            chip.style.boxShadow = `0 0 12px ${item.style.border}, 0 0 0 1.5px #ffffff`;
+            chip.style.transform = 'scale(1.05)';
+          } else if (isHovered) {
             chip.style.backgroundColor = item.style.bg;
             chip.style.borderColor = item.style.border;
             chip.style.color = '#ffffff';
@@ -1513,17 +1455,33 @@
           }
 
           chip.innerHTML = `
-            <span class="w-2 h-2 rounded-full" style="background-color: ${item.style.border}"></span>
+            <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: ${isFocused ? '#ffffff' : item.style.border}"></span>
             <span>${item.word}</span>
+            ${isFocused ? '<span class="text-[9px] opacity-90">🎯</span>' : ''}
           `;
 
           chip.onmouseenter = () => {
-            this.hoveredWord = item.word;
-            this.renderGrid();
+            if (!this.focusedWord) {
+              this.hoveredWord = item.word;
+              this.renderGrid();
+            }
           };
           chip.onmouseleave = () => {
-            this.hoveredWord = null;
-            this.renderGrid();
+            if (!this.focusedWord) {
+              this.hoveredWord = null;
+              this.renderGrid();
+            }
+          };
+
+          // Поддержка клика/тапа на смартфонах и ПК
+          chip.onclick = (e) => {
+            e.stopPropagation();
+            this.audio.playPop();
+            if (this.focusedWord === item.word) {
+              this.setFocusedWord(null);
+            } else {
+              this.setFocusedWord(item.word);
+            }
           };
 
           container.appendChild(chip);
@@ -1538,761 +1496,857 @@
         });
       },
 
+      setFocusedWord(word) {
+        this.focusedWord = word;
+        this.hoveredWord = null;
+        this.renderGrid();
+        this.renderChips();
+        if (word) {
+          this.notify(`Слово: ${word}`);
+        }
+      },
+
       toggleShowAnswers() {
         this.showAnswers = !this.showAnswers;
-        document.getElementById('revealText').innerText = this.showAnswers ? 'Скрыть' : 'Подсветка';
-        document.getElementById('revealIcon').innerText = this.showAnswers ? '🙈' : '👁️';
+        this.updateRevealButtonState();
         this.renderGrid();
       },
 
-      exportExcel() {
-        if (!this.grid.length) return;
-        const tsv = this.grid.map(row => row.join('\t')).join('\n');
-        this.copyToClipboard(tsv, '✓ Сетка 15×15 скопирована! Откройте Excel и нажмите Ctrl+V.');
+      updateRevealButtonState() {
+        const btn = document.getElementById('btnRevealAnswers');
+        const text = document.getElementById('revealText');
+        const icon = document.getElementById('revealIcon');
+        if (!btn || !text || !icon) return;
+
+        if (this.showAnswers) {
+          btn.className = "px-3 py-1.5 rounded-xl bg-brand-600/30 border border-brand-400 text-brand-neon text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-brand-500/20 active:scale-95";
+          text.innerText = "Подсветка: ВКЛ";
+          icon.innerText = "👁️";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-400 border border-white/10 transition flex items-center gap-1.5 active:scale-95";
+          text.innerText = "Подсветка: ВЫКЛ";
+          icon.innerText = "🙈";
+        }
       },
 
-      exportLinear() {
-        if (!this.grid.length) return;
+      exportExcel() {
+        if (this.grid.length === 0) {
+          this.notify('Сетка пуста');
+          return;
+        }
+        let tabString = '';
+        for (let r = 0; r < this.height; r++) {
+          tabString += this.grid[r].join('\t') + '\n';
+        }
+        this.copyToClipboard(tabString, 'Сетка 15×15 скопирована! Вставьте в Excel (Ctrl+V)');
+      },
+
+      exportRaw225() {
+        if (this.grid.length === 0) return;
         let str = '';
         for (let r = 0; r < this.height; r++) {
+          str += this.grid[r].join('');
+        }
+        this.copyToClipboard(str, `Скопирована строка из 225 букв!`);
+      },
+
+      printBoard() {
+        if (this.grid.length === 0) return;
+        let gridHtml = '<div style="display:grid;grid-template-columns:repeat(15, 28px);gap:2px;font-family:monospace;font-weight:bold;font-size:16px;">';
+        for (let r = 0; r < this.height; r++) {
           for (let c = 0; c < this.width; c++) {
-            str += this.grid[r][c];
+            gridHtml += `<div style="width:28px;height:28px;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;">${this.grid[r][c]}</div>`;
           }
         }
-        this.copyToClipboard(str, `✓ Скопировано одной строкой (${str.length} знаков)!`);
+        gridHtml += '</div>';
+
+        let wordsHtml = '<div style="margin-top:20px;display:flex;flex-wrap:wrap;gap:12px;font-family:sans-serif;font-size:14px;">';
+        this.placedWords.forEach(p => {
+          wordsHtml += `<div>[ ] ${p.word}</div>`;
+        });
+        wordsHtml += '</div>';
+
+        const printWin = window.open('', '_blank');
+        printWin.document.write(`
+          <html>
+            <head>
+              <title>${this.activeTopicName} — Филворд</title>
+              <style>body { font-family: sans-serif; padding: 24px; color: #000; }</style>
+            </head>
+            <body>
+              <h2>Филворд: ${this.activeTopicName}</h2>
+              <p>Найдите все спрятанные слова в сетке 15×15:</p>
+              ${gridHtml}
+              ${wordsHtml}
+              <script>window.onload = function(){ window.print(); }<\/script>
+            </body>
+          </html>
+        `);
+        printWin.document.close();
       },
 
-      exportTextGrid() {
-        if (!this.grid.length) return;
-        const textGrid = this.grid.map(row => row.join(' ')).join('\n');
-        this.copyToClipboard(textGrid, '✓ Сетка с пробелами скопирована!');
+      clearCurrentBoard() {
+        this.words = [];
+        this.activeTopicName = "Новая тема";
+        document.getElementById('topicNameInput').value = this.activeTopicName;
+        document.getElementById('wordsInput').value = '';
+        document.getElementById('wordCounterBadge').innerText = '0 слов';
+        this.generateBlankGrid();
+        this.scheduleAutoSaveAndSync();
+        this.notify('Холст очищен');
       },
 
-      exportWordsList() {
-        const list = this.placedWords.map(p => p.word).join(', ');
-        this.copyToClipboard(list, '✓ Список слов скопирован!');
-      },
-
-      copyToClipboard(text, msg) {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
+      copyToClipboard(text, successMessage) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
         try {
           document.execCommand('copy');
-          this.notify(msg);
-        } catch (e) {
+          this.notify(successMessage || 'Скопировано в буфер обмена!');
+          this.audio.playSuccess();
+        } catch (err) {
           this.notify('Ошибка копирования');
         }
-        document.body.removeChild(ta);
+        document.body.removeChild(textarea);
       },
 
+      notify(msg) {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = 'glass-card border border-white/20 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl shadow-black/50 flex items-center justify-between gap-3 animate-pop-in pointer-events-auto';
+        toast.innerHTML = `
+          <span>${msg}</span>
+          <button class="text-slate-400 hover:text-white font-bold">&times;</button>
+        `;
+        toast.querySelector('button').onclick = () => toast.remove();
+        container.appendChild(toast);
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transition = 'opacity 0.2s ease';
+          setTimeout(() => toast.remove(), 200);
+        }, 2800);
+      },
+
+      // Модуль Реверс-аудита
       reverse: {
-        rawLetters: '',
-        grid: [],
-        auditWords: [],
-        foundInReverse: [],
-        missingInReverse: [],
+        grid: Array.from({ length: 15 }, () => Array(15).fill('·')),
+        activeCell: null,
+        foundWords: [],
+        missingWords: [],
 
         init() {
-          this.grid = Array.from({ length: 15 }, () => Array(15).fill('·'));
-          this.renderGrid();
-        },
-
-        onInputLetters() {
-          const raw = document.getElementById('reverseInputRaw').value;
-          const cleaned = raw.toUpperCase().replace(/[^А-ЯЁA-Z]/g, '');
-          this.rawLetters = cleaned;
-
-          const counter = document.getElementById('reverseCharCounter');
-          counter.innerText = `${cleaned.length} / 225`;
-
-          if (cleaned.length === 225) {
-            counter.className = "text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
-            document.getElementById('reverseMatrixStatus').innerText = "Матрица 15×15 готова к аудиту";
-            document.getElementById('reverseMatrixStatus').className = "font-mono text-[11px] text-emerald-400 font-bold";
-          } else {
-            counter.className = "text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30";
-            const diff = 225 - cleaned.length;
-            document.getElementById('reverseMatrixStatus').innerText = diff > 0 ? `Не хватает ${diff} букв` : `Лишних ${Math.abs(diff)} букв`;
-            document.getElementById('reverseMatrixStatus').className = "font-mono text-[11px] text-amber-400";
-          }
-
-          this.grid = Array.from({ length: 15 }, () => Array(15).fill('·'));
-          for (let i = 0; i < Math.min(cleaned.length, 225); i++) {
-            const r = Math.floor(i / 15);
-            const c = i % 15;
-            this.grid[r][c] = cleaned[i];
-          }
-          this.renderGrid();
-        },
-
-        onInputWords() {
-          const raw = document.getElementById('reverseInputWords').value;
-          this.auditWords = app.cleanWordTokens(raw);
-          document.getElementById('auditWordsCount').innerText = `${this.auditWords.length} слов`;
-        },
-
-        pasteCurrentGenerated() {
-          let str = '';
-          for (let r = 0; r < app.height; r++) {
-            for (let c = 0; c < app.width; c++) {
-              str += app.grid[r][c] || '';
-            }
-          }
-          document.getElementById('reverseInputRaw').value = str;
-          document.getElementById('reverseInputWords').value = app.placedWords.map(p => p.word).join(', ');
-          this.onInputLetters();
-          this.onInputWords();
-          app.notify('Сетка из конструктора вставлена в реверс-аудит');
+          this.render();
         },
 
         clear() {
-          document.getElementById('reverseInputRaw').value = '';
-          document.getElementById('reverseInputWords').value = '';
-          this.rawLetters = '';
-          this.auditWords = [];
-          this.foundInReverse = [];
-          this.missingInReverse = [];
-          this.onInputLetters();
-          this.onInputWords();
-          document.getElementById('auditResultsContainer').innerHTML = '<span class="text-[11px] text-slate-500 italic">Запустите аудит для отображения отчета...</span>';
-          document.getElementById('auditFoundCount').innerText = '0';
-          document.getElementById('auditMissingCount').innerText = '0';
+          this.grid = Array.from({ length: 15 }, () => Array(15).fill('·'));
+          this.activeCell = null;
+          this.foundWords = [];
+          this.missingWords = [];
+          document.getElementById('reverseRawInput').value = '';
+          document.getElementById('reverseWordsInput').value = '';
+          document.getElementById('reverseCountBadge').innerText = '0 / 225';
+          document.getElementById('reverseFoundSummary').innerText = 'Очищено';
+          document.getElementById('reverseChipsContainer').innerHTML = '<span class="text-[11px] text-slate-500 italic">Сетка пуста...</span>';
+          this.render();
         },
 
-        renderGrid() {
-          const el = document.getElementById('reverseGridEl');
-          el.innerHTML = '';
+        loadCurrentFromConstructor() {
+          if (app.grid.length === 0) {
+            app.notify('В конструкторе нет сетки');
+            return;
+          }
+          this.grid = app.grid.map(row => [...row]);
+          let flat = '';
+          for (let r = 0; r < 15; r++) {
+            flat += this.grid[r].join('');
+          }
+          document.getElementById('reverseRawInput').value = flat;
+          document.getElementById('reverseWordsInput').value = app.words.join(', ');
+          document.getElementById('reverseCountBadge').innerText = '225 / 225';
+          this.render();
+          this.scanWords();
+          app.notify('Сетка загружена из конструктора');
+        },
+
+        onInputRaw(rawVal) {
+          const cleaned = rawVal
+            .toUpperCase()
+            .replace(/Ё/g, 'Е')
+            .replace(/[^А-ЯA-Z]/g, '');
+
+          const badge = document.getElementById('reverseCountBadge');
+          badge.innerText = `${cleaned.length} / 225`;
+
+          if (cleaned.length === 225) {
+            badge.className = "text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+          } else {
+            badge.className = "text-[11px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30";
+          }
+
+          for (let i = 0; i < 225; i++) {
+            const r = Math.floor(i / 15);
+            const c = i % 15;
+            this.grid[r][c] = i < cleaned.length ? cleaned[i] : '·';
+          }
+
+          this.render();
+        },
+
+        handleKeyDown(e) {
+          if (!this.activeCell) return;
+          // Проверяем ввод русской или английской буквы
+          const key = e.key.toUpperCase();
+          if (/^[А-ЯA-Z]$/.test(key)) {
+            const { r, c } = this.activeCell;
+            this.grid[r][c] = key;
+            this.updateRawTextareaFromGrid();
+            // Перемещаем фокус на следующую ячейку
+            if (c < 14) {
+              this.activeCell = { r, c: c + 1 };
+            } else if (r < 14) {
+              this.activeCell = { r: r + 1, c: 0 };
+            }
+            this.render();
+          } else if (e.key === 'Backspace') {
+            const { r, c } = this.activeCell;
+            this.grid[r][c] = '·';
+            this.updateRawTextareaFromGrid();
+            if (c > 0) {
+              this.activeCell = { r, c: c - 1 };
+            } else if (r > 0) {
+              this.activeCell = { r: r - 1, c: 14 };
+            }
+            this.render();
+          }
+        },
+
+        updateRawTextareaFromGrid() {
+          let s = '';
           for (let r = 0; r < 15; r++) {
             for (let c = 0; c < 15; c++) {
-              const char = this.grid[r][c];
+              s += this.grid[r][c] !== '·' ? this.grid[r][c] : ' ';
+            }
+          }
+          document.getElementById('reverseRawInput').value = s.trim();
+        },
+
+        render() {
+          const container = document.getElementById('reverseGrid');
+          if (!container) return;
+          container.innerHTML = '';
+
+          for (let r = 0; r < 15; r++) {
+            for (let c = 0; c < 15; c++) {
+              const letter = this.grid[r][c];
               const cell = document.createElement('div');
-              cell.className = 'cell-box flex items-center justify-center font-extrabold font-mono rounded-md sm:rounded-lg border border-white/5 bg-surface-850/90 text-slate-200';
-              cell.innerText = char;
-              cell.dataset.r = r;
-              cell.dataset.c = c;
-              el.appendChild(cell);
+              cell.className = 'cell-box flex items-center justify-center font-extrabold font-mono rounded-md border text-slate-200 cursor-pointer transition';
+              cell.innerText = letter;
+
+              const isSelected = this.activeCell && this.activeCell.r === r && this.activeCell.c === c;
+              if (isSelected) {
+                cell.className += ' bg-purple-600 border-white text-white scale-110 shadow-lg shadow-purple-500/50 z-20';
+              } else {
+                cell.className += ' bg-surface-850/90 border-white/5 hover:border-purple-400/40';
+              }
+
+              cell.onclick = (e) => {
+                e.stopPropagation();
+                this.activeCell = { r, c };
+                const colLetter = String.fromCharCode(65 + c);
+                document.getElementById('reverseCellStatus').innerText = `Выбрана ячейка ${colLetter}${r + 1} ('${letter}')`;
+                this.render();
+              };
+
+              container.appendChild(cell);
             }
           }
         },
 
-        runAudit() {
-          if (this.rawLetters.length < 225) {
-            app.notify(`В матрице ${this.rawLetters.length} букв из 225.`);
-          }
-          if (this.auditWords.length === 0) {
-            app.notify('Укажите слова для аудита!');
+        scanWords() {
+          const raw = document.getElementById('reverseWordsInput').value;
+          const words = app.cleanWordTokens(raw);
+
+          if (words.length === 0) {
+            app.notify('Введите слова для поиска');
             return;
           }
 
-          const dirs = [
-            [0, 1], [0, -1], [1, 0], [-1, 0],
-            [1, 1], [-1, -1], [1, -1], [-1, 1]
-          ];
+          this.foundWords = [];
+          this.missingWords = [];
 
-          this.foundInReverse = [];
-          this.missingInReverse = [];
-          const highlightedCoords = new Map();
-
-          this.auditWords.forEach((word, wordIdx) => {
-            let found = false;
-            const style = PALETTE[wordIdx % PALETTE.length];
-
-            for (let r = 0; r < 15 && !found; r++) {
-              for (let c = 0; c < 15 && !found; c++) {
-                for (let d of dirs) {
-                  const dr = d[0];
-                  const dc = d[1];
-                  const endR = r + dr * (word.length - 1);
-                  const endC = c + dc * (word.length - 1);
-
-                  if (endR < 0 || endR >= 15 || endC < 0 || endC >= 15) continue;
-
-                  let match = true;
-                  for (let k = 0; k < word.length; k++) {
-                    if (this.grid[r + dr * k][c + dc * k] !== word[k]) {
-                      match = false;
-                      break;
-                    }
-                  }
-
-                  if (match) {
-                    found = true;
-                    const path = [];
-                    for (let k = 0; k < word.length; k++) {
-                      const cr = r + dr * k;
-                      const cc = c + dc * k;
-                      path.push([cr, cc]);
-                      highlightedCoords.set(`${cr},${cc}`, style);
-                    }
-                    this.foundInReverse.push({ word, path, style });
-                    break;
-                  }
-                }
-              }
-            }
-
-            if (!found) {
-              this.missingInReverse.push(word);
-            }
-          });
-
-          document.querySelectorAll('#reverseGridEl .cell-box').forEach(cell => {
-            const key = `${cell.dataset.r},${cell.dataset.c}`;
-            if (highlightedCoords.has(key)) {
-              const style = highlightedCoords.get(key);
-              cell.style.backgroundColor = style.bg;
-              cell.style.borderColor = style.border;
-              cell.style.color = '#ffffff';
+          words.forEach(w => {
+            const loc = this.findWordInGrid(w);
+            if (loc) {
+              this.foundWords.push({ word: w, ...loc });
             } else {
-              cell.style.backgroundColor = '';
-              cell.style.borderColor = '';
-              cell.style.color = '';
+              this.missingWords.push(w);
             }
           });
 
-          document.getElementById('auditFoundCount').innerText = this.foundInReverse.length;
-          document.getElementById('auditMissingCount').innerText = this.missingInReverse.length;
-
-          const reportEl = document.getElementById('auditResultsContainer');
-          reportEl.innerHTML = '';
-
-          this.foundInReverse.forEach(item => {
-            const b = document.createElement('span');
-            b.className = 'text-[11px] font-mono px-2 py-0.5 rounded-lg border flex items-center gap-1';
-            b.style.backgroundColor = item.style.bg;
-            b.style.borderColor = item.style.border;
-            b.style.color = '#ffffff';
-            b.innerHTML = `<span>✓</span><span>${item.word}</span>`;
-            reportEl.appendChild(b);
-          });
-
-          this.missingInReverse.forEach(w => {
-            const b = document.createElement('span');
-            b.className = 'text-[11px] font-mono px-2 py-0.5 rounded-lg bg-rose-950/40 border border-rose-600/40 text-rose-300 font-bold flex items-center gap-1';
-            b.innerHTML = `<span>✕</span><span>${w}</span><span class="text-[9px] text-rose-400">(БРАК)</span>`;
-            reportEl.appendChild(b);
-          });
-
-          app.audio.playSuccess();
-          app.notify(`Аудит: Найдено ${this.foundInReverse.length}, Брак ${this.missingInReverse.length}`);
+          this.renderChips();
+          app.notify(`Проверено: найдено ${this.foundWords.length} из ${words.length}`);
         },
 
-        scanAllTopics() {
+        scanAllCatalogTopics() {
           const keys = Object.keys(app.topics);
           if (keys.length === 0) {
-            app.notify('В каталоге пока нет сохраненных тем!');
+            app.notify('В каталоге нет тем для сверки');
             return;
           }
 
-          let bestMatch = null;
-          let maxFound = 0;
+          let bestTopic = null;
+          let maxMatches = 0;
 
-          keys.forEach(topicName => {
-            const words = app.topics[topicName];
-            let foundCount = 0;
-
-            words.forEach(w => {
-              if (this.testWordInGrid(w)) foundCount++;
+          keys.forEach(k => {
+            const t = app.topics[k];
+            let matches = 0;
+            t.words.forEach(w => {
+              if (this.findWordInGrid(w)) matches++;
             });
-
-            if (foundCount > maxFound) {
-              maxFound = foundCount;
-              bestMatch = { topicName, foundCount, total: words.length };
+            if (matches > maxMatches) {
+              maxMatches = matches;
+              bestTopic = { name: k, total: t.words.length, matches, words: t.words };
             }
           });
 
-          if (bestMatch && bestMatch.foundCount > 0) {
-            app.notify(`Совпадение: "${bestMatch.topicName}" (${bestMatch.foundCount}/${bestMatch.total})!`);
-            document.getElementById('reverseInputWords').value = app.topics[bestMatch.topicName].join(', ');
-            this.onInputWords();
-            this.runAudit();
+          if (bestTopic && maxMatches > 0) {
+            document.getElementById('reverseWordsInput').value = bestTopic.words.join(', ');
+            this.scanWords();
+            app.notify(`Определена тема: "${bestTopic.name}" (совпало ${bestTopic.matches} из ${bestTopic.total} слов)`);
           } else {
-            app.notify('Ни одна из сохраненных тем не подошла к матрице.');
+            app.notify('Совпадений с темами в каталоге не найдено');
           }
         },
 
-        testWordInGrid(word) {
-          const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+        findWordInGrid(word) {
+          const dirs = [
+            [0, 1, 'вправо →'], [0, -1, 'влево ←'],
+            [1, 0, 'вниз ↓'], [-1, 0, 'вверх ↑'],
+            [1, 1, 'диагональ ↘'], [-1, -1, 'диагональ ↖'],
+            [1, -1, 'диагональ ↙'], [-1, 1, 'диагональ ↗']
+          ];
+
           for (let r = 0; r < 15; r++) {
             for (let c = 0; c < 15; c++) {
-              for (let d of dirs) {
-                const dr = d[0];
-                const dc = d[1];
-                const endR = r + dr * (word.length - 1);
-                const endC = c + dc * (word.length - 1);
-                if (endR < 0 || endR >= 15 || endC < 0 || endC >= 15) continue;
-                let ok = true;
+              if (this.grid[r][c] !== word[0]) continue;
+
+              for (const [dr, dc, dirName] of dirs) {
+                let match = true;
+                const coords = [];
                 for (let k = 0; k < word.length; k++) {
-                  if (this.grid[r + dr * k][c + dc * k] !== word[k]) {
-                    ok = false;
+                  const nr = r + dr * k;
+                  const nc = c + dc * k;
+                  if (nr < 0 || nr >= 15 || nc < 0 || nc >= 15 || this.grid[nr][nc] !== word[k]) {
+                    match = false;
                     break;
                   }
+                  coords.push([nr, nc]);
                 }
-                if (ok) return true;
+                if (match) {
+                  return { start: [r, c], coords, dirName };
+                }
               }
             }
           }
-          return false;
+          return null;
+        },
+
+        renderChips() {
+          const container = document.getElementById('reverseChipsContainer');
+          const summary = document.getElementById('reverseFoundSummary');
+          if (!container || !summary) return;
+          container.innerHTML = '';
+
+          const total = this.foundWords.length + this.missingWords.length;
+          summary.innerText = `Найдено ${this.foundWords.length} из ${total}`;
+
+          this.foundWords.forEach(item => {
+            const chip = document.createElement('div');
+            chip.className = 'text-[11px] font-mono px-2.5 py-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-semibold flex items-center gap-1 cursor-pointer hover:scale-105 transition';
+            chip.innerText = `✓ ${item.word} (${item.dirName})`;
+            chip.onclick = () => {
+              this.highlightFoundCoords(item.coords);
+            };
+            container.appendChild(chip);
+          });
+
+          this.missingWords.forEach(w => {
+            const chip = document.createElement('div');
+            chip.className = 'text-[11px] font-mono px-2.5 py-1 rounded-xl bg-rose-950/40 border border-rose-800/40 text-rose-400 line-through';
+            chip.innerText = `✗ ${w} (брак)`;
+            container.appendChild(chip);
+          });
+        },
+
+        highlightFoundCoords(coords) {
+          const cells = document.querySelectorAll('#reverseGrid .cell-box');
+          cells.forEach(c => {
+            c.classList.remove('animate-double-pulse');
+            c.style.backgroundColor = '';
+            c.style.borderColor = '';
+          });
+
+          coords.forEach(([r, c]) => {
+            const idx = r * 15 + c;
+            const target = cells[idx];
+            if (target) {
+              target.style.backgroundColor = '#10b981';
+              target.style.borderColor = '#ffffff';
+              target.classList.add('animate-double-pulse');
+            }
+          });
+        },
+
+        applyToConstructor() {
+          app.grid = this.grid.map(row => [...row]);
+          const rawWords = document.getElementById('reverseWordsInput').value;
+          if (rawWords.trim()) {
+            app.words = app.cleanWordTokens(rawWords);
+            document.getElementById('wordsInput').value = app.words.join(', ');
+            document.getElementById('wordCounterBadge').innerText = `${app.words.length} слов`;
+          }
+          app.renderGrid();
+          app.switchTab('constructor');
+          app.notify('Сетка и слова перенесены в Конструктор');
+        },
+
+        copyTabDelimited() {
+          let tabString = '';
+          for (let r = 0; r < 15; r++) {
+            tabString += this.grid[r].join('\t') + '\n';
+          }
+          app.copyToClipboard(tabString, 'Матрица скопирована для Excel');
+        },
+
+        copyRaw225() {
+          let s = '';
+          for (let r = 0; r < 15; r++) {
+            s += this.grid[r].join('');
+          }
+          app.copyToClipboard(s, '225 букв скопировано');
         }
       },
 
-      initPlayMode() {
+      // Режим разгадывания филворда (Интерактив)
+      playInit() {
+        if (this.placedWords.length === 0) {
+          this.generate();
+        }
         document.getElementById('playTopicTitle').innerText = this.activeTopicName;
+        this.playState.foundWords = new Set();
         this.playState.seconds = 0;
-        this.playState.foundWords.clear();
-        this.updatePlayTimerDisplay();
+        this.playRenderGrid();
+        this.playRenderChecklist();
+        this.playStartTimer();
+      },
 
-        if (this.playState.timerInterval) clearInterval(this.playState.timerInterval);
+      playStartTimer() {
+        clearInterval(this.playState.timerInterval);
         this.playState.timerInterval = setInterval(() => {
           this.playState.seconds++;
-          this.updatePlayTimerDisplay();
+          const m = Math.floor(this.playState.seconds / 60).toString().padStart(2, '0');
+          const s = (this.playState.seconds % 60).toString().padStart(2, '0');
+          const el = document.getElementById('playTimerText');
+          if (el) el.innerText = `${m}:${s}`;
         }, 1000);
-
-        this.renderPlayGrid();
-        this.renderPlayChecklist();
       },
 
-      updatePlayTimerDisplay() {
-        const m = String(Math.floor(this.playState.seconds / 60)).padStart(2, '0');
-        const s = String(this.playState.seconds % 60).padStart(2, '0');
-        document.getElementById('playTimerLabel').innerText = `${m}:${s}`;
+      playRestart() {
+        this.playState.foundWords.clear();
+        this.playState.seconds = 0;
+        this.playRenderGrid();
+        this.playRenderChecklist();
+        this.playStartTimer();
+        this.notify('Игра начата заново');
       },
 
-      renderPlayGrid() {
-        const el = document.getElementById('playGrid');
-        el.innerHTML = '';
+      playRenderGrid() {
+        const container = document.getElementById('playGrid');
+        if (!container) return;
+        container.innerHTML = '';
 
-        for (let r = 0; r < this.height; r++) {
-          for (let c = 0; c < this.width; c++) {
+        for (let r = 0; r < 15; r++) {
+          for (let c = 0; c < 15; c++) {
+            const letter = this.grid[r][c] || '·';
             const cell = document.createElement('div');
-            cell.className = 'cell-box flex items-center justify-center font-extrabold font-mono rounded-md sm:rounded-lg border border-white/5 bg-surface-850 text-slate-200 cursor-pointer select-none';
-            cell.innerText = this.grid[r][c] || '·';
-            cell.dataset.row = r;
-            cell.dataset.col = c;
-            el.appendChild(cell);
+            cell.className = 'cell-box flex items-center justify-center font-extrabold font-mono rounded-md border text-slate-200 bg-surface-850/90 border-white/5 transition';
+            cell.innerText = letter;
+            cell.dataset.r = r;
+            cell.dataset.c = c;
+            container.appendChild(cell);
           }
         }
       },
 
-      renderPlayChecklist() {
-        const container = document.getElementById('playWordsChecklist');
+      playRenderChecklist() {
+        const container = document.getElementById('playWordChecklist');
+        if (!container) return;
         container.innerHTML = '';
-        
-        document.getElementById('playFoundScore').innerText = `${this.playState.foundWords.size} / ${this.placedWords.length}`;
-        document.getElementById('playWordsLeftBadge').innerText = `Осталось: ${this.placedWords.length - this.playState.foundWords.size}`;
 
-        if (this.placedWords.length === 0) {
-          container.innerHTML = '<span class="text-[11px] text-slate-500 italic">Сначала добавьте слова в конструкторе</span>';
-          return;
-        }
+        const total = this.placedWords.length;
+        const found = this.playState.foundWords.size;
+        document.getElementById('playFoundCounter').innerText = `${found} / ${total}`;
+        document.getElementById('playRemainingCount').innerText = `Осталось: ${total - found}`;
 
         this.placedWords.forEach(item => {
           const isFound = this.playState.foundWords.has(item.word);
-          const el = document.createElement('div');
-          el.className = `px-3 py-1.5 rounded-xl border text-xs font-mono font-bold flex items-center justify-between transition ${
+          const chip = document.createElement('div');
+          chip.className = `text-[11px] font-mono px-2.5 py-1 rounded-xl border transition-all ${
             isFound 
-              ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300 line-through' 
-              : 'bg-surface-900/60 border-white/5 text-slate-300'
+              ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 line-through opacity-70' 
+              : 'bg-surface-900/80 border-white/10 text-slate-300'
           }`;
-          el.innerHTML = `
-            <span>${item.word}</span>
-            <span>${isFound ? '✓' : '•'}</span>
-          `;
-          container.appendChild(el);
+          chip.innerText = (isFound ? '✓ ' : '• ') + item.word;
+          container.appendChild(chip);
         });
       },
 
       setupPlayEvents() {
-        const wrapper = document.getElementById('interactiveGridWrapper');
+        const grid = document.getElementById('playGrid');
+        if (!grid) return;
 
-        const getCell = (e) => {
-          let target = e.target;
-          if (e.touches && e.touches.length > 0) {
-            const t = e.touches[0];
-            target = document.elementFromPoint(t.clientX, t.clientY);
-          }
-          if (target && target.dataset && target.dataset.row !== undefined) {
-            return {
-              r: parseInt(target.dataset.row),
-              c: parseInt(target.dataset.col),
-              el: target
-            };
+        const getCellFromCoords = (x, y) => {
+          const el = document.elementFromPoint(x, y);
+          if (el && el.classList.contains('cell-box') && el.dataset.r) {
+            return { r: parseInt(el.dataset.r), c: parseInt(el.dataset.c) };
           }
           return null;
         };
 
-        const onStart = (e) => {
-          const cell = getCell(e);
-          if (!cell) return;
+        const handleStart = (r, c) => {
           this.playState.isSelecting = true;
-          this.playState.startCell = cell;
-          this.playState.currentCells = [cell];
-          this.updateSelectionVisuals();
+          this.playState.startCell = { r, c };
+          this.playState.currentCells = [{ r, c }];
+          this.playHighlightSelection();
         };
 
-        const onMove = (e) => {
+        const handleMove = (r, c) => {
           if (!this.playState.isSelecting || !this.playState.startCell) return;
-          const cell = getCell(e);
-          if (!cell) return;
-
-          const dr = cell.r - this.playState.startCell.r;
-          const dc = cell.c - this.playState.startCell.c;
+          const s = this.playState.startCell;
+          const dr = r - s.r;
+          const dc = c - s.c;
           const stepR = dr === 0 ? 0 : dr / Math.abs(dr);
           const stepC = dc === 0 ? 0 : dc / Math.abs(dc);
 
+          // Проверка линии: по горизонтали, вертикали или под углом 45 градусов
           if (dr === 0 || dc === 0 || Math.abs(dr) === Math.abs(dc)) {
-            const len = Math.max(Math.abs(dr), Math.abs(dc));
-            const path = [];
-            for (let i = 0; i <= len; i++) {
-              const r = this.playState.startCell.r + stepR * i;
-              const c = this.playState.startCell.c + stepC * i;
-              const cellEl = document.querySelector(`#playGrid [data-row="${r}"][data-col="${c}"]`);
-              if (cellEl) path.push({ r, c, el: cellEl });
+            const cells = [];
+            const steps = Math.max(Math.abs(dr), Math.abs(dc));
+            for (let i = 0; i <= steps; i++) {
+              cells.push({ r: s.r + stepR * i, c: s.c + stepC * i });
             }
-            this.playState.currentCells = path;
-            this.updateSelectionVisuals();
+            this.playState.currentCells = cells;
+            this.playHighlightSelection();
           }
         };
 
-        const onEnd = () => {
+        const handleEnd = () => {
           if (!this.playState.isSelecting) return;
           this.playState.isSelecting = false;
-          this.verifySelectedWord();
-          this.clearSelectionVisuals();
+          this.checkSelectedWord();
         };
 
-        wrapper.addEventListener('mousedown', onStart);
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onEnd);
+        // Мышь
+        grid.addEventListener('mousedown', (e) => {
+          const cell = getCellFromCoords(e.clientX, e.clientY);
+          if (cell) handleStart(cell.r, cell.c);
+        });
+        window.addEventListener('mousemove', (e) => {
+          if (!this.playState.isSelecting) return;
+          const cell = getCellFromCoords(e.clientX, e.clientY);
+          if (cell) handleMove(cell.r, cell.c);
+        });
+        window.addEventListener('mouseup', handleEnd);
 
-        wrapper.addEventListener('touchstart', onStart, { passive: true });
-        window.addEventListener('touchmove', onMove, { passive: true });
-        window.addEventListener('touchend', onEnd);
+        // Тач-события для мобильных устройств
+        grid.addEventListener('touchstart', (e) => {
+          const t = e.touches[0];
+          const cell = getCellFromCoords(t.clientX, t.clientY);
+          if (cell) handleStart(cell.r, cell.c);
+        }, { passive: true });
+
+        grid.addEventListener('touchmove', (e) => {
+          if (!this.playState.isSelecting) return;
+          const t = e.touches[0];
+          const cell = getCellFromCoords(t.clientX, t.clientY);
+          if (cell) handleMove(cell.r, cell.c);
+        }, { passive: true });
+
+        grid.addEventListener('touchend', handleEnd);
       },
 
-      updateSelectionVisuals() {
-        document.querySelectorAll('#playGrid .cell-box').forEach(c => {
-          if (!c.dataset.locked) {
+      playHighlightSelection() {
+        const cells = document.querySelectorAll('#playGrid .cell-box');
+        cells.forEach(c => {
+          if (!c.dataset.found) {
             c.style.backgroundColor = '';
             c.style.borderColor = '';
           }
         });
 
-        let selected = '';
-        this.playState.currentCells.forEach(cell => {
-          cell.el.style.backgroundColor = 'rgba(99, 102, 241, 0.45)';
-          cell.el.style.borderColor = '#818cf8';
-          selected += cell.el.innerText;
-        });
-
-        const pill = document.getElementById('currentSelectionWord');
-        if (selected.length > 0) {
-          pill.innerText = selected;
-          pill.style.opacity = '1';
-        } else {
-          pill.style.opacity = '0';
-        }
-      },
-
-      clearSelectionVisuals() {
-        document.querySelectorAll('#playGrid .cell-box').forEach(c => {
-          if (!c.dataset.locked) {
-            c.style.backgroundColor = '';
-            c.style.borderColor = '';
+        this.playState.currentCells.forEach(({ r, c }) => {
+          const idx = r * 15 + c;
+          const el = cells[idx];
+          if (el && !el.dataset.found) {
+            el.style.backgroundColor = 'rgba(56, 189, 248, 0.45)';
+            el.style.borderColor = '#38bdf8';
           }
         });
-        document.getElementById('currentSelectionWord').style.opacity = '0';
       },
 
-      verifySelectedWord() {
-        let fwd = '';
-        this.playState.currentCells.forEach(c => fwd += c.el.innerText);
-        const bwd = fwd.split('').reverse().join('');
+      checkSelectedWord() {
+        const selected = this.playState.currentCells.map(c => this.grid[c.r][c.c]).join('');
+        const reversed = selected.split('').reverse().join('');
 
-        const matched = this.placedWords.find(p => p.word === fwd || p.word === bwd);
-        if (matched && !this.playState.foundWords.has(matched.word)) {
-          this.playState.foundWords.add(matched.word);
+        let match = this.placedWords.find(p => p.word === selected || p.word === reversed);
+
+        if (match && !this.playState.foundWords.has(match.word)) {
+          this.playState.foundWords.add(match.word);
           this.audio.playSuccess();
-          this.notify(`Найдено: ${matched.word}! 🎉`);
+          this.notify(`Найдено слово: ${match.word}!`);
 
-          this.playState.currentCells.forEach(c => {
-            c.el.dataset.locked = "true";
-            c.el.style.backgroundColor = matched.style.bg;
-            c.el.style.borderColor = matched.style.border;
-            c.el.style.color = '#ffffff';
+          // Фиксируем ячейки найденного слова
+          const allCells = document.querySelectorAll('#playGrid .cell-box');
+          this.playState.currentCells.forEach(({ r, c }) => {
+            const idx = r * 15 + c;
+            const el = allCells[idx];
+            if (el) {
+              el.dataset.found = 'true';
+              el.style.backgroundColor = match.style.border;
+              el.style.borderColor = '#ffffff';
+              el.style.color = '#ffffff';
+            }
           });
 
-          this.renderPlayChecklist();
+          this.playRenderChecklist();
 
-          if (this.playState.foundWords.size === this.placedWords.length && this.placedWords.length > 0) {
+          // Проверка победы
+          if (this.playState.foundWords.size === this.placedWords.length) {
             clearInterval(this.playState.timerInterval);
-            this.notify(`ПОБЕДА! Филворд решён за ${document.getElementById('playTimerLabel').innerText}! 🏆`);
+            this.audio.playFanfare();
+            if (typeof confetti === 'function') {
+              confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
+            }
+            document.getElementById('victoryTimeVal').innerText = document.getElementById('playTimerText').innerText;
+            document.getElementById('victoryWordsVal').innerText = `${this.placedWords.length} / ${this.placedWords.length}`;
+            document.getElementById('victoryModal').classList.remove('hidden');
           }
+
+        } else {
+          // Сброс выделения
+          const cells = document.querySelectorAll('#playGrid .cell-box');
+          cells.forEach(c => {
+            if (!c.dataset.found) {
+              c.style.backgroundColor = '';
+              c.style.borderColor = '';
+            }
+          });
         }
       },
 
-      playReset() {
-        this.initPlayMode();
-      },
-
-      saveCurrentTopic() {
-        const titleInput = document.getElementById('newTopicTitle');
-        const title = titleInput.value.trim();
-        if (!title) {
-          this.notify('Введите название темы!');
-          return;
-        }
+      // Каталог тем
+      saveCurrentToCatalog() {
         if (this.words.length === 0) {
-          this.notify('Сначала введите слова!');
+          this.notify('Сначала введите слова');
           return;
         }
-
-        this.topics[title] = [...this.words];
-        this.activeTopicName = title;
-        document.getElementById('activeTopicBadgeName').innerText = title;
-        titleInput.value = '';
-        this.persistState();
-        this.notify(`Тема "${title}" сохранена!`);
+        const topicKey = this.activeTopicName.trim();
+        this.topics[topicKey] = {
+          name: topicKey,
+          words: [...this.words],
+          updatedAt: Date.now()
+        };
+        this.scheduleAutoSaveAndSync();
+        this.renderTopicsCatalog();
+        this.notify(`Тема "${topicKey}" сохранена навсегда!`);
       },
 
-      renderTopicsVault() {
-        const container = document.getElementById('topicsGridContainer');
+      loadTopic(topicKey) {
+        const item = this.topics[topicKey];
+        if (!item) return;
+        this.activeTopicName = item.name;
+        this.words = [...item.words];
+        document.getElementById('topicNameInput').value = this.activeTopicName;
+        document.getElementById('wordsInput').value = this.words.join(', ');
+        document.getElementById('wordCounterBadge').innerText = `${this.words.length} слов`;
+        this.generate();
+        this.switchTab('constructor');
+        this.scheduleAutoSaveAndSync();
+        this.notify(`Тема "${item.name}" загружена в конструктор`);
+      },
+
+      deleteTopic(topicKey) {
+        if (this.topics[topicKey]) {
+          delete this.topics[topicKey];
+          this.scheduleAutoSaveAndSync();
+          this.renderTopicsCatalog();
+          this.notify(`Тема "${topicKey}" удалена`);
+        }
+      },
+
+      renderTopicsCatalog() {
+        const container = document.getElementById('topicsCardsContainer');
+        const query = (document.getElementById('topicSearchInput').value || '').toLowerCase().trim();
+        if (!container) return;
         container.innerHTML = '';
-        const search = (document.getElementById('vaultSearchInput').value || '').toLowerCase().trim();
+
         const keys = Object.keys(this.topics);
+        document.getElementById('dTopicsCountBadge').innerText = keys.length;
+        const mBadge = document.getElementById('mTopicsBadge');
+        if (mBadge) mBadge.classList.toggle('hidden', keys.length === 0);
 
-        document.getElementById('vaultTotalCount').innerText = `${keys.length} тем`;
+        const filtered = keys.filter(k => {
+          if (!query) return true;
+          const t = this.topics[k];
+          return k.toLowerCase().includes(query) || t.words.some(w => w.toLowerCase().includes(query));
+        });
 
-        if (keys.length === 0) {
+        if (filtered.length === 0) {
           container.innerHTML = `
-            <div class="col-span-full p-8 rounded-2xl glass-card text-center space-y-3">
-              <div class="text-3xl">📚</div>
-              <h3 class="text-base font-bold text-white">Каталог пока пуст</h3>
-              <p class="text-xs text-slate-400 max-w-md mx-auto">
-                Создайте первую тему в конструкторе: введите слова, укажите название и нажмите «Сохранить тему».
-              </p>
-              <button onclick="app.switchTab('studio')" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold shadow-lg">
-                Перейти в конструктор
-              </button>
+            <div class="col-span-full glass-card rounded-2xl p-8 text-center space-y-2">
+              <span class="text-3xl">📭</span>
+              <h3 class="text-sm font-bold text-slate-300">В каталоге пока нет тем</h3>
+              <p class="text-xs text-slate-500">Введите слова в Конструкторе и нажмите кнопку «💾 Сохранить в тему».</p>
             </div>
           `;
           return;
         }
 
-        keys.forEach(name => {
-          if (search && !name.toLowerCase().includes(search)) return;
-
-          const words = this.topics[name];
+        filtered.forEach(k => {
+          const t = this.topics[k];
           const card = document.createElement('div');
-          card.className = `glass-card p-4 rounded-2xl border transition duration-200 flex flex-col justify-between group hover:border-brand-500/50 ${
-            this.activeTopicName === name ? 'border-brand-500/60 bg-brand-500/10' : 'border-white/10'
-          }`;
-
+          card.className = 'glass-card rounded-2xl p-4 flex flex-col justify-between gap-3 border border-white/10 hover:border-brand-500/40 transition';
           card.innerHTML = `
             <div>
-              <div class="flex items-start justify-between gap-2 mb-1.5">
-                <h4 class="text-xs sm:text-sm font-bold text-white group-hover:text-brand-neon transition line-clamp-1">${name}</h4>
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-surface-800 text-slate-300 border border-white/5">
-                  ${words.length} слов
-                </span>
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <h4 class="font-extrabold text-sm text-white truncate">${t.name}</h4>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-brand-500/15 text-brand-neon border border-brand-500/20">${t.words.length} слов</span>
               </div>
-              <p class="text-[11px] text-slate-400 font-mono line-clamp-2 leading-relaxed mb-3">
-                ${words.slice(0, 10).join(', ')}...
-              </p>
+              <p class="text-[11px] text-slate-400 font-mono line-clamp-2">${t.words.join(', ')}</p>
             </div>
-            
-            <div class="flex items-center justify-between pt-2 border-t border-white/5">
-              <button onclick="app.loadTopicFromVault('${name}')" class="px-3 py-1 rounded-xl bg-brand-600/80 hover:bg-brand-500 text-white text-xs font-bold transition shadow-sm">
-                Загрузить
+            <div class="flex items-center gap-2 pt-2 border-t border-white/5">
+              <button onclick="app.loadTopic('${t.name}')" class="flex-1 py-1.5 rounded-xl bg-brand-600/30 hover:bg-brand-600/50 text-brand-neon text-xs font-bold transition flex items-center justify-center gap-1 active:scale-95">
+                <span>⚡</span> Загрузить
               </button>
-              <button onclick="app.deleteTopicPrompt('${name}')" class="text-slate-500 hover:text-rose-400 text-xs p-1" title="Удалить тему">
-                ✕
+              <button onclick="app.deleteTopic('${t.name}')" class="px-2.5 py-1.5 rounded-xl bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 border border-rose-800/30 text-xs font-semibold transition active:scale-95">
+                🗑️
               </button>
             </div>
           `;
-
           container.appendChild(card);
         });
       },
 
-      loadTopicFromVault(name) {
-        if (!this.topics[name]) return;
-        this.activeTopicName = name;
-        this.words = [...this.topics[name]];
-        document.getElementById('wordInputArea').value = this.words.join(', ');
-        document.getElementById('activeTopicBadgeName').innerText = name;
-        this.updateWordPills();
-        this.generate();
-        this.persistState();
-        this.switchTab('studio');
-        this.notify(`Загружена тема: "${name}"`);
-      },
-
-      deleteTopicPrompt(name) {
-        this.showConfirm(
-          'Удалить тему?',
-          `Вы уверены, что хотите удалить тему "${name}"?`,
-          () => {
-            delete this.topics[name];
-            if (this.activeTopicName === name) {
-              this.activeTopicName = "Новая тема";
-              document.getElementById('activeTopicBadgeName').innerText = this.activeTopicName;
-            }
-            this.persistState();
-            this.renderTopicsVault();
-            this.notify(`Тема "${name}" удалена`);
-          }
-        );
-      },
-
-      exportAllTopicsJSON() {
-        const json = JSON.stringify(this.topics, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
+      exportTopicsJSON() {
+        const payload = JSON.stringify(this.topics, null, 2);
+        const blob = new Blob([payload], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `wordvault_topics_${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `WordVault_Topics_Backup_${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        this.notify('Каталог тем экспортирован в JSON!');
+        this.notify('Резервная копия тем сохранена!');
       },
 
       importTopicsJSON(event) {
-        const file = event.target.files && event.target.files[0];
+        const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
-            const imported = JSON.parse(e.target.result);
-            if (imported && typeof imported === 'object') {
-              this.topics = { ...this.topics, ...imported };
-              this.persistState();
-              this.renderTopicsVault();
+            const parsed = JSON.parse(e.target.result);
+            if (typeof parsed === 'object' && parsed !== null) {
+              this.topics = { ...this.topics, ...parsed };
+              this.scheduleAutoSaveAndSync();
+              this.renderTopicsCatalog();
               this.notify('Темы успешно импортированы!');
             }
           } catch (err) {
-            this.notify('Ошибка чтения JSON-файла');
+            this.notify('Ошибка формата JSON');
           }
         };
         reader.readAsText(file);
       },
 
-      switchTab(tab) {
-        ['tabStudio', 'tabReverse', 'tabPlay', 'tabTopics'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.classList.add('hidden');
-        });
+      scheduleAutoSaveAndSync() {
+        this.lastLocalEditTimestamp = Date.now();
+        PermanentDB.set('wv_last_edit_timestamp', this.lastLocalEditTimestamp);
 
-        // Сброс классов десктопного меню
-        ['navTabStudio', 'navTabReverse', 'navTabPlay', 'navTabTopics'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap";
-        });
+        clearTimeout(this.cloudPushTimer);
+        this.cloudPushTimer = setTimeout(() => {
+          this.saveCurrentStateToPersistent();
+        }, 600);
+      },
 
-        // Сброс классов мобильного меню
-        ['mobNavTabStudio', 'mobNavTabReverse', 'mobNavTabPlay', 'mobNavTabTopics'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.className = "py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center text-slate-400 hover:text-white";
-        });
+      async saveCurrentStateToPersistent() {
+        const snapshot = {
+          topicName: this.activeTopicName,
+          words: this.words,
+          wordsRaw: document.getElementById('wordsInput').value,
+          topics: this.topics,
+          timestamp: this.lastLocalEditTimestamp || Date.now()
+        };
 
-        const activeDesktopClass = "px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm whitespace-nowrap";
-        const activeMobileClass = "py-2 px-1 rounded-xl text-[11px] font-bold transition flex flex-col items-center justify-center bg-brand-600 text-white shadow-sm";
+        // Локально навсегда в IndexedDB
+        await PermanentDB.set('wv_app_state', snapshot);
+        // В реалтайм-облако MQTT (ПК <-> телефон)
+        this.syncEngine.pushState(snapshot);
+      },
 
-        if (tab === 'studio') {
-          document.getElementById('tabStudio').classList.remove('hidden');
-          const d = document.getElementById('navTabStudio'); if (d) d.className = activeDesktopClass;
-          const m = document.getElementById('mobNavTabStudio'); if (m) m.className = activeMobileClass;
-        } else if (tab === 'reverse') {
-          document.getElementById('tabReverse').classList.remove('hidden');
-          const d = document.getElementById('navTabReverse'); if (d) d.className = activeDesktopClass;
-          const m = document.getElementById('mobNavTabReverse'); if (m) m.className = activeMobileClass;
-          this.reverse.renderGrid();
-        } else if (tab === 'play') {
-          document.getElementById('tabPlay').classList.remove('hidden');
-          const d = document.getElementById('navTabPlay'); if (d) d.className = activeDesktopClass;
-          const m = document.getElementById('mobNavTabPlay'); if (m) m.className = activeMobileClass;
-          this.initPlayMode();
-        } else if (tab === 'topics') {
-          document.getElementById('tabTopics').classList.remove('hidden');
-          const d = document.getElementById('navTabTopics'); if (d) d.className = activeDesktopClass;
-          const m = document.getElementById('mobNavTabTopics'); if (m) m.className = activeMobileClass;
-          this.renderTopicsVault();
+      async restorePersistedState() {
+        const saved = await PermanentDB.get('wv_app_state');
+        if (saved) {
+          this.activeTopicName = saved.topicName || "Новая тема";
+          this.topics = saved.topics || {};
+          this.words = saved.words || [];
+          document.getElementById('topicNameInput').value = this.activeTopicName;
+          document.getElementById('wordsInput').value = saved.wordsRaw || this.words.join(', ');
+          document.getElementById('wordCounterBadge').innerText = `${this.words.length} слов`;
+          this.lastLocalEditTimestamp = saved.timestamp || 0;
+          this.generate();
+        } else {
+          this.generateBlankGrid();
         }
       },
 
-      openPrintModal() {
-        document.getElementById('printThemeHeading').innerText = `Тема: ${this.activeTopicName}`;
-        const container = document.getElementById('printGridContainer');
-        container.innerHTML = '';
+      applyRemoteState(remote) {
+        if (!remote || !remote.timestamp) return;
+        this.isApplyingRemoteSnapshot = true;
 
-        for (let r = 0; r < this.height; r++) {
-          for (let c = 0; c < this.width; c++) {
-            const cell = document.createElement('div');
-            cell.className = 'print-cell';
-            cell.innerText = this.grid[r][c] || '·';
-            container.appendChild(cell);
-          }
+        // Синхронизируем темы с заменой словаря (чтобы удаленные темы удалялись везде)
+        if (remote.topics) {
+          this.topics = { ...remote.topics };
         }
+        if (remote.topicName) {
+          this.activeTopicName = remote.topicName;
+          document.getElementById('topicNameInput').value = remote.topicName;
+        }
+        if (remote.words) {
+          this.words = [...remote.words];
+          document.getElementById('wordsInput').value = remote.wordsRaw || remote.words.join(', ');
+          document.getElementById('wordCounterBadge').innerText = `${this.words.length} слов`;
+          this.generate();
+        }
+        this.renderTopicsCatalog();
+        this.lastLocalEditTimestamp = remote.timestamp;
+        PermanentDB.set('wv_last_edit_timestamp', remote.timestamp);
+        PermanentDB.set('wv_app_state', remote);
 
-        const wordsContainer = document.getElementById('printWordsListContainer');
-        wordsContainer.innerHTML = '';
-        this.placedWords.forEach(item => {
-          const wEl = document.createElement('div');
-          wEl.innerText = `[ ] ${item.word}`;
-          wordsContainer.appendChild(wEl);
-        });
-
-        document.getElementById('printModal').classList.remove('hidden');
-      },
-
-      closePrintModal() {
-        document.getElementById('printModal').classList.add('hidden');
-      },
-
-      notify(msg) {
-        const toast = document.getElementById('appToast');
-        document.getElementById('toastMessage').innerText = msg;
-        toast.classList.remove('translate-y-24', 'opacity-0');
-        toast.classList.add('translate-y-0', 'opacity-100');
-        
-        clearTimeout(this.toastTimer);
-        this.toastTimer = setTimeout(() => {
-          toast.classList.remove('translate-y-0', 'opacity-100');
-          toast.classList.add('translate-y-24', 'opacity-0');
-        }, 2800);
-      },
-
-      showConfirm(title, message, onOk) {
-        const modal = document.getElementById('confirmModal');
-        document.getElementById('confirmTitle').innerText = title;
-        document.getElementById('confirmMessage').innerText = message;
-        modal.classList.remove('hidden');
-
-        const okBtn = document.getElementById('confirmOkBtn');
-        const cancelBtn = document.getElementById('confirmCancelBtn');
-
-        const cleanup = () => {
-          modal.classList.add('hidden');
-          okBtn.onclick = null;
-          cancelBtn.onclick = null;
-        };
-
-        okBtn.onclick = () => {
-          cleanup();
-          if (onOk) onOk();
-        };
-        cancelBtn.onclick = cleanup;
+        this.notify('Данные обновлены из облака!');
+        this.isApplyingRemoteSnapshot = false;
       }
     };
 
-    window.onload = function() {
+    // Запуск приложения после загрузки страницы
+    window.addEventListener('DOMContentLoaded', () => {
       app.init();
-    };
+    });
   </script>
 </body>
 </html>
