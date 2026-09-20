@@ -2875,6 +2875,176 @@
       setTimeout(() => win.print(), 400);
     }
 
+    function copyText(text, success = "Скопировано в буфер обмена.") {
+      try {
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.style.position = "fixed";
+        area.style.top = "0";
+        area.style.left = "0";
+        area.style.width = "2em";
+        area.style.height = "2em";
+        area.style.padding = "0";
+        area.style.border = "none";
+        area.style.outline = "none";
+        area.style.boxShadow = "none";
+        area.style.background = "transparent";
+        area.style.opacity = "0.01";
+        area.setAttribute("readonly", "");
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+        area.setSelectionRange(0, area.value.length);
+        const ok = document.execCommand("copy");
+        document.body.removeChild(area);
+        if (ok) {
+          toast(success);
+          return true;
+        }
+      } catch (err) {}
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          toast(success);
+        }).catch(() => {
+          toast("Не удалось скопировать в буфер.");
+        });
+        return;
+      }
+      toast("Буфер обмена недоступен в этом браузере.");
+    }
+
+    function exportBoardXLSX(board = state.board.value) {
+      if (typeof XLSX === "undefined") {
+        toast("Библиотека XLSX ещё загружается...");
+        return;
+      }
+      if (!board || !board.grid) {
+        toast("Нет данных сетки для экспорта.");
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+      const gridSheet = XLSX.utils.aoa_to_sheet(gridRows(board.grid));
+      gridSheet["!cols"] = Array.from({ length: SIZE }, () => ({ wch: 4 }));
+      gridSheet["!rows"] = Array.from({ length: SIZE }, () => ({ hpt: 24 }));
+
+      const wordRows = [["Слово", "Статус", "Начало", "Конец", "Направление"]];
+      (board.words || []).forEach(word => {
+        const placement = (board.placements || []).find(p => p.word === word);
+        wordRows.push([
+          word,
+          placement ? "Размещено" : "Не размещено",
+          placement ? coord(placement.cells[0]) : "",
+          placement ? coord(placement.cells[placement.cells.length - 1]) : "",
+          placement ? directionOf(placement.cells) : ""
+        ]);
+      });
+
+      const wordSheet = XLSX.utils.aoa_to_sheet(wordRows);
+      wordSheet["!cols"] = [{ wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 15 }];
+
+      const occupied = new Set((board.placements || []).flatMap(p => p.cells));
+      const answerGrid = board.grid.map((letter, i) => occupied.has(i) ? letter : "");
+      const answerSheet = XLSX.utils.aoa_to_sheet(gridRows(answerGrid));
+      answerSheet["!cols"] = Array.from({ length: SIZE }, () => ({ wch: 4 }));
+      answerSheet["!rows"] = Array.from({ length: SIZE }, () => ({ hpt: 24 }));
+
+      XLSX.utils.book_append_sheet(wb, gridSheet, "Сетка");
+      XLSX.utils.book_append_sheet(wb, wordSheet, "Слова и координаты");
+      XLSX.utils.book_append_sheet(wb, answerSheet, "Ответы");
+
+      XLSX.writeFile(wb, `${filename(board.name || "WordVault")}.xlsx`);
+      toast(`Файл «${board.name}» (XLSX) сохранён.`);
+    }
+
+    function printCurrentBoard(board = state.board.value) {
+      if (!board || !board.grid) {
+        toast("Нет сетки для печати.");
+        return;
+      }
+      const win = window.open("", "_blank");
+      if (!win) {
+        toast("Разрешите всплывающие окна для печати.");
+        return;
+      }
+
+      const doc = win.document;
+      doc.title = (board.name || "Филворд") + " — WordVault";
+
+      const style = doc.createElement("style");
+      style.textContent = `
+        @page { size: A4; margin: 15mm; }
+        body { font-family: -apple-system, Arial, sans-serif; color: #111; margin: 0; background: #fff; }
+        h1 { font-size: 22px; margin-bottom: 6px; }
+        p { font-size: 12px; margin: 0 0 14px; }
+        .grid-wrap { display: flex; justify-content: center; margin: 15px 0; }
+        .grid { display: grid; grid-template-columns: repeat(15, 1fr); width: 150mm; height: 150mm; border-top: 1.5px solid #222; border-left: 1.5px solid #222; }
+        .cell { display: flex; align-items: center; justify-content: center; border-right: 1px solid #444; border-bottom: 1px solid #444; font: bold 16px Consolas, monospace; }
+        .words { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 16px; margin-top: 16px; font-size: 11px; }
+        .answers { break-before: page; page-break-before: always; margin-top: 20px; }
+        .coordinates { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 16px; font-size: 11px; margin-top: 12px; }
+        .controls { position: fixed; top: 10px; right: 10px; z-index: 1000; background: #fff; padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 12px #0002; }
+        @media print { .controls { display: none; } }
+      `;
+      doc.head.append(style);
+
+      const controls = doc.createElement("div");
+      controls.className = "controls";
+      const btn = node("button", "", "🖨️ Печать / Сохранить в PDF");
+      btn.type = "button";
+      btn.onclick = () => win.print();
+      controls.append(btn);
+      doc.body.append(controls);
+
+      const ruleText = board.settings?.overlap === false
+        ? "Найдите слова по прямым линиям. Слова не пересекаются (каждая буква принадлежит только одному слову)."
+        : "Найдите слова по прямым линиям в любом из 8 направлений. Слова могут пересекаться и иметь общие буквы.";
+
+      const page1 = doc.createElement("div");
+      page1.append(node("h1", "", board.name || "Филворд"));
+      page1.append(node("p", "", ruleText));
+
+      const gWrap = doc.createElement("div");
+      gWrap.className = "grid-wrap";
+      const gEl = doc.createElement("div");
+      gEl.className = "grid";
+      board.grid.forEach(ch => gEl.append(node("div", "cell", ch)));
+      gWrap.append(gEl);
+      page1.append(gWrap);
+
+      const wWrap = doc.createElement("div");
+      wWrap.className = "words";
+      (board.words || []).forEach(w => wWrap.append(node("div", "", `□ ${w}`)));
+      page1.append(wWrap);
+      doc.body.append(page1);
+
+      if ($("printAnswers")?.checked) {
+        const page2 = doc.createElement("div");
+        page2.className = "answers";
+        page2.append(node("h1", "", (board.name || "Филворд") + " — Ответы"));
+        page2.append(node("p", "", "Сетка с ответами и координатами слов:"));
+
+        const ansGWrap = doc.createElement("div");
+        ansGWrap.className = "grid-wrap";
+        const ansGEl = doc.createElement("div");
+        ansGEl.className = "grid";
+        const occ = new Set((board.placements || []).flatMap(p => p.cells));
+        board.grid.forEach((ch, idx) => ansGEl.append(node("div", "cell", occ.has(idx) ? ch : "")));
+        ansGWrap.append(ansGEl);
+        page2.append(ansGWrap);
+
+        const cWrap = doc.createElement("div");
+        cWrap.className = "coordinates";
+        (board.placements || []).forEach(p => cWrap.append(node("div", "", `${p.word}: ${pathText(p.cells)}`)));
+        page2.append(cWrap);
+        doc.body.append(page2);
+      }
+
+      win.focus();
+      setTimeout(() => win.print(), 350);
+    }
+
     async function exportBookXLSX() {
       if (typeof XLSX === "undefined") {
         toast("Библиотека XLSX ещё загружается.");
@@ -2934,6 +3104,82 @@
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    function exportBackup() {
+      download(
+        JSON.stringify({
+          format: "WordVaultBackup",
+          version: SCHEMA,
+          exportedAt: new Date().toISOString(),
+          state
+        }, null, 2),
+        `WordVault_Backup_${new Date().toISOString().slice(0, 10)}.json`,
+        "application/json"
+      );
+      toast("Резервная копия скачана.");
+    }
+
+    async function importBackup(file) {
+      if (!file) return;
+      if (file.size > MAX_PAYLOAD * 2) { toast("Файл слишком большой."); return; }
+
+      try {
+        const raw = JSON.parse(await file.text());
+        let items = [];
+        let importedBoard = null;
+
+        if (raw.format === "WordVaultBackup" && (raw.version === 3 || raw.version === SCHEMA)) {
+          const validated = validateState(raw.state);
+          importedBoard = validated.board.value;
+          items = Object.values(validated.topics || {})
+            .filter(record => !record.deleted)
+            .map(record => record.value);
+          if (validated.books && Object.keys(validated.books).length) {
+            Object.assign(state.books, validated.books);
+          }
+        } else if (raw.topics && typeof raw.topics === "object") {
+          items = Object.values(raw.topics).map(t => ({
+            name: t.name || "Тема",
+            words: t.words || parseWords(t.raw || "").words,
+            board: t.board || null
+          }));
+        } else {
+          throw new Error("Неподдерживаемый формат JSON");
+        }
+
+        const confirmed = await confirmModal(`Импортировать ${items.length} тем из файла?`, "Импорт тем");
+        if (!confirmed) return;
+
+        for (const item of items) {
+          const id = "import:" + uid();
+          state.topics[id] = {
+            rev: nextRevision(),
+            deleted: false,
+            value: {
+              name: item.name,
+              words: [...item.words],
+              board: item.board ? clone(item.board) : null,
+              updatedAt: Date.now(),
+              conflict: false
+            }
+          };
+        }
+
+        if (importedBoard) {
+          const replaceBoard = await confirmModal("Восстановить также текущую сетку из копии?", "Текущая сетка");
+          if (replaceBoard) commitBoard(clone(importedBoard));
+          else stateChanged();
+        } else {
+          stateChanged();
+        }
+
+        toast("Импорт завершён успешно.");
+      } catch (error) {
+        toast("Ошибка импорта: " + error.message);
+      } finally {
+        $("backupFile").value = "";
+      }
     }
 
     async function switchTab(tab) {
@@ -3028,10 +3274,15 @@
             cell.style.setProperty("--word-color", "#12866a");
           }
         });
-        $("reverseCellLabel").textContent = this.active !== null ? `${coord(this.active)}: ${this.grid[this.active]}` : "Выберите клетку";
+        if (this.active !== null) {
+          $("reverseGrid").children[this.active]?.classList.add("selected");
+          $("reverseCellLabel").textContent = `${coord(this.active)}: ${this.grid[this.active]}`;
+        } else {
+          $("reverseCellLabel").textContent = "Выберите клетку";
+        }
       },
       setLetter(letter, advance = true) {
-        if (this.active === null) return;
+        if (this.active === null) { toast("Сначала выберите клетку."); return; }
         const norm = normalize(letter);
         if (!/^[А-ЯA-Z·]$/.test(norm)) return;
         this.grid[this.active] = norm;
@@ -3040,7 +3291,41 @@
         this.writeRaw();
         this.render();
       },
+      move(delta) {
+        this.active = Math.max(0, Math.min(CELLS - 1, (this.active ?? 0) + delta));
+        this.render();
+      },
+      handleKey(event) {
+        if (activeTab !== "reverse" || event.target !== $("reverseGrid") ||
+            event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+
+        if (this.active === null) this.active = 0;
+        const arrows = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -SIZE, ArrowDown: SIZE };
+
+        if (Object.hasOwn(arrows, event.key)) {
+          event.preventDefault();
+          this.move(arrows[event.key]);
+        } else if (/^[А-ЯA-ZЁ]$/.test(normalize(event.key))) {
+          event.preventDefault();
+          this.setLetter(event.key);
+        } else if (event.key === "Backspace" || event.key === "Delete") {
+          event.preventDefault();
+          this.setLetter("·", false);
+          if (event.key === "Backspace") this.move(-1);
+        } else if (event.key === "Escape") {
+          this.active = null;
+          this.render();
+        }
+      },
+      canScan() {
+        if (this.count !== CELLS) {
+          toast("Для проверки нужна строка из 225 позиций. Пустая позиция — точка ·.");
+          return false;
+        }
+        return true;
+      },
       async scan() {
+        if (!this.canScan()) return;
         const parsed = parseWords($("reverseWords").value);
         if (!parsed.words.length) { toast("Введите слова для проверки."); return; }
         const token = ++this.scanToken;
@@ -3076,6 +3361,64 @@
           block.append(btns);
           container.append(block);
         });
+      },
+      async findTopic() {
+        if (!this.canScan()) return;
+        const topics = liveTopics();
+        if (!topics.length) { toast("Каталог пуст."); return; }
+
+        const token = ++this.scanToken;
+        const grid = [...this.grid];
+        const ranked = [];
+        $("reverseSummary").textContent = "Сопоставление с каталогом…";
+
+        for (let i = 0; i < topics.length; i++) {
+          const item = topics[i][1].value;
+          let matches = 0;
+
+          for (const word of item.words) {
+            if (findOccurrences(grid, word, 0, 1).length) matches++;
+          }
+
+          if (matches) ranked.push({ item, matches, ratio: matches / Math.max(1, item.words.length) });
+
+          if (i % 3 === 0) {
+            await sleep(0);
+            if (token !== this.scanToken) return;
+          }
+        }
+
+        ranked.sort((a, b) => b.matches - a.matches || b.ratio - a.ratio);
+
+        if (!ranked.length) {
+          $("reverseSummary").textContent = "Совпадений нет";
+          toast("Совпадений с каталогом не найдено.");
+          return;
+        }
+
+        const best = ranked[0];
+        $("reverseWords").value = best.item.words.join(", ");
+        toast(`Вероятная тема: ${best.item.name}. Совпало ${best.matches} из ${best.item.words.length}.`);
+        await this.scan();
+      },
+      async apply() {
+        if (!this.canScan()) return;
+        const words = parseWords($("reverseWords").value).words;
+
+        const board = {
+          id: uid(),
+          name: state.board.value.name,
+          raw: $("reverseWords").value.slice(0, 30000),
+          words,
+          settings: clone(state.board.value.settings),
+          grid: [...this.grid],
+          placements: placementsFromGrid(this.grid, words),
+          createdAt: Date.now()
+        };
+
+        commitBoard(board);
+        await switchTab("constructor");
+        toast("Сетка перенесена в конструктор.");
       }
     };
 
@@ -3185,26 +3528,68 @@
     }
 
     function renderTopics() {
+      const query = $("topicSearch") ? $("topicSearch").value.trim().toLowerCase() : "";
       const records = liveTopics();
       $("topicCount").textContent = records.length;
       const container = $("topicsGrid");
       container.replaceChildren();
 
-      records.forEach(([id, record]) => {
+      const filtered = records.filter(([, record]) => {
+        const item = record.value;
+        return !query || item.name.toLowerCase().includes(query) ||
+          item.words.some(w => w.toLowerCase().includes(query));
+      }).sort((a, b) => (b[1].value.updatedAt || 0) - (a[1].value.updatedAt || 0));
+
+      filtered.forEach(([id, record]) => {
         const item = record.value;
         const card = node("article", "card topic-card");
         card.append(node("h3", "", item.name));
-        card.append(node("span", "muted small-text", `${item.words.length} слов`));
+        card.append(node("span", "muted small-text", `${item.words.length} слов · ${item.board ? "сетка готова" : "список слов"}`));
+        card.append(node("p", "mono small-text muted", item.words.slice(0, 15).join(", ") + (item.words.length > 15 ? "…" : "")));
+
         const actions = node("div", "actions");
-        actions.append(action("Открыть сетку", () => {
+        actions.append(action("Открыть", () => {
           activeBookId = null;
           activeBookTopicIndex = null;
-          commitBoard(clone(item.board));
+          if (item.board) {
+            commitBoard(clone(item.board));
+          } else {
+            $("topicName").value = item.name;
+            $("wordsInput").value = item.words.join(", ");
+            executeRebuild();
+          }
           switchTab("constructor");
         }, "primary small"));
+
+        actions.append(action("📋 Слова", () => {
+          copyText(item.words.join(", "), `Слова темы «${item.name}» скопированы`);
+        }, "small"));
+
+        if (item.board) {
+          actions.append(action("📊 XLSX", () => {
+            exportBoardXLSX(item.board);
+          }, "small"));
+          actions.append(action("📋 Сетка (Excel)", () => {
+            copyText(gridTSV(item.board.grid), `Сетка «${item.name}» скопирована для Excel.`);
+          }, "small"));
+        }
+
+        actions.append(action("Удалить", async () => {
+          const ok = await confirmModal(`Удалить тему «${item.name}» из каталога?`, "Удаление темы");
+          if (!ok) return;
+          state.topics[id] = { rev: nextRevision(), deleted: true };
+          stateChanged();
+          renderTopics();
+          toast(`Тема «${item.name}» удалена.`);
+        }, "danger small"));
+
         card.append(actions);
         container.append(card);
       });
+
+      if (!filtered.length) {
+        container.append(node("div", "card subtle muted", records.length ? "Ничего не найдено по запросу." : "Сохранённых тем пока нет. Нажмите «💾 Сохранить» в конструкторе."));
+      }
     }
 
     function bindEvents() {
@@ -3218,12 +3603,48 @@
 
       $("saveTopicButton").addEventListener("click", () => {
         const b = state.board.value;
-        if (!b.words.length) { toast("Сначала создайте сетку."); return; }
+        if (!b.words.length) { toast("Сначала создайте сетку со словами."); return; }
         const id = "topic:" + b.name.toLowerCase();
         state.topics[id] = { rev: nextRevision(), deleted: false, value: { name: b.name, words: [...b.words], board: clone(b), updatedAt: Date.now() } };
         stateChanged();
         toast("Тема сохранена в каталог.");
       });
+
+      $("clearButton").addEventListener("click", async () => {
+        const ok = await confirmModal("Очистить текущую сетку в конструкторе? (Каталог и книги сохранятся)", "Очистка");
+        if (!ok) return;
+        const board = emptyBoard();
+        board.id = uid();
+        board.createdAt = Date.now();
+        commitBoard(board);
+        $("generationStatus").textContent = "";
+        toast("Конструктор очищен.");
+      });
+
+      $("revealButton").addEventListener("click", () => {
+        showAnswers = !showAnswers;
+        renderConstructor();
+      });
+
+      // Слушатели экспорта и копирования темы конструктора
+      $("xlsxButton").addEventListener("click", () => exportBoardXLSX());
+      $("headerExcel").addEventListener("click", () => exportBoardXLSX());
+
+      $("tsvButton").addEventListener("click", () => {
+        copyText(gridTSV(state.board.value.grid), "Сетка скопирована для Excel (TSV).");
+      });
+
+      $("rawButton").addEventListener("click", () => {
+        copyText(state.board.value.grid.join(""), "Скопировано 225 символов матрицы.");
+      });
+
+      $("printButton").addEventListener("click", () => printCurrentBoard());
+
+      // Управление каталогом тем
+      $("topicSearch").addEventListener("input", renderTopics);
+      $("exportBackup").addEventListener("click", exportBackup);
+      $("importBackup").addEventListener("click", () => $("backupFile").click());
+      $("backupFile").addEventListener("change", e => importBackup(e.target.files[0]));
 
       $("backToBookBtn").addEventListener("click", () => {
         if (activeBookId) {
@@ -3322,7 +3743,6 @@
         if (e.key === "Enter") { e.preventDefault(); $("fastTopicWords").focus(); }
       });
 
-      // События улучшенного массового ввода тем
       $("openBatchImportBtn").addEventListener("click", () => {
         $("batchImportText").value = "";
         refreshBatchPreview();
@@ -3430,14 +3850,59 @@
       playGrid.addEventListener("pointerup", finishSelection);
       playGrid.addEventListener("pointercancel", cancelSelection);
 
+      // Слушатели раздела «Реверс-аудит»
       $("reverseRaw").addEventListener("input", () => Reverse.readRaw());
+      $("reverseWords").addEventListener("input", () => {
+        Reverse.invalidate();
+        Reverse.render();
+      });
+      $("reverseTypos").addEventListener("change", () => Reverse.invalidate());
       $("reverseScan").addEventListener("click", () => Reverse.scan());
+      $("reverseFindTopic").addEventListener("click", () => Reverse.findTopic());
+      $("reverseApply").addEventListener("click", () => Reverse.apply());
+
+      $("reverseTSV").addEventListener("click", () => {
+        if (Reverse.canScan()) copyText(gridTSV(Reverse.grid), "Матрица скопирована для Excel.");
+      });
+
+      $("reverseCopy").addEventListener("click", () => {
+        if (Reverse.canScan()) copyText(Reverse.grid.join(""), "Скопировано 225 символов.");
+      });
+
       $("reverseLoad").addEventListener("click", () => {
         Reverse.grid = [...state.board.value.grid];
         Reverse.writeRaw();
         $("reverseWords").value = state.board.value.words.join(", ");
         Reverse.render();
       });
+
+      $("reverseClear").addEventListener("click", () => {
+        Reverse.grid = Array(CELLS).fill("·");
+        Reverse.active = null;
+        Reverse.count = 0;
+        Reverse.invalidate();
+        $("reverseRaw").value = "";
+        $("reverseWords").value = "";
+        $("reverseLetter").value = "";
+        Reverse.updateCount();
+        Reverse.render();
+      });
+
+      $("reverseGrid").addEventListener("keydown", e => Reverse.handleKey(e));
+      $("reverseSet").addEventListener("click", () => {
+        Reverse.setLetter($("reverseLetter").value);
+        $("reverseLetter").value = "";
+      });
+      $("reverseLetter").addEventListener("keydown", e => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          Reverse.setLetter($("reverseLetter").value);
+          $("reverseLetter").value = "";
+        }
+      });
+      $("reverseErase").addEventListener("click", () => Reverse.setLetter("·", false));
+      $("reversePrev").addEventListener("click", () => Reverse.move(-1));
+      $("reverseNext").addEventListener("click", () => Reverse.move(1));
 
       $("soundButton").addEventListener("click", () => {
         Sound.muted = !Sound.muted;
