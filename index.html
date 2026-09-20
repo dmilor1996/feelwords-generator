@@ -2,11 +2,11 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090d17">
   <title>WordVault Studio — конструктор и аудит</title>
 
-  <!-- Для синхронизации и настоящего экспорта XLSX. -->
+  <!-- Внешние библиотеки: MQTT для облачной синхронизации и SheetJS для экспорта в Excel -->
   <script defer src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -55,6 +55,7 @@
       align-items: center;
       gap: 6px;
       line-height: 1.3;
+      user-select: none;
     }
 
     button:hover, .button:hover { background: #283650; }
@@ -67,6 +68,7 @@
 
     :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 
+    /* Предотвращение принудительного масштабирования страницы в iOS Safari */
     input[type="text"], input[type="number"], textarea, select {
       width: 100%;
       background: #090f1d;
@@ -74,10 +76,11 @@
       border: 1px solid var(--line);
       border-radius: 10px;
       padding: 10px 12px;
+      font-size: 16px;
     }
 
     textarea { resize: vertical; min-height: 90px; }
-    input[type="checkbox"] { accent-color: #818cf8; }
+    input[type="checkbox"] { accent-color: #818cf8; width: 16px; height: 16px; }
     h1, h2, h3, p { margin: 0; }
     h1 { font-size: 18px; }
     h2 { font-size: 19px; }
@@ -194,6 +197,12 @@
       font-size: 12px;
       color: var(--cyan);
       background: #142739;
+    }
+
+    .badge-amber {
+      color: var(--amber);
+      background: #3b2e15;
+      border-color: #665124;
     }
 
     .settings-grid {
@@ -484,7 +493,10 @@
             <div>
               <div class="row between">
                 <label for="wordsInput"><b>Слова</b></label>
-                <span id="wordCount" class="badge">0 слов</span>
+                <div class="row">
+                  <span id="rebuildHint" class="badge badge-amber" hidden>Требуется перестроить</span>
+                  <span id="wordCount" class="badge">0 слов</span>
+                </div>
               </div>
               <textarea id="wordsInput" rows="7" class="gap-small mono"
                 placeholder="ГАЛАКТИКА, ТЕЛЕСКОП, КВАЗАР, ОРБИТА, ПЛАНЕТА"></textarea>
@@ -521,8 +533,7 @@
             </label>
 
             <p class="muted small-text">
-              Генератор проверяет допустимые позиции и выбирает лучший из нескольких вариантов.
-              Размещение всех слов не гарантируется.
+              Генератор находит наилучшую укладку пересечений с временным бюджетом оптимизации.
             </p>
           </div>
 
@@ -637,7 +648,7 @@
               <div id="columnLabels" class="column-labels mono"></div>
               <div id="rowLabels" class="row-labels mono"></div>
               <div id="reverseGrid" class="letter-grid" tabindex="0"
-                aria-label="Редактор сетки. Выберите клетку. Стрелки перемещают выделение, буквы изменяют клетку."></div>
+                aria-label="Редактор сетки. Стрелки перемещают выделение, буквы изменяют клетку."></div>
             </div>
 
             <div class="row wrap gap">
@@ -651,8 +662,7 @@
             </div>
 
             <p class="muted small-text gap">
-              На ПК можно печатать прямо в выделенной сетке.
-              На телефоне используйте поле «Буква».
+              На ПК можно печатать прямо в выделенной сетке. На телефоне используйте поле «Буква».
             </p>
           </div>
 
@@ -704,8 +714,7 @@
           <h3>Найти слова</h3>
           <div id="playWords" class="chips"></div>
           <p class="muted small-text">
-            Прогресс игры сохраняется в этом браузере.
-            Между устройствами синхронизируются сетки и каталог, но не игровой таймер.
+            Прогресс сохраняется в этом браузере. Экран телефона защищён от засыпания во время игры.
           </p>
         </div>
       </div>
@@ -743,20 +752,13 @@
     <h2>Синхронизация устройств</h2>
     <p>Откройте <b>одинаковый адрес сайта</b> на телефоне и компьютере.</p>
     <p class="small-text muted">
-      Общий публичный канал работает без регистрации. Секретные данные сюда не помещайте.
-      WSS защищает соединение, но не закрывает доступ к самому MQTT-каналу.
+      Общий публичный канал работает без регистрации.
     </p>
     <div class="card subtle small-text">
       <div>Канал: <span id="syncChannel" class="mono"></span></div>
       <div class="gap-small">Соединение: <span id="syncConnection"></span></div>
-      <div class="gap-small">Отправка: <span id="syncDelivery"></span></div>
-      <div class="gap-small">Локальная база: <span id="syncStorage"></span></div>
+      <div class="gap-small">Хранилище: <span id="syncStorage"></span></div>
     </div>
-    <p class="muted small-text gap">
-      Изменения сохраняются локально и отправляются после подключения.
-      Подтверждение брокера не означает, что другое устройство уже получило данные.
-      JSON-копия нужна для резервного хранения.
-    </p>
     <div class="actions">
       <button id="syncNow" class="primary">Отправить / согласовать</button>
       <button id="syncClose">Закрыть</button>
@@ -768,6 +770,15 @@
     <p id="victoryText"></p>
     <div class="actions">
       <button id="victoryClose" class="primary">Продолжить</button>
+    </div>
+  </dialog>
+
+  <dialog id="confirmDialog">
+    <h2 id="confirmTitle">Подтверждение</h2>
+    <p id="confirmMessage"></p>
+    <div class="actions">
+      <button id="confirmOk" class="danger">Подтвердить</button>
+      <button id="confirmCancel">Отмена</button>
     </div>
   </dialog>
 
@@ -820,6 +831,29 @@
 
     const clone = value => JSON.parse(JSON.stringify(value));
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    function confirmModal(message, title = "Подтверждение") {
+      return new Promise(resolve => {
+        const dlg = $("confirmDialog");
+        $("confirmTitle").textContent = title;
+        $("confirmMessage").textContent = message;
+
+        const onOk = () => { cleanup(); resolve(true); };
+        const onCancel = () => { cleanup(); resolve(false); };
+
+        function cleanup() {
+          $("confirmOk").removeEventListener("click", onOk);
+          $("confirmCancel").removeEventListener("click", onCancel);
+          dlg.removeEventListener("close", onCancel);
+          try { dlg.close(); } catch {}
+        }
+
+        $("confirmOk").addEventListener("click", onOk);
+        $("confirmCancel").addEventListener("click", onCancel);
+        dlg.addEventListener("close", onCancel);
+        dlg.showModal();
+      });
+    }
 
     function uid() {
       if (crypto.randomUUID) return crypto.randomUUID();
@@ -900,6 +934,202 @@
 
       return { words, rejected, duplicates };
     }
+
+    const DB = {
+      driver: "idb", // 'idb' | 'local' | 'memory'
+      db: null,
+      memoryStore: new Map(),
+      ok: false,
+      queue: Promise.resolve(),
+
+      async open() {
+        return new Promise(resolve => {
+          let completed = false;
+          const finish = (isOk, driverName) => {
+            if (completed) return;
+            completed = true;
+            this.ok = isOk;
+            this.driver = driverName;
+            resolve(isOk);
+          };
+
+          try {
+            if (!window.indexedDB) {
+              this.initFallback(finish);
+              return;
+            }
+
+            const request = indexedDB.open("WordVault_Permanent_DB", 1);
+
+            request.onupgradeneeded = () => {
+              if (!request.result.objectStoreNames.contains("app_state")) {
+                request.result.createObjectStore("app_state");
+              }
+            };
+
+            request.onsuccess = () => {
+              this.db = request.result;
+              this.db.onversionchange = () => this.db.close();
+              finish(true, "IndexedDB");
+            };
+
+            request.onerror = () => this.initFallback(finish);
+            request.onblocked = () => this.initFallback(finish);
+            setTimeout(() => { if (!completed) this.initFallback(finish); }, 4000);
+          } catch {
+            this.initFallback(finish);
+          }
+        });
+      },
+
+      initFallback(finish) {
+        try {
+          const testKey = "__wv_test__";
+          localStorage.setItem(testKey, "1");
+          localStorage.removeItem(testKey);
+          finish(true, "LocalStorage");
+        } catch {
+          finish(true, "Память (без сохранения)");
+        }
+      },
+
+      async get(key) {
+        if (this.driver === "idb" && this.db) {
+          return new Promise(resolve => {
+            try {
+              const tx = this.db.transaction("app_state", "readonly");
+              const req = tx.objectStore("app_state").get(key);
+              req.onsuccess = () => resolve(req.result ?? null);
+              req.onerror = () => resolve(null);
+            } catch {
+              resolve(null);
+            }
+          });
+        }
+
+        if (this.driver === "LocalStorage") {
+          try {
+            const val = localStorage.getItem("wv_" + key);
+            return val ? JSON.parse(val) : null;
+          } catch {
+            return null;
+          }
+        }
+
+        return this.memoryStore.get(key) ?? null;
+      },
+
+      put(key, value) {
+        const snapshot = clone(value);
+        const op = () => new Promise(resolve => {
+          if (this.driver === "idb" && this.db) {
+            try {
+              const tx = this.db.transaction("app_state", "readwrite");
+              tx.objectStore("app_state").put(snapshot, key);
+              tx.oncomplete = () => resolve(true);
+              tx.onerror = tx.onabort = () => resolve(false);
+              return;
+            } catch {
+              // fallback gracefully
+            }
+          }
+
+          if (this.driver === "LocalStorage" || !this.db) {
+            try {
+              localStorage.setItem("wv_" + key, JSON.stringify(snapshot));
+              resolve(true);
+              return;
+            } catch {}
+          }
+
+          this.memoryStore.set(key, snapshot);
+          resolve(true);
+        });
+
+        this.queue = this.queue.then(op, op);
+        return this.queue;
+      }
+    };
+
+    const Sound = {
+      ctx: null,
+      muted: false,
+      unlocked: false,
+
+      unlock() {
+        if (this.unlocked && this.ctx && this.ctx.state === "running") return;
+        try {
+          const AudioClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioClass) return;
+          if (!this.ctx) this.ctx = new AudioClass();
+          if (this.ctx.state === "suspended") {
+            this.ctx.resume().catch(() => {});
+          }
+          this.unlocked = true;
+        } catch {}
+      },
+
+      play(success = false) {
+        if (this.muted) return;
+        this.unlock();
+
+        try {
+          if (!this.ctx) return;
+          const notes = success ? [523, 659, 784] : [540];
+          const time = this.ctx.currentTime;
+
+          notes.forEach((frequency, index) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const start = time + index * .07;
+
+            osc.type = "sine";
+            osc.frequency.value = frequency;
+            gain.gain.setValueAtTime(.07, start);
+            gain.gain.exponentialRampToValueAtTime(.001, start + .18);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(start);
+            osc.stop(start + .2);
+          });
+        } catch {}
+      }
+    };
+
+    // Слушатели для мгновенного снятия блокировки звука в мобильных браузерах
+    ["pointerdown", "touchstart", "click", "keydown"].forEach(evt => {
+      window.addEventListener(evt, () => Sound.unlock(), { once: true, passive: true });
+    });
+
+    let wakeLockSentinel = null;
+    async function updateWakeLock(enable) {
+      if (!("wakeLock" in navigator)) return;
+      try {
+        if (enable && !wakeLockSentinel && !document.hidden) {
+          wakeLockSentinel = await navigator.wakeLock.request("screen");
+          wakeLockSentinel.addEventListener("release", () => {
+            wakeLockSentinel = null;
+          });
+        } else if (!enable && wakeLockSentinel) {
+          await wakeLockSentinel.release();
+          wakeLockSentinel = null;
+        }
+      } catch {}
+    }
+
+    let deviceId = uid();
+    let logicalClock = 0;
+    let activeTab = "constructor";
+    let state = {
+      schema: SCHEMA,
+      board: { rev: { n: 0, by: "" }, ancestors: [], value: emptyBoard() },
+      topics: {}
+    };
+
+    let showAnswers = true;
+    let focusedWord = null;
+    let textModified = false;
+    let savedAt = 0;
 
     function cleanSettings(value = {}) {
       return {
@@ -1080,17 +1310,25 @@
 
       let best = null;
       let bestScore = -1;
+      const startTime = performance.now();
+      const budgetMs = 380; // бюджет времени для плавной работы интерфейса
+      let iteration = 0;
+      const maxIterations = 80;
 
-      for (let round = 0; round < 7; round++) {
+      while ((performance.now() - startTime < budgetMs || iteration < 8) && iteration < maxIterations) {
+        iteration++;
         if (cancelled()) return null;
 
         const grid = Array(CELLS).fill("");
         const placements = [];
-        const shuffled = words.map(word => ({ word, rnd: Math.random() }))
-          .sort((a, b) => b.word.length - a.word.length || a.rnd - b.rnd);
+
+        // Дисперсия порядка: длинные слова в начале с вариациями для поиска лучших пересечений
+        const shuffled = words.map(w => ({ word: w, score: w.length + (Math.random() * 0.9 - 0.45) }))
+          .sort((a, b) => b.score - a.score)
+          .map(x => x.word);
 
         for (let wi = 0; wi < shuffled.length; wi++) {
-          const word = shuffled[wi].word;
+          const word = shuffled[wi];
           let choice = null;
           let topScore = -Infinity;
 
@@ -1114,7 +1352,8 @@
 
                 if (!valid) continue;
 
-                const score = overlap * (round % 2 ? 1.5 : 3) + Math.random() * 5;
+                // Приоритет плотным пересечениям
+                const score = overlap * (iteration % 2 ? 2.5 : 4.0) + Math.random() * 3.5;
                 if (score > topScore) {
                   topScore = score;
                   choice = cells;
@@ -1127,11 +1366,6 @@
             choice.forEach((index, k) => { grid[index] = word[k]; });
             placements.push({ word, cells: choice });
           }
-
-          if (wi % 12 === 0) {
-            await sleep(0);
-            if (cancelled()) return null;
-          }
         }
 
         const occupied = grid.filter(Boolean).length;
@@ -1143,140 +1377,22 @@
           best = { grid, placements };
         }
 
-        if (placements.length === words.length && round >= 1) break;
-        await sleep(0);
+        // Если 100% слов размещено и сделано хотя бы 3 прогона — выходим досрочно
+        if (placements.length === words.length && iteration >= 3) break;
+
+        if (iteration % 6 === 0) {
+          await sleep(0);
+          if (cancelled()) return null;
+        }
+      }
+
+      if (!best) {
+        best = { grid: Array(CELLS).fill(""), placements: [] };
       }
 
       best.grid = best.grid.map(letter => letter || randomFiller(words, settings.filler));
       return best;
     }
-
-    const DB = {
-      db: null,
-      ok: false,
-      queue: Promise.resolve(),
-
-      async open() {
-        return new Promise(resolve => {
-          let completed = false;
-          const finish = result => {
-            if (completed) return;
-            completed = true;
-            resolve(result);
-          };
-
-          try {
-            const request = indexedDB.open("WordVault_Permanent_DB", 1);
-
-            request.onupgradeneeded = () => {
-              if (!request.result.objectStoreNames.contains("app_state")) {
-                request.result.createObjectStore("app_state");
-              }
-            };
-
-            request.onsuccess = () => {
-              this.db = request.result;
-              this.ok = true;
-              this.db.onversionchange = () => this.db.close();
-              finish(true);
-            };
-
-            request.onerror = () => finish(false);
-            request.onblocked = () => finish(false);
-            setTimeout(() => finish(false), 6000);
-          } catch {
-            finish(false);
-          }
-        });
-      },
-
-      async get(key) {
-        if (!this.db) return null;
-        return new Promise(resolve => {
-          try {
-            const tx = this.db.transaction("app_state", "readonly");
-            const request = tx.objectStore("app_state").get(key);
-            request.onsuccess = () => resolve(request.result ?? null);
-            request.onerror = () => resolve(null);
-            tx.onabort = () => resolve(null);
-          } catch {
-            resolve(null);
-          }
-        });
-      },
-
-      put(key, value) {
-        const snapshot = clone(value);
-        const operation = () => new Promise(resolve => {
-          if (!this.db) { resolve(false); return; }
-
-          try {
-            const tx = this.db.transaction("app_state", "readwrite");
-            tx.objectStore("app_state").put(snapshot, key);
-            tx.oncomplete = () => { this.ok = true; resolve(true); };
-            tx.onerror = tx.onabort = () => { this.ok = false; resolve(false); };
-          } catch {
-            this.ok = false;
-            resolve(false);
-          }
-        });
-
-        this.queue = this.queue.then(operation, operation);
-        return this.queue;
-      }
-    };
-
-    const Sound = {
-      ctx: null,
-      muted: false,
-
-      play(success = false) {
-        if (this.muted) return;
-
-        try {
-          const Audio = window.AudioContext || window.webkitAudioContext;
-          if (!Audio) return;
-          if (!this.ctx) this.ctx = new Audio();
-          this.ctx.resume().catch(() => {});
-
-          const notes = success ? [523, 659, 784] : [540];
-          const time = this.ctx.currentTime;
-
-          notes.forEach((frequency, index) => {
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-            const start = time + index * .07;
-
-            osc.type = "sine";
-            osc.frequency.value = frequency;
-            gain.gain.setValueAtTime(.07, start);
-            gain.gain.exponentialRampToValueAtTime(.001, start + .18);
-            osc.connect(gain);
-            gain.connect(this.ctx.destination);
-            osc.start(start);
-            osc.stop(start + .2);
-          });
-        } catch {}
-      }
-    };
-
-    let deviceId = uid();
-    let logicalClock = 0;
-    let activeTab = "constructor";
-    let state = {
-      schema: SCHEMA,
-      board: { rev: { n: 0, by: "" }, ancestors: [], value: emptyBoard() },
-      topics: {}
-    };
-
-    let showAnswers = true;
-    let focusedWord = null;
-    let draftDirty = false;
-    let draftBase = null;
-    let draftSeq = 0;
-    let draftTimer = null;
-    let forceGeneration = false;
-    let savedAt = 0;
 
     const revKey = rev => `${rev.n}@${rev.by}`;
 
@@ -1399,7 +1515,7 @@
       if (ok) {
         savedAt = Date.now();
         $("storageStatus").textContent =
-          "Сохранено в этом браузере: " + new Date(savedAt).toLocaleTimeString();
+          `Сохранено [${DB.driver}]: ` + new Date(savedAt).toLocaleTimeString();
       } else {
         $("storageStatus").textContent =
           "Не удалось записать локальную базу. Сохраните резервную копию JSON.";
@@ -1427,6 +1543,8 @@
 
       state.board = entityFrom(base, board);
       focusedWord = null;
+      textModified = false;
+      $("rebuildHint").hidden = true;
       renderConstructor(true);
       stateChanged();
     }
@@ -1468,7 +1586,7 @@
       if (after !== before) {
         persistState();
         renderTopics();
-        if (boardChanged && !draftDirty) {
+        if (boardChanged && !textModified) {
           focusedWord = null;
           renderConstructor(true);
           toast("Сетка обновлена с другого устройства.");
@@ -1556,8 +1674,7 @@
             } catch (error) {
               if (Date.now() - this.errorNoticeAt > 15000) {
                 this.errorNoticeAt = Date.now();
-                toast("Облачные данные отклонены: " + error.message +
-                  ". Если открыта старая версия сайта — закройте её.");
+                toast("Облачные данные отклонены: " + error.message);
               }
             }
           });
@@ -1625,7 +1742,7 @@
 
         if (new Blob([payload]).size > MAX_PAYLOAD) {
           this.update("Слишком большой каталог");
-          toast("Объём состояния превышает лимит. Экспортируйте резервную копию и сократите каталог.");
+          toast("Объём превышает лимит. Экспортируйте копию и сократите каталог.");
           return false;
         }
 
@@ -1661,8 +1778,7 @@
     function updateSyncDialog() {
       $("syncChannel").textContent = Sync.channel || "—";
       $("syncConnection").textContent = Sync.connected ? "подключено" : "нет соединения";
-      $("syncDelivery").textContent = Sync.pending ? "есть ожидающие изменения" : "состояние согласовано";
-      $("syncStorage").textContent = DB.ok ? "IndexedDB доступна" : "не подтверждена";
+      $("syncStorage").textContent = `${DB.driver} (${DB.ok ? "активно" : "ошибка"})`;
     }
 
     function settingsFromUI() {
@@ -1687,104 +1803,72 @@
       if (parsed.duplicates) warnings.push(`Повторов исключено: ${parsed.duplicates}.`);
 
       const mixed = parsed.words.filter(w => /[А-Я]/.test(w) && /[A-Z]/.test(w));
-      if (mixed.length) warnings.push("Смешаны кириллица и латиница внутри слов: " + mixed.join(", "));
+      if (mixed.length) warnings.push("Смешаны кириллица и латиница: " + mixed.join(", "));
 
       $("wordWarnings").hidden = warnings.length === 0;
       $("wordWarnings").textContent = warnings.join(" ");
+
+      // Проверяем, изменился ли состав слов относительно текущей сетки
+      const currentWords = state.board.value.words;
+      const isWordsChanged = stable(parsed.words) !== stable(currentWords);
+      textModified = isWordsChanged;
+      $("rebuildHint").hidden = !isWordsChanged;
     }
 
-    function markDraft(force = false) {
-      if (!draftDirty) draftBase = clone(state.board);
-      draftDirty = true;
-      forceGeneration ||= force;
-      draftSeq++;
-      updateInputWarnings();
-      $("storageStatus").textContent = "Есть изменения: подготовка сохранения…";
-
-      clearTimeout(draftTimer);
-      draftTimer = setTimeout(() => processDraft(), 400);
-    }
-
-    async function processDraft(force = false) {
-      clearTimeout(draftTimer);
-      if (!draftDirty && !force) return true;
-
-      if (!draftDirty) {
-        draftDirty = true;
-        draftBase = clone(state.board);
-        draftSeq++;
+    // Сохранение названия темы без перестройки сетки
+    function autoSaveMetaOnly() {
+      const name = $("topicName").value.trim().slice(0, 120) || "Новая тема";
+      if (name !== state.board.value.name) {
+        state.board.value.name = name;
+        state.board.value.raw = $("wordsInput").value.slice(0, 30000);
+        stateChanged();
       }
+    }
 
-      forceGeneration ||= force;
-      const sequence = draftSeq;
-      const base = clone(draftBase || state.board);
+    // Явная перестройка сетки по кнопке
+    async function executeRebuild() {
       const raw = $("wordsInput").value.slice(0, 30000);
       const parsed = parseWords(raw);
       const name = $("topicName").value.trim().slice(0, 120) || "Новая тема";
       const settings = settingsFromUI();
 
-      const needsGeneration = forceGeneration ||
-        stable(parsed.words) !== stable(base.value.words) ||
-        stable(settings) !== stable(base.value.settings);
+      if (!parsed.words.length) {
+        toast("Введите слова для построения сетки.");
+        return;
+      }
+
+      if (!allowedDirections(settings).length) {
+        toast("Включите хотя бы одно направление букв.");
+        return;
+      }
+
+      $("generateButton").disabled = true;
+      $("generationStatus").textContent = "Поиск оптимальной укладки…";
 
       try {
-        if (needsGeneration && parsed.words.length && !allowedDirections(settings).length) {
-          throw new Error("Включите горизонталь, вертикаль или диагонали");
-        }
-
-        $("generationStatus").textContent = needsGeneration ? "Генерация лучших вариантов…" : "Сохранение…";
-
-        let layout = {
-          grid: [...base.value.grid],
-          placements: clone(base.value.placements)
-        };
-
-        if (needsGeneration) {
-          layout = await generateGrid(parsed.words, settings, () => sequence !== draftSeq);
-          if (!layout || sequence !== draftSeq) return false;
-        }
-
-        if (sequence !== draftSeq) return false;
+        const layout = await generateGrid(parsed.words, settings);
+        const base = clone(state.board);
 
         const board = {
-          id: needsGeneration ? uid() : base.value.id,
+          id: uid(),
           name,
           raw,
           words: parsed.words,
           settings,
           grid: layout.grid,
           placements: layout.placements,
-          createdAt: needsGeneration ? Date.now() : base.value.createdAt
+          createdAt: Date.now()
         };
 
-        draftDirty = false;
-        draftBase = null;
-        forceGeneration = false;
         commitBoard(board, base);
-        $("generationStatus").textContent = needsGeneration
-          ? `Готово: размещено ${board.placements.length} из ${board.words.length}.`
-          : "Изменения сохранены.";
-
-        return true;
+        $("generationStatus").textContent =
+          `Готово: размещено ${board.placements.length} из ${board.words.length}.`;
       } catch (error) {
-        if (sequence === draftSeq) {
-          $("generationStatus").textContent = error.message;
-          toast(error.message);
-        }
-        return false;
+        $("generationStatus").textContent = error.message;
+        toast(error.message);
+      } finally {
+        $("generateButton").disabled = false;
       }
-    }
-
-    async function ensureDraft() {
-      return !draftDirty || await processDraft();
-    }
-
-    function cancelDraft() {
-      clearTimeout(draftTimer);
-      draftSeq++;
-      draftDirty = false;
-      draftBase = null;
-      forceGeneration = false;
     }
 
     function createGrid(container, grid, onClick) {
@@ -1802,7 +1886,7 @@
     function renderConstructor(updateInputs = false) {
       const board = state.board.value;
 
-      if (updateInputs && !draftDirty) {
+      if (updateInputs) {
         $("topicName").value = board.name;
         $("wordsInput").value = board.raw;
         $("dirH").checked = board.settings.h;
@@ -1828,6 +1912,7 @@
         placement.cells.forEach(index => {
           occupied.add(index);
           const cell = $("constructorGrid").children[index];
+          if (!cell) return;
 
           if (placement.word === focusedWord) {
             cell.style.setProperty("--word-color", color);
@@ -1853,7 +1938,7 @@
       board.words.forEach(word => {
         const found = placed.has(word);
         const chip = action((found ? "" : "✗ ") + word, () => {
-          if (!found) { toast("Слово не размещено. Попробуйте перестроить сетку."); return; }
+          if (!found) { toast("Слово не размещено. Нажмите «Перестроить сетку»."); return; }
           focusedWord = focusedWord === word ? null : word;
           renderConstructor();
           Sound.play();
@@ -1912,14 +1997,13 @@
         const card = node("article", "card topic-card");
         card.append(node("h3", "", item.name));
         card.append(node("span", "muted small-text",
-          `${item.words.length} слов · ${item.board ? "точная сетка сохранена" : "только список слов"}`));
+          `${item.words.length} слов · ${item.board ? "точная сетка сохранена" : "список слов"}`));
         card.append(node("p", "mono small-text muted",
           item.words.slice(0, 35).join(", ") + (item.words.length > 35 ? "…" : "")));
 
         const actions = node("div", "actions");
 
         const open = async regenerate => {
-          if (!await ensureDraft()) return;
           const existing = state.topics[id];
           if (!existing || existing.deleted) return;
 
@@ -1931,7 +2015,7 @@
               const words = existing.value.words;
               const settings = board?.settings || clone(DEFAULT_SETTINGS);
               if (!allowedDirections(settings).length) settings.h = true;
-              toast("Подготовка сетки…");
+              toast("Построение сетки…");
               const layout = await generateGrid(words, settings);
               board = {
                 id: uid(),
@@ -1945,7 +2029,6 @@
               };
             }
 
-            cancelDraft();
             commitBoard(board, base);
             await switchTab("constructor");
           } catch (error) {
@@ -1955,8 +2038,9 @@
 
         if (item.board) actions.append(action("Открыть сетку", () => open(false), "primary small"));
         actions.append(action("Новый вариант", () => open(true), "small"));
-        actions.append(action("Удалить", () => {
-          if (!confirm(`Удалить «${item.name}» из каталога на всех устройствах?`)) return;
+        actions.append(action("Удалить", async () => {
+          const confirmed = await confirmModal(`Удалить тему «${item.name}» из каталога?`, "Удаление темы");
+          if (!confirmed) return;
           state.topics[id] = { rev: nextRevision(), deleted: true };
           stateChanged();
         }, "small danger"));
@@ -2018,15 +2102,11 @@
 
         if (this.count !== CELLS) messages.push(
           this.count > CELLS
-            ? "Символов больше 225. Лишние символы не обрезаны автоматически; исправьте ввод."
+            ? "Символов больше 225. Исправьте лишние знаки."
             : "Матрица неполная. Для пустых позиций используйте точки ·."
         );
 
         if (letters < CELLS) messages.push(`Букв: ${letters}; пустых клеток: ${CELLS - letters}.`);
-
-        const hasRu = this.grid.some(x => /[А-Я]/.test(x));
-        const hasEn = this.grid.some(x => /[A-Z]/.test(x));
-        if (hasRu && hasEn) messages.push("В матрице присутствуют и кириллица, и латиница.");
 
         $("reverseWarning").hidden = messages.length === 0;
         $("reverseWarning").textContent = messages.join(" ");
@@ -2048,8 +2128,10 @@
 
         this.highlight.forEach(index => {
           const cell = $("reverseGrid").children[index];
-          cell.classList.add("highlight");
-          cell.style.setProperty("--word-color", "#12866a");
+          if (cell) {
+            cell.classList.add("highlight");
+            cell.style.setProperty("--word-color", "#12866a");
+          }
         });
 
         if (this.active !== null) {
@@ -2067,13 +2149,13 @@
           return;
         }
         if (this.count > CELLS) {
-          toast("Сначала исправьте слишком длинную исходную строку.");
+          toast("Сначала исправьте длину строки.");
           return;
         }
 
         const normalized = normalize(letter);
         if (!/^[А-ЯA-Z·]$/.test(normalized)) {
-          toast("Введите одну русскую или английскую букву.");
+          toast("Введите одну букву.");
           return;
         }
 
@@ -2125,7 +2207,6 @@
 
         const parsed = parseWords($("reverseWords").value);
         if (!parsed.words.length) { toast("Введите слова для проверки."); return; }
-        if (parsed.rejected.length) toast("Часть слов отклонена: " + parsed.rejected.slice(0, 3).join("; "));
 
         const token = ++this.scanToken;
         const grid = [...this.grid];
@@ -2165,7 +2246,7 @@
           block.append(node("b", item.matches.length ? "success-text" : "error-text",
             item.matches.length
               ? `✓ ${item.word}: вхождений ${item.matches.length}`
-              : `✗ ${item.word}: не найдено по прямой в 8 направлениях`));
+              : `✗ ${item.word}: не найдено по прямой`));
 
           const buttons = node("div", "actions gap-small");
 
@@ -2176,10 +2257,6 @@
               this.render();
             }, "small"));
           });
-
-          if (item.matches.length > 30) {
-            buttons.append(node("span", "muted small-text", "Показаны первые 30 вхождений."));
-          }
 
           block.append(buttons);
 
@@ -2195,14 +2272,8 @@
               },
               "small gap-small"
             );
-
             block.append(suggestion);
           });
-
-          if (item.possible.length) {
-            block.append(node("p", "muted small-text gap-small",
-              "Это гипотезы, а не доказанные опечатки. Исправления автоматически не применяются."));
-          }
 
           container.append(block);
         });
@@ -2226,9 +2297,7 @@
             if (findOccurrences(grid, word, 0, 1).length) matches++;
           }
 
-          if (matches) ranked.push({
-            item, matches, ratio: matches / Math.max(1, item.words.length)
-          });
+          if (matches) ranked.push({ item, matches, ratio: matches / Math.max(1, item.words.length) });
 
           if (i % 3 === 0) {
             await sleep(0);
@@ -2251,7 +2320,7 @@
       },
 
       async apply() {
-        if (!this.canScan() || !await ensureDraft()) return;
+        if (!this.canScan()) return;
         const words = parseWords($("reverseWords").value).words;
 
         const board = {
@@ -2265,10 +2334,9 @@
           createdAt: Date.now()
         };
 
-        cancelDraft();
         commitBoard(board);
         await switchTab("constructor");
-        toast("Точная сетка перенесена. Ответы и статистика пересчитаны.");
+        toast("Сетка перенесена в конструктор.");
       }
     };
 
@@ -2305,6 +2373,7 @@
       if (shouldRun && gameRunningSince === null) gameRunningSince = performance.now();
       if (!shouldRun) pauseGameClock();
       renderGameStatus();
+      updateWakeLock(shouldRun);
     }
 
     function saveGame() {
@@ -2354,12 +2423,12 @@
       $("playPause").disabled = game.completed || total === 0;
 
       $("playStatus").textContent = total === 0
-        ? "В этой сетке нет размещённых слов. Создайте головоломку в конструкторе."
+        ? "В этой сетке нет размещённых слов. Создайте сетку в конструкторе."
         : game.completed
-          ? "Все слова найдены. Прогресс сохранён в этом браузере."
+          ? "Все слова найдены!"
           : game.manualPaused
             ? "Игра на паузе."
-            : "Игра автоматически приостанавливается при уходе с вкладки.";
+            : "Таймер приостанавливается при сворачивании браузера.";
     }
 
     function renderGame() {
@@ -2539,12 +2608,11 @@
     }
 
     async function switchTab(tab) {
-      if (tab !== "constructor" && !await ensureDraft()) return;
-
       if (activeTab === "play" && tab !== "play") {
         pauseGameClock();
         cancelSelection();
         saveGame();
+        updateWakeLock(false);
       }
 
       activeTab = tab;
@@ -2582,11 +2650,11 @@
           area.select();
           const copied = document.execCommand("copy");
           area.remove();
-          if (!copied) throw new Error("Буфер обмена недоступен");
+          if (!copied) throw new Error("Буфер недоступен");
         }
         toast(success);
       } catch {
-        toast("Браузер запретил копирование. Попробуйте ещё раз или используйте экспорт файла.");
+        toast("Не удалось скопировать в буфер обмена.");
       }
     }
 
@@ -2615,10 +2683,8 @@
     }
 
     async function exportXLSX() {
-      if (!await ensureDraft()) return;
-
       if (typeof XLSX === "undefined") {
-        toast("Библиотека XLSX не загрузилась. Доступно «Копировать для Excel».");
+        toast("Библиотека XLSX не загрузилась. Скопируйте таблицу кнопкой «Для Excel».");
         return;
       }
 
@@ -2656,18 +2722,13 @@
 
       try {
         XLSX.writeFile(workbook, filename(board.name) + ".xlsx");
-        toast("XLSX подготовлен.");
+        toast("XLSX файл сохранён.");
       } catch (error) {
         toast("Ошибка экспорта: " + error.message);
       }
     }
 
     function printCurrentBoard() {
-      if (draftDirty) {
-        toast("Дождитесь сохранения текущих изменений и повторите печать.");
-        return;
-      }
-
       const win = window.open("", "_blank");
       if (!win) {
         toast("Разрешите всплывающее окно для печати.");
@@ -2752,8 +2813,6 @@
     }
 
     async function exportBackup() {
-      if (!await ensureDraft()) return;
-
       download(
         JSON.stringify({
           format: "WordVaultBackup",
@@ -2764,37 +2823,16 @@
         "WordVault_Backup_" + new Date().toISOString().slice(0, 10) + ".json",
         "application/json"
       );
-      toast("Резервная копия подготовлена.");
-    }
-
-    function validateLegacyTopics(raw) {
-      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-        throw new Error("Неверный формат старого каталога");
-      }
-
-      const items = [];
-      const entries = Object.entries(raw);
-      if (entries.length > MAX_TOPICS) throw new Error("Слишком много тем");
-
-      for (const [key, value] of entries) {
-        if (!value || !Array.isArray(value.words) || !value.words.every(w => typeof w === "string")) {
-          throw new Error("Неверная структура темы");
-        }
-        const words = parseWords(value.words.join(" ")).words;
-        const name = String(value.name || key).slice(0, 120);
-        items.push({ name, words, board: null });
-      }
-      return items;
+      toast("Резервная копия скачана.");
     }
 
     async function importBackup(file) {
       if (!file) return;
       if (file.size > MAX_PAYLOAD * 2) { toast("Файл слишком большой."); return; }
-      if (!await ensureDraft()) return;
 
       try {
         const raw = JSON.parse(await file.text());
-        let items;
+        let items = [];
         let importedBoard = null;
 
         if (raw.format === "WordVaultBackup" && raw.version === SCHEMA) {
@@ -2804,16 +2842,11 @@
             .filter(record => !record.deleted)
             .map(record => record.value);
         } else {
-          items = validateLegacyTopics(raw);
+          throw new Error("Неподдерживаемый формат JSON");
         }
 
-        if (liveTopics().length + items.length > MAX_TOPICS) {
-          throw new Error(`После импорта может быть превышен лимит ${MAX_TOPICS} тем`);
-        }
-
-        if (!confirm(`Импортировать ${items.length} тем? Текущие темы не удаляются; импортированные получат отдельные записи.`)) {
-          return;
-        }
+        const confirmed = await confirmModal(`Импортировать ${items.length} тем из файла?`, "Импорт тем");
+        if (!confirmed) return;
 
         for (const item of items) {
           const id = "import:" + uid();
@@ -2830,16 +2863,17 @@
           };
         }
 
-        if (importedBoard && confirm("Также восстановить текущую сетку из резервной копии?")) {
-          cancelDraft();
-          commitBoard(clone(importedBoard));
+        if (importedBoard) {
+          const replaceBoard = await confirmModal("Восстановить также текущую сетку из копии?", "Текущая сетка");
+          if (replaceBoard) commitBoard(clone(importedBoard));
+          else stateChanged();
         } else {
           stateChanged();
         }
 
-        toast("Импорт завершён.");
+        toast("Импорт завершён успешно.");
       } catch (error) {
-        toast("Импорт отменён: " + error.message);
+        toast("Ошибка импорта: " + error.message);
       } finally {
         $("backupFile").value = "";
       }
@@ -2872,50 +2906,7 @@
             Object.keys(found).length === board.placements.length
         };
       } catch {
-        toast("Старый игровой прогресс не удалось восстановить.");
-      }
-    }
-
-    async function migrateLegacy() {
-      const old = await DB.get("wv_app_state");
-      if (!old) return;
-
-      try {
-        const words = parseWords(
-          typeof old.wordsRaw === "string" ? old.wordsRaw :
-          Array.isArray(old.words) ? old.words.join(" ") : ""
-        ).words;
-
-        const settings = clone(DEFAULT_SETTINGS);
-        const layout = await generateGrid(words, settings);
-
-        state.board = {
-          rev: nextRevision(),
-          ancestors: [],
-          value: {
-            id: uid(),
-            name: String(old.topicName || "Новая тема").slice(0, 120),
-            raw: typeof old.wordsRaw === "string" ? old.wordsRaw.slice(0, 30000) : words.join(", "),
-            words,
-            settings,
-            grid: layout.grid,
-            placements: layout.placements,
-            createdAt: Date.now()
-          }
-        };
-
-        const topics = validateLegacyTopics(old.topics || {});
-        for (const item of topics) {
-          state.topics[topicId(item.name)] = {
-            rev: nextRevision(),
-            deleted: false,
-            value: { ...item, updatedAt: Date.now(), conflict: false }
-          };
-        }
-
-        toast("Старые слова и темы перенесены. Старая версия не сохраняла точный макет — сетка создана заново.");
-      } catch {
-        toast("Не удалось автоматически перенести старые данные. Можно импортировать прежний JSON.");
+        toast("Игровой прогресс сброшен.");
       }
     }
 
@@ -2924,27 +2915,36 @@
         button.addEventListener("click", () => switchTab(button.dataset.tab));
       });
 
-      $("topicName").addEventListener("input", () => markDraft());
-      $("wordsInput").addEventListener("input", () => markDraft());
+      // Редактирование слов только обновляет статус и черновик, не трогая текущую сетку
+      $("wordsInput").addEventListener("input", () => {
+        updateInputWarnings();
+      });
+
+      $("topicName").addEventListener("input", () => {
+        autoSaveMetaOnly();
+      });
 
       ["dirH", "dirV", "dirD", "dirR", "fillerMode"].forEach(id => {
-        $(id).addEventListener("change", () => markDraft());
+        $(id).addEventListener("change", () => {
+          $("rebuildHint").hidden = false;
+        });
       });
 
-      $("generateButton").addEventListener("click", async () => {
-        markDraft(true);
-        await processDraft(true);
+      $("generateButton").addEventListener("click", executeRebuild);
+
+      $("saveTopicButton").addEventListener("click", () => {
+        if (!state.board.value.words.length) {
+          toast("Сначала создайте сетку со словами.");
+          return;
+        }
+        if (saveTopic(state.board.value)) {
+          toast("Тема и сетка сохранены в каталог.");
+        }
       });
 
-      $("saveTopicButton").addEventListener("click", async () => {
-        if (!await ensureDraft()) return;
-        if (!state.board.value.words.length) { toast("Сначала добавьте слова."); return; }
-        if (saveTopic(state.board.value)) toast("Тема и точная сетка сохранены.");
-      });
-
-      $("clearButton").addEventListener("click", () => {
-        if (!confirm("Очистить текущую сетку на всех устройствах? Каталог сохранится.")) return;
-        cancelDraft();
+      $("clearButton").addEventListener("click", async () => {
+        const confirmed = await confirmModal("Очистить текущую сетку на всех устройствах? (Каталог сохранится)", "Очистка");
+        if (!confirmed) return;
         const board = emptyBoard();
         board.id = uid();
         board.createdAt = Date.now();
@@ -2960,14 +2960,12 @@
       $("headerExcel").addEventListener("click", exportXLSX);
       $("xlsxButton").addEventListener("click", exportXLSX);
 
-      $("tsvButton").addEventListener("click", async () => {
-        if (await ensureDraft()) await copyText(gridTSV(state.board.value.grid),
-          "Сетка скопирована. Вставьте в Excel.");
+      $("tsvButton").addEventListener("click", () => {
+        copyText(gridTSV(state.board.value.grid), "Сетка скопирована для Excel.");
       });
 
-      $("rawButton").addEventListener("click", async () => {
-        if (await ensureDraft()) await copyText(state.board.value.grid.join(""),
-          "Скопировано 225 символов, включая точки пустых клеток.");
+      $("rawButton").addEventListener("click", () => {
+        copyText(state.board.value.grid.join(""), "Скопировано 225 символов матрицы.");
       });
 
       $("printButton").addEventListener("click", printCurrentBoard);
@@ -2987,14 +2985,12 @@
       $("syncClose").addEventListener("click", () => $("syncDialog").close());
 
       $("syncNow").addEventListener("click", async () => {
-        if (!await ensureDraft()) return;
         await persistState();
-        if (Sync.push(true)) toast("Отправка начата. Статус покажет подтверждение брокера.");
-        else toast("Состояние сохранено локально; отправка произойдёт при доступном соединении.");
+        if (Sync.push(true)) toast("Синхронизация отправлена.");
+        else toast("Сохранено локально.");
       });
 
       $("reverseRaw").addEventListener("input", () => Reverse.readRaw());
-
       $("reverseWords").addEventListener("input", () => {
         Reverse.invalidate();
         Reverse.render();
@@ -3003,7 +2999,6 @@
       $("reverseTypos").addEventListener("change", () => Reverse.invalidate());
 
       $("reverseLoad").addEventListener("click", async () => {
-        if (!await ensureDraft()) return;
         Reverse.grid = [...state.board.value.grid];
         Reverse.active = null;
         Reverse.invalidate();
@@ -3064,9 +3059,10 @@
         saveGame();
       });
 
-      $("playRestart").addEventListener("click", () => {
+      $("playRestart").addEventListener("click", async () => {
         if (!game) return;
-        if (!confirm("Начать эту же головоломку заново?")) return;
+        const confirmed = await confirmModal("Начать эту головоломку заново с нуля?", "Сброс игры");
+        if (!confirmed) return;
         pauseGameClock();
         game.found = {};
         game.elapsedMs = 0;
@@ -3078,8 +3074,9 @@
         saveGame();
       });
 
-      $("playLoadNew").addEventListener("click", () => {
-        if (confirm("Заменить текущую игру сеткой из конструктора?")) newGame();
+      $("playLoadNew").addEventListener("click", async () => {
+        const confirmed = await confirmModal("Заменить текущую игру новой сеткой из конструктора?", "Новая игра");
+        if (confirmed) newGame();
       });
 
       $("victoryClose").addEventListener("click", () => $("victoryDialog").close());
@@ -3093,7 +3090,7 @@
           cancelSelection();
           pauseGameClock();
           saveGame();
-          if (draftDirty) processDraft();
+          updateWakeLock(false);
         } else {
           refreshGameClock();
           Sync.queuePush(100);
@@ -3103,22 +3100,12 @@
       window.addEventListener("pagehide", () => {
         pauseGameClock();
         saveGame();
-      });
-
-      window.addEventListener("beforeunload", event => {
-        if (draftDirty) {
-          event.preventDefault();
-          event.returnValue = "";
-        }
+        updateWakeLock(false);
       });
     }
 
     async function init() {
-      const opened = await DB.open();
-
-      if (!opened) {
-        toast("Локальная база недоступна. Данные могут не пережить закрытие страницы — используйте JSON.");
-      }
+      await DB.open();
 
       const savedDevice = await DB.get("wv_device_v3");
       if (typeof savedDevice === "string") deviceId = savedDevice;
@@ -3135,10 +3122,8 @@
           observe(state.board);
           Object.values(state.topics).forEach(observe);
         } catch {
-          toast("Сохранённое состояние повреждено. Восстановите резервную копию.");
+          toast("Сохранённое состояние повреждено. Создана чистая база.");
         }
-      } else {
-        await migrateLegacy();
       }
 
       bindEvents();
@@ -3155,7 +3140,6 @@
       setInterval(() => {
         if (game) {
           $("playTimer").textContent = formatTime(elapsedGame());
-
           if (gameRunningSince !== null) {
             gameSaveTick++;
             if (gameSaveTick % 5 === 0) saveGame();
@@ -3168,7 +3152,6 @@
       init().catch(error => {
         console.error(error);
         toast("Ошибка запуска: " + error.message);
-        $("storageStatus").textContent = "Ошибка запуска. Обновите страницу или восстановите резервную копию.";
       });
     });
   })();
