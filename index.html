@@ -1098,6 +1098,11 @@
         this.setupPlayEvents();
         this.reverse.init();
         this.syncEngine.init();
+
+        // Обработка клавиатуры для редактирования ячеек реверса
+        window.addEventListener('keydown', (e) => {
+          this.reverse.handleKeyDown(e);
+        });
       },
 
       openSyncInfoModal() {
