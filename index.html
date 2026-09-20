@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090d17">
-  <title>WordVault Studio — книги филвордов и конструктор</title>
+  <title>WordVault Studio — книги филвордов и 3D ридер</title>
 
   <!-- Внешние библиотеки: MQTT для облачной синхронизации и SheetJS для экспорта в Excel -->
   <script defer src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
@@ -24,6 +24,8 @@
       --green: #6ee7b7;
       --red: #fda4af;
       --amber: #fcd34d;
+      --gold: #d4af37;
+      --gold-light: #fef08a;
     }
 
     * { box-sizing: border-box; }
@@ -56,9 +58,11 @@
       gap: 6px;
       line-height: 1.3;
       user-select: none;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
     }
 
     button:hover, .button:hover { background: #283650; }
+    button:active, .button:active { transform: scale(0.98); }
     button:disabled { opacity: .45; cursor: not-allowed; }
     button.primary { background: #5256c9; border-color: #7478ec; }
     button.primary:hover { background: #666be1; }
@@ -66,6 +70,17 @@
     button.danger:hover { background: #5a2840; }
     button.success { background: #174c43; color: #a5f3ce; }
     button.success:hover { background: #1f6358; }
+    button.gold {
+      background: linear-gradient(135deg, #785a1a, #523e11);
+      border-color: #eab308;
+      color: #fef9c3;
+      font-weight: 600;
+      box-shadow: 0 4px 15px #eab3082a;
+    }
+    button.gold:hover {
+      background: linear-gradient(135deg, #926d20, #634b15);
+      border-color: #fde047;
+    }
     button.small { padding: 5px 8px; font-size: 12px; }
 
     :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
@@ -146,13 +161,22 @@
 
     .nav-inner {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 8px;
-      padding: 10px 18px;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 6px;
+      padding: 8px 14px;
     }
 
     .tab-button { background: transparent; }
     .tab-button.active { background: #383b77; border-color: #818cf8; }
+    .tab-button.highlight-tab {
+      background: #372a15;
+      border-color: #ca8a04;
+      color: #fef08a;
+    }
+    .tab-button.highlight-tab.active {
+      background: #573f15;
+      border-color: #facc15;
+    }
 
     main { padding: 20px 18px 80px; }
 
@@ -205,6 +229,7 @@
     .badge-amber { color: var(--amber); background: #3b2e15; border-color: #665124; }
     .badge-green { color: var(--green); background: #14382e; border-color: #1f6352; }
     .badge-red { color: var(--red); background: #3a1923; border-color: #662734; }
+    .badge-gold { color: #fef08a; background: #423214; border-color: #a16207; }
 
     .settings-grid {
       display: grid;
@@ -273,7 +298,9 @@
     .cell.dragging { background: #276580; border-color: #a6efff; }
     .cell.found { background: #16775c; border-color: #77e3b8; }
 
-    #playGrid, #playGrid .cell { touch-action: none; }
+    #playGrid, #playGrid .cell, #bookRightGrid, #bookRightGrid .book-cell {
+      touch-action: none;
+    }
 
     .chips {
       display: flex;
@@ -398,7 +425,338 @@
       font-size: 12px;
     }
 
-    /* Адаптивная форма быстрого ввода тем */
+    .reader-theater {
+      background:
+        radial-gradient(ellipse at 50% 20%, #30261a88, transparent 70%),
+        radial-gradient(circle at 50% 90%, #0d121c, #05080e 80%);
+      border: 1px solid #3d3527;
+      border-radius: 20px;
+      padding: 18px 14px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 100px #000000aa, 0 18px 45px #00000099;
+    }
+
+    .reader-top-bar {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      z-index: 10;
+    }
+
+    /* Пропорция разворота двух страниц А6: формат А5 (210х148 мм, 1.419) */
+    .book-stage {
+      perspective: 1800px;
+      width: 100%;
+      max-width: 920px;
+      aspect-ratio: 1.419;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      margin: 8px 0;
+    }
+
+    .book-volume {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      position: relative;
+      transform-style: preserve-3d;
+      border-radius: 8px;
+      box-shadow:
+        0 26px 60px -10px #000000ee,
+        0 8px 24px #000000aa,
+        0 0 0 4px #261b11;
+    }
+
+    /* Закладка-ляссе */
+    .book-bookmark-ribbon {
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 18px;
+      height: calc(100% + 42px);
+      background: linear-gradient(90deg, #991b1b, #dc2626, #b91c1c);
+      z-index: 25;
+      box-shadow: 2px 4px 12px #00000088;
+      pointer-events: none;
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 12px), 0 100%);
+    }
+
+    /* Корешок и тень сгиба */
+    .book-spine-crease {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 44px;
+      background: linear-gradient(
+        90deg,
+        rgba(0,0,0,0.35) 0%,
+        rgba(0,0,0,0.15) 35%,
+        rgba(255,255,255,0.08) 50%,
+        rgba(0,0,0,0.15) 65%,
+        rgba(0,0,0,0.35) 100%
+      );
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    /* Страница книги А6 */
+    .book-page {
+      flex: 1;
+      height: 100%;
+      background: #fbf8f0; /* Тёплый цвет бумаги верже */
+      color: #1a1714;
+      padding: 16px 20px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: Georgia, "Times New Roman", serif;
+      box-shadow: inset 0 0 24px #dfd4be88;
+    }
+
+    .book-page.left-page {
+      border-radius: 6px 0 0 6px;
+      border-right: 1px solid #dcd1bb;
+      box-shadow: inset -18px 0 24px -10px #00000028;
+    }
+
+    .book-page.right-page {
+      border-radius: 0 6px 6px 0;
+      border-left: 1px solid #dcd1bb;
+      box-shadow: inset 18px 0 24px -10px #00000028;
+    }
+
+    /* Режим обложки книги (закрыта / открыта) */
+    .book-cover-view {
+      position: absolute;
+      inset: 0;
+      background: #2b1810;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 30px;
+      color: #fef08a;
+      z-index: 30;
+      background-size: cover;
+      background-position: center;
+      cursor: pointer;
+      box-shadow:
+        inset 0 0 80px #000000cc,
+        0 24px 60px #000000ee;
+    }
+
+    .cover-gold-border {
+      border: 3px double #ca8a04;
+      border-radius: 8px;
+      padding: 24px 18px;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(18, 10, 6, 0.55);
+      backdrop-filter: blur(2px);
+    }
+
+    .cover-title {
+      font-size: clamp(20px, 3.8vw, 38px);
+      font-family: Georgia, serif;
+      color: #fef08a;
+      text-shadow: 0 2px 4px #000, 0 0 20px #eab30866;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .cover-author {
+      font-size: clamp(12px, 1.8vw, 16px);
+      color: #fef9c3;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .cover-hint {
+      font-size: 13px;
+      color: #e2d7ba;
+      background: #00000077;
+      padding: 6px 14px;
+      border-radius: 99px;
+      border: 1px solid #785a1a;
+      margin-top: 10px;
+    }
+
+    /* Книжные элементы страницы */
+    .book-running-header {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #786d5e;
+      border-bottom: 1px solid #e5dac4;
+      padding-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      font-family: system-ui, sans-serif;
+    }
+
+    .book-topic-title {
+      font-size: clamp(15px, 2.3vw, 23px);
+      color: #2b1f14;
+      margin: 8px 0 2px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .book-rule-sub {
+      font-size: 11px;
+      color: #736756;
+      font-style: italic;
+      margin-bottom: 8px;
+    }
+
+    .book-word-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px 12px;
+      overflow-y: auto;
+      max-height: calc(100% - 110px);
+      padding-right: 4px;
+      font-size: clamp(11px, 1.4vw, 14px);
+    }
+
+    .book-word-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #2e261f;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .book-word-item.done {
+      color: #8c8275;
+      text-decoration: line-through;
+      text-decoration-color: #b91c1c;
+      text-decoration-thickness: 1.5px;
+    }
+
+    .book-word-checkbox {
+      width: 12px;
+      height: 12px;
+      border: 1px solid #8c7e6c;
+      border-radius: 2px;
+      display: inline-grid;
+      place-items: center;
+      font-size: 9px;
+      color: #991b1b;
+      font-weight: bold;
+    }
+
+    .book-page-num {
+      font-size: 11px;
+      color: #8a7c6a;
+      text-align: center;
+      font-family: system-ui, sans-serif;
+      border-top: 1px solid #e5dac4;
+      padding-top: 4px;
+    }
+
+    /* Правая страница: тактильная печатная сетка А6 */
+    .book-grid-wrap {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .book-grid {
+      display: grid;
+      grid-template-columns: repeat(15, minmax(0, 1fr));
+      grid-template-rows: repeat(15, minmax(0, 1fr));
+      gap: 1.5px;
+      width: 100%;
+      aspect-ratio: 1;
+      margin: auto;
+      background: #4a3e31;
+      padding: 1.5px;
+      border: 1.5px solid #2e251c;
+      border-radius: 4px;
+      box-shadow: 0 4px 15px #00000015;
+    }
+
+    .book-cell {
+      background: #fdfaf3;
+      color: #1a1714;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font: bold clamp(8px, 1.7vw, 15px)/1 Consolas, ui-monospace, monospace;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+    }
+
+    /* Эффект маркера-хайлайтера прямо на бумаге */
+    .book-cell.highlighter {
+      background: #fde047 !important;
+      color: #000 !important;
+    }
+
+    .book-cell.highlighter-word {
+      background: #a7f3d0 !important;
+      color: #064e3b !important;
+    }
+
+    .book-cell.book-hover {
+      background: #fef08a;
+    }
+
+    /* Панель перелистывания книги */
+    .reader-controls-bar {
+      width: 100%;
+      max-width: 780px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .page-slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .page-slider {
+      width: 100%;
+      accent-color: #eab308;
+      cursor: pointer;
+    }
+
     .fast-topic-grid {
       display: grid;
       grid-template-columns: minmax(180px, 4fr) minmax(220px, 7fr) auto;
@@ -406,7 +764,6 @@
       align-items: center;
     }
 
-    /* Адаптивная панель действий книги */
     .book-actions-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -414,7 +771,6 @@
       width: 100%;
     }
 
-    /* Стили для интерактивного предпросмотра массового импорта */
     .batch-preview-box {
       max-height: 250px;
       overflow-y: auto;
@@ -513,173 +869,41 @@
       .batch-item-words { display: none; }
     }
 
-    /* Мобильная адаптация для таблиц тем, диалогов и форм книги */
-    @media (max-width: 640px) {
+    @media (max-width: 680px) {
+      .book-stage {
+        aspect-ratio: auto;
+        height: auto;
+        min-height: 520px;
+      }
+      .book-volume {
+        flex-direction: column;
+        border-radius: 6px;
+      }
+      .book-page.left-page {
+        border-radius: 6px 6px 0 0;
+        border-right: none;
+        border-bottom: 2px dashed #dcd1bb;
+        min-height: 240px;
+      }
+      .book-page.right-page {
+        border-radius: 0 0 6px 6px;
+        border-left: none;
+        min-height: 330px;
+      }
+      .book-spine-crease, .book-bookmark-ribbon {
+        display: none;
+      }
+      .nav-inner {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 4px;
+      }
       dialog {
         padding: 16px 12px;
         width: calc(100vw - 16px) !important;
-        max-width: calc(100vw - 16px) !important;
         border-radius: 14px;
-        margin: auto;
       }
-
-      .fast-topic-grid {
-        grid-template-columns: 1fr;
-        gap: 8px;
-      }
-
-      .fast-topic-grid button {
-        width: 100%;
-        padding: 11px;
-      }
-
-      .book-actions-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-      }
-
-      .book-actions-grid button {
-        font-size: 11px;
-        padding: 9px 5px;
-        text-align: center;
-      }
-
-      .book-header-banner {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-        padding: 9px 11px;
-      }
-
-      .banner-nav-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1.3fr;
-        gap: 6px;
-        width: 100%;
-      }
-
-      .banner-nav-actions button {
-        width: 100%;
-        padding: 7px 4px;
-        font-size: 11px;
-      }
-
-      /* Трансформация таблицы тем в мобильные карточки без бокового скролла */
-      .topics-table-wrap {
-        overflow-x: visible !important;
-      }
-
-      .topics-table thead {
-        display: none;
-      }
-
-      .topics-table, .topics-table tbody {
-        display: block;
-        width: 100%;
-      }
-
-      .topics-table tr {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        grid-template-areas:
-          "num name status"
-          "words words words"
-          "actions actions actions";
-        gap: 6px 8px;
-        align-items: center;
-        background: #0d1525;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 10px 12px;
-        margin-bottom: 8px;
-        width: 100%;
-        box-sizing: border-box;
-      }
-
-      .topics-table td {
-        padding: 0;
-        border-bottom: none;
-      }
-
-      .topics-table td.col-num {
-        grid-area: num;
-        font-weight: 700;
-        color: var(--muted);
-      }
-
-      .topics-table td.col-name {
-        grid-area: name;
-        font-weight: 600;
-        font-size: 14px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        min-width: 0;
-      }
-
-      .topics-table td.col-status {
-        grid-area: status;
-        text-align: right;
-      }
-
-      .topics-table td.col-words {
-        grid-area: words;
-        font-size: 11px;
-        color: var(--muted);
-        line-height: 1.3;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .topics-table td.col-actions {
-        grid-area: actions;
-        width: 100%;
-        margin-top: 4px;
-        padding-top: 6px;
-        border-top: 1px solid #1c273e;
-      }
-
-      .topics-table td.col-actions .row {
-        width: 100%;
-        display: grid;
-        grid-template-columns: 1fr 42px;
-        gap: 8px;
-      }
-
-      .topics-table td.col-actions button {
-        width: 100%;
-        padding: 8px 10px;
-        font-size: 13px;
-        justify-content: center;
-      }
-    }
-
-    @media (max-width: 560px) {
-      .header-inner { padding: 10px; flex-wrap: wrap; }
-      .logo-icon { width: 34px; height: 34px; }
-      h1 { font-size: 16px; }
-      .header-actions { margin-left: auto; }
-      .sync-badge { max-width: 180px; font-size: 10px; padding: 7px; }
-      .nav-inner { gap: 4px; padding: 8px 6px; }
-      .tab-button { padding: 8px 2px; font-size: 10px; }
-      main { padding: 12px 8px 70px; }
-      .card { padding: 12px; border-radius: 12px; }
-      .letter-grid { gap: 2px; padding: 3px; }
-      .cell { border-radius: 3px; }
-      .topics-grid, .books-grid { grid-template-columns: 1fr; }
-      .column-labels { gap: 2px; padding: 0 3px; }
-      .row-labels { gap: 2px; padding-top: 3px; padding-bottom: 3px; }
-      .hide-mobile { display: none; }
-      .coordinate-layout { grid-template-columns: 18px minmax(0, 1fr); }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation: none !important;
-        transition: none !important;
-        scroll-behavior: auto !important;
-      }
+      .fast-topic-grid { grid-template-columns: 1fr; }
+      .book-actions-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -691,7 +915,7 @@
         <div class="logo-icon" aria-hidden="true">15²</div>
         <div>
           <h1>WordVault Studio</h1>
-          <div class="desktop-description muted small-text">Конструктор · Книги филвордов · Аудит</div>
+          <div class="desktop-description muted small-text">Конструктор · Книги филвордов · 3D Ридер</div>
         </div>
       </div>
 
@@ -709,6 +933,7 @@
     <div class="nav-inner">
       <button class="tab-button active" data-tab="constructor" aria-current="page">⚡ Конструктор</button>
       <button class="tab-button" data-tab="books">📖 Книги <span id="navBooksCount">0</span></button>
+      <button class="tab-button highlight-tab" data-tab="reader">✨ 3D Книга</button>
       <button class="tab-button" data-tab="reverse">🔍 Реверс</button>
       <button class="tab-button" data-tab="play">🎮 Игра</button>
       <button class="tab-button" data-tab="topics">📚 Темы <span id="topicCount">0</span></button>
@@ -729,6 +954,7 @@
         <div class="row banner-nav-actions">
           <button id="prevBookTopicBtn" class="small" type="button">‹ Пред. тема</button>
           <button id="nextBookTopicBtn" class="small" type="button">След. тема ›</button>
+          <button id="bannerToReaderBtn" class="gold small" type="button">✨ В 3D Ридер</button>
           <button id="backToBookBtn" class="primary small" type="button">← В книгу</button>
         </div>
       </div>
@@ -798,10 +1024,6 @@
                 <option value="dots">Точки ·</option>
               </select>
             </label>
-
-            <p class="muted small-text">
-              Генератор находит наилучшую укладку слов с временным бюджетом оптимизации.
-            </p>
           </div>
 
           <div class="card stack">
@@ -851,6 +1073,90 @@
       </div>
     </section>
 
+    <section id="view-reader" class="stack" hidden>
+      <div class="reader-theater">
+        <div class="reader-top-bar">
+          <div class="row wrap" style="gap: 8px;">
+            <button id="readerBackToBooksBtn" class="small" type="button">← К сборникам</button>
+            <h2 id="readerBookTitleDisplay" style="font-size: 16px; color: #fef08a;">Книга филвордов</h2>
+          </div>
+
+          <div class="row wrap" style="gap: 8px;">
+            <label class="button small" style="margin: 0; cursor: pointer;">
+              🖼️ Обложка
+              <input id="readerCoverFileInput" type="file" accept="image/*" style="display:none;">
+            </label>
+            <button id="readerRemoveCoverBtn" class="small danger" type="button" title="Удалить пользовательскую обложку" hidden>✕</button>
+            <button id="readerSettingsBtn" class="small" type="button">⚙️ Настройки</button>
+            <button id="readerFullscreenBtn" class="small" type="button" title="На весь экран">⛶</button>
+          </div>
+        </div>
+
+        <!-- 3D Разворот книги А6 -->
+        <div class="book-stage">
+          <div class="book-volume">
+            <div class="book-bookmark-ribbon" aria-hidden="true"></div>
+            <div class="book-spine-crease" aria-hidden="true"></div>
+
+            <!-- Обложка книги (Стр. 0) -->
+            <div id="bookCoverView" class="book-cover-view">
+              <div class="cover-gold-border">
+                <div class="cover-author" id="coverAuthorText">WORDVAULT STUDIO</div>
+                <div>
+                  <h1 class="cover-title" id="coverTitleText">СБОРНИК ФИЛВОРДОВ</h1>
+                  <p id="coverMetaText" style="color: #ca8a04; margin-top: 10px; font-style: italic;">50 избранных головоломок</p>
+                </div>
+                <div class="cover-hint">Нажмите, чтобы открыть книгу ➔</div>
+              </div>
+            </div>
+
+            <!-- Левая страница разворота (Тема и слова) -->
+            <div class="book-page left-page">
+              <div>
+                <div class="book-running-header">
+                  <span id="bookRunningLeftTitle">WORDVAULT</span>
+                  <span id="bookRunningLeftTopic">ТЕМА</span>
+                </div>
+
+                <h3 class="book-topic-title" id="bookLeftTitle">Название темы</h3>
+                <div class="book-rule-sub" id="bookLeftRule">Найдите слова по прямым линиям:</div>
+
+                <div class="book-word-list" id="bookWordList"></div>
+              </div>
+
+              <div class="book-page-num" id="bookLeftPageNum">Стр. 2</div>
+            </div>
+
+            <!-- Правая страница разворота (Сетка 15х15) -->
+            <div class="book-page right-page">
+              <div class="book-grid-wrap">
+                <div class="book-running-header">
+                  <span>ФИЛВОРД 15×15</span>
+                  <span id="bookGridProgressBadge">0 / 0</span>
+                </div>
+
+                <div id="bookRightGrid" class="book-grid"></div>
+
+                <div class="book-page-num" id="bookRightPageNum">Стр. 3</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Нижняя панель листания разворотов -->
+        <div class="reader-controls-bar">
+          <button id="bookPrevPageBtn" class="primary" type="button">‹ Пред. разворот</button>
+
+          <div class="page-slider-wrap">
+            <input id="bookPageSlider" type="range" min="0" max="50" value="0" class="page-slider">
+            <span id="bookPageIndicator" class="badge badge-gold mono">Обложка</span>
+          </div>
+
+          <button id="bookNextPageBtn" class="primary" type="button">След. разворот ›</button>
+        </div>
+      </div>
+    </section>
+
     <section id="view-books" class="stack" hidden>
       <!-- Режим 1: Каталог книг -->
       <div id="booksListView" class="stack">
@@ -858,7 +1164,7 @@
           <div class="row between wrap">
             <div>
               <h2>Книги и сборники филвордов</h2>
-              <p class="muted small-text">Создавайте книги на 50+ тем с едиными правилами и экспортом в печать.</p>
+              <p class="muted small-text">Создавайте книги на 50+ тем с едиными правилами, 3D ридером и экспортом.</p>
             </div>
             <div class="actions">
               <button id="createBookBtn" class="primary" type="button">+ Создать книгу</button>
@@ -881,6 +1187,7 @@
             </div>
             <div class="row wrap" style="gap: 6px;">
               <span id="currentBookProgressBadge" class="badge">0 / 0 готово</span>
+              <button id="openBookInReaderBtn" class="gold small" type="button">✨ 📖 Читать как книгу (А6)</button>
               <button id="editBookSettingsBtn" class="small" type="button">⚙️ Настройки</button>
             </div>
           </div>
@@ -909,16 +1216,13 @@
             <input id="fastTopicWords" type="text" placeholder="Слова через запятую или пробел (ОРБИТА, ЗВЕЗДА...)">
             <button id="addFastTopicBtn" class="primary" type="button" style="white-space:nowrap;">+ Добавить</button>
           </div>
-          <p class="muted small-text">
-            Совет: вводите название, слова и нажимайте Enter для быстрого добавления темы.
-          </p>
         </div>
 
         <!-- Таблица тем книги -->
         <div class="card stack">
           <div class="row between wrap gap-small">
             <h3>Темы сборника (<span id="bookTopicsCount">0</span>)</h3>
-            <span class="muted small-text">Нажмите «Сетка» для перехода в макет</span>
+            <span class="muted small-text">Нажмите «Сетка» для перехода в конструктор</span>
           </div>
 
           <div class="topics-table-wrap" style="overflow-x: auto;">
@@ -956,9 +1260,6 @@
             </div>
             <textarea id="reverseRaw" rows="6" class="mono"
               placeholder="Вставьте строку или таблицу из Excel. Точка · обозначает пустую клетку."></textarea>
-            <p class="muted small-text">
-              Пробелы и табуляции удаляются. Для сохранения пустых позиций используйте · или точку.
-            </p>
             <div id="reverseWarning" class="notice" hidden></div>
             <div class="actions">
               <button id="reverseLoad" type="button">Из конструктора</button>
@@ -1015,10 +1316,6 @@
               <button id="reversePrev" class="small" type="button" aria-label="Предыдущая клетка">←</button>
               <button id="reverseNext" class="small" type="button" aria-label="Следующая клетка">→</button>
             </div>
-
-            <p class="muted small-text gap">
-              На ПК можно печатать прямо в выделенной сетке. На телефоне используйте поле «Буква».
-            </p>
           </div>
 
           <div class="card">
@@ -1056,21 +1353,14 @@
       <div class="play-layout">
         <div class="card">
           <div class="grid-shell">
-            <div id="playGrid" class="letter-grid" tabindex="0"
-              aria-label="Игровая сетка. Стрелки перемещают курсор, Enter выбирает начало и конец слова."></div>
+            <div id="playGrid" class="letter-grid" tabindex="0"></div>
           </div>
           <p id="playStatus" class="muted small-text gap"></p>
-          <p class="muted small-text gap-small">
-            Клавиатура: стрелки — перемещение, Enter — начало/конец слова, Escape — отмена.
-          </p>
         </div>
 
         <div class="card stack">
           <h3>Найти слова</h3>
           <div id="playWords" class="chips"></div>
-          <p class="muted small-text">
-            Прогресс сохраняется в этом браузере. Экран телефона защищён от засыпания во время игры.
-          </p>
         </div>
       </div>
     </section>
@@ -1080,9 +1370,7 @@
         <div class="row between wrap">
           <div>
             <h2>Каталог тем и сохранённых сеток</h2>
-            <p class="muted small-text">
-              «Открыть сетку» восстанавливает точный макет. «Новый вариант» генерирует другой.
-            </p>
+            <p class="muted small-text">«Открыть» восстанавливает точный макет. «Слова» копирует список.</p>
           </div>
           <div class="actions">
             <button id="exportBackup" type="button">💾 Резервная копия JSON</button>
@@ -1116,6 +1404,11 @@
         <input id="bookModalAuthor" type="text" maxlength="100" placeholder="WordVault Studio" class="gap-small">
       </div>
 
+      <div class="row between">
+        <label for="bookModalStartPage"><b>Головоломки начинаются со страницы:</b></label>
+        <input id="bookModalStartPage" type="number" min="1" max="10" value="3" style="width: 80px; text-align: center;">
+      </div>
+
       <h3>Глобальные настройки правил для сеток книги</h3>
       <div class="settings-grid">
         <label class="check"><input id="bookDirH" type="checkbox" checked> Горизонталь →</label>
@@ -1144,15 +1437,12 @@
     </div>
   </dialog>
 
-  <!-- Улучшенный диалог массового ввода 50 тем с интерактивным предпросмотром -->
+  <!-- Диалог массового ввода тем с интерактивным предпросмотром -->
   <dialog id="batchImportModal" style="width: min(840px, calc(100vw - 20px));">
     <div class="row between wrap gap-small">
       <h2>Массовый ввод тем в книгу</h2>
       <button id="batchSampleBtn" class="small" type="button">📋 Пример</button>
     </div>
-    <p class="small-text muted">
-      Вставьте текст в любом удобном формате (с <code># Заголовок</code>, нумерацией <code>1. Тема</code> или двоеточием <code>Тема: слова</code>).
-    </p>
 
     <div class="row between wrap gap-small">
       <label class="check" style="margin: 0;">
@@ -1167,9 +1457,7 @@
 ПЛАНЕТА, ЗВЕЗДА, ОРБИТА, КОМЕТА, СПУТНИК, АСТЕРОИД, ГАЛАКТИКА
 
 # Океан
-АКУЛА, ДЕЛЬФИН, КИТ, КОРАЛЛ, СКАТ, РИФ, МЕДУЗА, КРАБ
-
-1. Животные: ВОЛК, ЛИСИЦА, МЕДВЕДЬ, РЫСЬ, БАРСУК, БОБР"></textarea>
+АКУЛА, ДЕЛЬФИН, КИТ, КОРАЛЛ, СКАТ, РИФ, МЕДУЗА, КРАБ"></textarea>
 
     <div class="row between wrap gap-small">
       <div class="row wrap" id="batchLiveBadges" style="gap: 5px;">
@@ -1188,7 +1476,7 @@
     </div>
   </dialog>
 
-  <!-- Диалог прогресса пакетной генерации -->
+  <!-- Диалог пакетной генерации -->
   <dialog id="batchGenModal">
     <h2>Генерация книги филвордов</h2>
     <p id="batchGenStatus">Построение оптимальных укладок сеток…</p>
@@ -1384,10 +1672,6 @@
       return { words, rejected, duplicates };
     }
 
-    /* ==========================================================================
-       УМНЫЙ ВСЕЯДНЫЙ ПАРСЕР МАССОВОГО ИМПОРТА (BATCH PARSER)
-       Устойчив к отступам, пустым строкам, номерам и разным стилям форматирования
-       ========================================================================== */
     function parseBatchInput(text, autoSplit = true) {
       const lines = text.split(/\r?\n/);
       const rawBlocks = [];
@@ -1413,22 +1697,16 @@
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const trimmed = line.trim();
-
-        // Пустая строка не сбрасывает заголовок, если слова под ним ещё не начались!
-        // Это предотвращает потерю тем вида "# Заголовок \n\n СЛОВА..."
         if (!trimmed) continue;
 
         let isHeader = false;
         let extTitle = "";
         let inlineWords = "";
 
-        // Формат 1: Заголовки Markdown (# Тема, ## Тема)
         if (/^#{1,4}\s+/.test(trimmed)) {
           isHeader = true;
           extTitle = trimmed.replace(/^#{1,4}\s+/, "");
-        }
-        // Формат 2: Нумерация вида "1. Название", "Тема 1: Название", "1) Название"
-        else if (/^(?:тема\s*\d*[:.]?|\d+[\s.)\-]+)/i.test(trimmed)) {
+        } else if (/^(?:тема\s*\d*[:.]?|\d+[\s.)\-]+)/i.test(trimmed)) {
           if (trimmed.includes(":") && !trimmed.endsWith(":")) {
             const colonIdx = trimmed.indexOf(":");
             const before = trimmed.slice(0, colonIdx).replace(/^(?:тема\s*\d*[:.]?|\d+[\s.)\-]+)/i, "").trim();
@@ -1441,9 +1719,7 @@
             extTitle = trimmed.replace(/^(?:тема\s*\d*[:.]?|\d+[\s.)\-]+)/i, "").replace(/[:.]+$/, "").trim();
             if (!extTitle) extTitle = trimmed;
           }
-        }
-        // Формат 3: Строка с разделителем двоеточие или таб: "Космос: ПЛАНЕТА, ЗВЕЗДА"
-        else if ((trimmed.includes(":") || trimmed.includes("\t")) && !trimmed.endsWith(":")) {
+        } else if ((trimmed.includes(":") || trimmed.includes("\t")) && !trimmed.endsWith(":")) {
           const sep = trimmed.includes(":") ? ":" : "\t";
           const parts = trimmed.split(sep);
           const maybeTitle = parts[0].trim();
@@ -1453,9 +1729,7 @@
             extTitle = maybeTitle;
             inlineWords = maybeWords;
           }
-        }
-        // Формат 4: Короткая отдельная строка заголовка без запятых
-        else if (curWordsLines.length > 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4) {
+        } else if (curWordsLines.length > 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4) {
           if (/[А-ЯA-Zа-яa-z]/.test(trimmed)) {
             isHeader = true;
             extTitle = trimmed;
@@ -1467,7 +1741,6 @@
           curTitle = extTitle;
           if (inlineWords) curWordsLines.push(inlineWords);
         } else {
-          // Если заголовок ещё не был задан, а первая строка короткая и без запятых — это заголовок
           if (!curTitle && curWordsLines.length === 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4) {
             curTitle = trimmed;
           } else {
@@ -1478,7 +1751,6 @@
 
       flush();
 
-      // Обработка тем и умное деление длинных списков
       const processed = [];
       const warnings = [];
 
@@ -1527,7 +1799,6 @@
           } else if (words.length < 5) {
             status = "warn";
             statusText = `${words.length} слов (мало слов)`;
-            warnings.push(`Тема «${name}»: мало слов (${words.length})`);
           }
 
           processed.push({
@@ -1700,6 +1971,65 @@
             osc.start(start);
             osc.stop(start + .2);
           });
+        } catch {}
+      },
+
+      // Шелест переворачиваемой книжной страницы
+      playPageFlip() {
+        if (this.muted) return;
+        this.unlock();
+        try {
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime;
+          const bufferSize = this.ctx.sampleRate * 0.18;
+          const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+
+          const noise = this.ctx.createBufferSource();
+          noise.buffer = buffer;
+
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = "bandpass";
+          filter.frequency.setValueAtTime(800, now);
+          filter.frequency.exponentialRampToValueAtTime(320, now + 0.18);
+          filter.Q.value = 2.5;
+
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.01, now);
+          gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          noise.start(now);
+        } catch {}
+      },
+
+      // Карандашный росчерк при нахождении слова в книге
+      playPencilStroke() {
+        if (this.muted) return;
+        this.unlock();
+        try {
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(420, now);
+          osc.frequency.exponentialRampToValueAtTime(680, now + 0.12);
+
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.15);
         } catch {}
       }
     };
@@ -2081,6 +2411,8 @@
           id: String(book.id || id),
           title: String(book.title || "Сборник филвордов").slice(0, 120),
           author: String(book.author || "WordVault").slice(0, 100),
+          coverImage: typeof book.coverImage === "string" ? book.coverImage : null,
+          startPage: Number.isInteger(book.startPage) ? Math.max(1, book.startPage) : 3,
           settings: cleanSettings(book.settings),
           topics: (book.topics || []).map(t => ({
             id: String(t.id || uid()),
@@ -2088,7 +2420,8 @@
             raw: typeof t.raw === "string" ? t.raw.slice(0, 30000) : "",
             words: Array.isArray(t.words) ? [...t.words] : parseWords(t.raw || "").words,
             grid: Array.isArray(t.grid) && t.grid.length === CELLS ? [...t.grid] : null,
-            placements: Array.isArray(t.placements) ? clone(t.placements) : []
+            placements: Array.isArray(t.placements) ? clone(t.placements) : [],
+            found: Array.isArray(t.found) ? [...t.found] : []
           })),
           updatedAt: Number.isFinite(book.updatedAt) ? book.updatedAt : Date.now()
         };
@@ -2220,7 +2553,6 @@
               if (compareRev(remote.board.rev, state.board.rev) > 0) state.board = remote.board;
               Object.assign(state.topics, remote.topics);
 
-              // Защита от отката локальных изменений: проверяем метку времени updatedAt
               if (remote.books && typeof remote.books === "object") {
                 let changedAny = false;
                 for (const [bId, rBook] of Object.entries(remote.books)) {
@@ -2231,7 +2563,10 @@
                     changedAny = true;
                   }
                 }
-                if (changedAny && activeBookId) renderBookDetail();
+                if (changedAny && activeBookId) {
+                  renderBookDetail();
+                  if (activeTab === "reader") renderBookReader();
+                }
               }
 
               if (stable(state) !== before) {
@@ -2450,6 +2785,239 @@
       if (!board.words.length) chips.append(node("span", "muted small-text", "Введите слова для генерации."));
     }
 
+    let readerPageIndex = 0; // 0 = обложка, 1 = разворот темы 1, 2 = тема 2 ...
+    let bookPointerId = null;
+    let bookSelectionStart = null;
+    let bookSelectionCells = [];
+
+    function ensureActiveBook() {
+      if (activeBookId && state.books[activeBookId]) return state.books[activeBookId];
+      const bookIds = Object.keys(state.books);
+      if (bookIds.length > 0) {
+        activeBookId = bookIds[0];
+        return state.books[activeBookId];
+      }
+      return null;
+    }
+
+    function openBookIn3DReader(bookId, topicIdx = null) {
+      activeBookId = bookId;
+      const book = state.books[bookId];
+      if (!book) return;
+
+      if (topicIdx !== null) {
+        readerPageIndex = topicIdx + 1; // 0 - обложка, 1+ темы
+      } else {
+        readerPageIndex = 0; // Начинаем с обложки
+      }
+
+      switchTab("reader");
+      renderBookReader();
+    }
+
+    function renderBookReader() {
+      const book = ensureActiveBook();
+      if (!book) {
+        $("readerBookTitleDisplay").textContent = "Нет созданных книг";
+        $("coverTitleText").textContent = "НЕТ КНИГ";
+        $("coverMetaText").textContent = "Создайте книгу во вкладке «Книги»";
+        $("bookCoverView").hidden = false;
+        $("bookCoverView").style.backgroundImage = "";
+        return;
+      }
+
+      $("readerBookTitleDisplay").textContent = book.title;
+      $("coverTitleText").textContent = book.title;
+      $("coverAuthorText").textContent = (book.author || "WordVault Studio").toUpperCase();
+      $("coverMetaText").textContent = `${book.topics.length} филвордов · формат А6`;
+
+      // Настройка обложки
+      if (book.coverImage) {
+        $("bookCoverView").style.backgroundImage = `url("${book.coverImage}")`;
+        $("readerRemoveCoverBtn").hidden = false;
+      } else {
+        $("bookCoverView").style.backgroundImage = "";
+        $("readerRemoveCoverBtn").hidden = true;
+      }
+
+      const totalTopics = book.topics.length;
+      const maxPages = totalTopics;
+      const slider = $("bookPageSlider");
+      slider.max = maxPages;
+      slider.value = readerPageIndex;
+
+      // Режим отображения: Обложка (0) или Разворот (1+)
+      if (readerPageIndex === 0) {
+        $("bookCoverView").hidden = false;
+        $("bookPageIndicator").textContent = "Обложка книги";
+        $("bookPrevPageBtn").disabled = true;
+        $("bookNextPageBtn").disabled = totalTopics === 0;
+        return;
+      }
+
+      $("bookCoverView").hidden = true;
+      const topicIndex = readerPageIndex - 1;
+      const topic = book.topics[topicIndex];
+      const startPage = book.startPage || 3;
+      const leftPageNum = (topicIndex * 2) + startPage - 1;
+      const rightPageNum = (topicIndex * 2) + startPage;
+
+      $("bookPrevPageBtn").disabled = false;
+      $("bookNextPageBtn").disabled = readerPageIndex >= totalTopics;
+      $("bookPageIndicator").textContent = `Стр. ${leftPageNum}–${rightPageNum} (#${readerPageIndex} из ${totalTopics})`;
+
+      if (!topic) return;
+
+      // Левая страница (Тема и слова)
+      $("bookRunningLeftTitle").textContent = book.title.toUpperCase();
+      $("bookRunningLeftTopic").textContent = `№ ${topicIndex + 1}`;
+      $("bookLeftTitle").textContent = topic.name;
+      $("bookLeftPageNum").textContent = `— ${leftPageNum} —`;
+      $("bookRightPageNum").textContent = `— ${rightPageNum} —`;
+
+      const ruleText = book.settings?.overlap === false
+        ? "Слова читаются по прямым линиям (не пересекаются):"
+        : "Слова читаются по прямым линиям в любом направлении:";
+      $("bookLeftRule").textContent = ruleText;
+
+      // Если сетка ещё не сгенерирована — генерируем её на лету
+      if (!topic.grid || !topic.placements.length) {
+        generateGrid(topic.words, book.settings).then(layout => {
+          topic.grid = [...layout.grid];
+          topic.placements = clone(layout.placements);
+          persistState();
+          renderBookReader();
+        });
+      }
+
+      // Список слов
+      const wordListEl = $("bookWordList");
+      wordListEl.replaceChildren();
+      const foundSet = new Set(topic.found || []);
+
+      topic.words.forEach(w => {
+        const isDone = foundSet.has(w);
+        const item = node("div", `book-word-item ${isDone ? "done" : ""}`);
+        const chk = node("span", "book-word-checkbox", isDone ? "✓" : "");
+        const label = node("span", "", w);
+        item.append(chk, label);
+
+        item.addEventListener("click", () => {
+          if (!foundSet.has(w)) {
+            foundSet.add(w);
+            Sound.playPencilStroke();
+          } else {
+            foundSet.delete(w);
+          }
+          topic.found = Array.from(foundSet);
+          persistState();
+          renderBookReader();
+        });
+
+        wordListEl.append(item);
+      });
+
+      // Правая страница (Сетка 15х15)
+      $("bookGridProgressBadge").textContent = `${foundSet.size} / ${topic.words.length} найдено`;
+      const rightGridEl = $("bookRightGrid");
+      rightGridEl.replaceChildren();
+
+      const gridData = topic.grid || Array(CELLS).fill("·");
+      const highlightPlacements = (topic.placements || []).filter(p => foundSet.has(p.word));
+      const highlightedCellIndices = new Set(highlightPlacements.flatMap(p => p.cells));
+
+      gridData.forEach((ch, idx) => {
+        const cell = node("div", "book-cell", ch);
+        cell.dataset.index = idx;
+
+        if (highlightedCellIndices.has(idx)) {
+          cell.classList.add("highlighter-word");
+        }
+
+        rightGridEl.append(cell);
+      });
+    }
+
+    function flipBookPage(delta) {
+      const book = ensureActiveBook();
+      if (!book) return;
+      const newPage = Math.max(0, Math.min(book.topics.length, readerPageIndex + delta));
+      if (newPage !== readerPageIndex) {
+        readerPageIndex = newPage;
+        Sound.playPageFlip();
+        renderBookReader();
+      }
+    }
+
+    /* Интерактивное выделение слов хайлайтером на странице книги */
+    function initBookGridInteractions() {
+      const grid = $("bookRightGrid");
+
+      grid.addEventListener("pointerdown", e => {
+        const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest("#bookRightGrid .book-cell");
+        if (!cell) return;
+        const idx = Number(cell.dataset.index);
+        bookPointerId = e.pointerId;
+        bookSelectionStart = idx;
+        bookSelectionCells = [idx];
+        grid.setPointerCapture(e.pointerId);
+        paintBookGridDrag();
+      });
+
+      grid.addEventListener("pointermove", e => {
+        if (e.pointerId !== bookPointerId || bookSelectionStart === null) return;
+        const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest("#bookRightGrid .book-cell");
+        if (!cell) return;
+        bookSelectionCells = straightLine(bookSelectionStart, Number(cell.dataset.index));
+        paintBookGridDrag();
+      });
+
+      const finishBookSelection = () => {
+        if (bookPointerId === null) return;
+        bookPointerId = null;
+
+        const book = ensureActiveBook();
+        if (book && readerPageIndex > 0) {
+          const topic = book.topics[readerPageIndex - 1];
+          if (topic && bookSelectionCells.length >= 2) {
+            const letters = bookSelectionCells.map(i => topic.grid[i]).join("");
+            const revLetters = [...letters].reverse().join("");
+            const matched = topic.words.find(w => w === letters || w === revLetters);
+
+            if (matched) {
+              if (!topic.found) topic.found = [];
+              if (!topic.found.includes(matched)) {
+                topic.found.push(matched);
+                Sound.playPencilStroke();
+                toast(`Найдено в книге: ${matched}!`);
+                persistState();
+                if (topic.found.length === topic.words.length) {
+                  Sound.play(true);
+                  $("victoryText").textContent = `Головоломка «${topic.name}» в книге полностью решена!`;
+                  $("victoryDialog").showModal();
+                }
+              }
+            }
+          }
+        }
+
+        bookSelectionCells = [];
+        bookSelectionStart = null;
+        renderBookReader();
+      };
+
+      grid.addEventListener("pointerup", finishBookSelection);
+      grid.addEventListener("pointercancel", finishBookSelection);
+    }
+
+    function paintBookGridDrag() {
+      const cells = $("bookRightGrid").children;
+      const set = new Set(bookSelectionCells);
+      for (let i = 0; i < cells.length; i++) {
+        cells[i].classList.toggle("highlighter", set.has(i));
+      }
+    }
+
     function renderBooks() {
       const books = Object.values(state.books || {});
       $("navBooksCount").textContent = books.length;
@@ -2470,10 +3038,12 @@
 
         const actions = node("div", "actions");
         actions.append(action("📖 Открыть книгу", () => openBook(book.id), "primary small"));
+        actions.append(action("✨ 3D Ридер", () => openBookIn3DReader(book.id), "gold small"));
         actions.append(action("Удалить", async () => {
           const ok = await confirmModal(`Удалить книгу «${book.title}» (${totalTopics} тем)?`, "Удаление книги");
           if (!ok) return;
           delete state.books[book.id];
+          if (activeBookId === book.id) activeBookId = null;
           await persistState();
           stateChanged();
         }, "danger small"));
@@ -2538,8 +3108,8 @@
         actionsDiv.style.justifyContent = "flex-end";
 
         actionsDiv.append(action("👁 Сетка", () => openTopicInConstructor(activeBookId, idx), "small primary"));
+        actionsDiv.append(action("📖 Читать", () => openBookIn3DReader(activeBookId, idx), "small gold"));
 
-        // Удаление темы с первого раза (поиск по id)
         actionsDiv.append(action("✕", async () => {
           const ok = await confirmModal(`Удалить тему «${topic.name}» из этой книги?`, "Удаление темы");
           if (!ok) return;
@@ -2623,7 +3193,8 @@
         raw: rawWords,
         words: parsed.words,
         grid: null,
-        placements: []
+        placements: [],
+        found: []
       });
 
       book.updatedAt = Date.now();
@@ -2636,9 +3207,6 @@
       toast(`Тема «${name}» добавлена (#${book.topics.length}).`);
     }
 
-    /* ==========================================================================
-       ЛОГИКА ПРЕДПРОСМОТРА МАССОВОГО ИМПОРТА
-       ========================================================================== */
     let parsedBatchResult = null;
     let batchInputDebounce = null;
 
@@ -2658,7 +3226,7 @@
 
       if (result.warnings.length > 0) {
         $("batchWarnBadge").hidden = false;
-        $("batchWarnBadge").textContent = `${result.warnings.length} предпрежд./ошибок`;
+        $("batchWarnBadge").textContent = `${result.warnings.length} предпр.`;
       } else {
         $("batchWarnBadge").hidden = true;
       }
@@ -2797,14 +3365,14 @@
       controls.append(printBtn);
       doc.body.append(controls);
 
-      // 1. Обложка
+      // Обложка
       const coverPage = node("div", "page cover");
       coverPage.append(node("h1", "", book.title));
       coverPage.append(node("h2", "", `Сборник из ${book.topics.length} филвордов`));
       coverPage.append(node("div", "meta", `${book.author || "WordVault Studio"} · 15×15 клеток`));
       doc.body.append(coverPage);
 
-      // 2. Оглавление
+      // Оглавление
       const tocPage = node("div", "page");
       tocPage.append(node("h2", "", "ОГЛАВЛЕНИЕ"));
       const tocList = node("div", "toc-list");
@@ -2822,7 +3390,7 @@
         ? "Слова читаются по прямым линиям. Слова не пересекаются (каждая буква принадлежит только одному слову)."
         : "Слова читаются по прямым линиям в любом направлении. Слова могут пересекаться и иметь общие буквы.";
 
-      // 3. Страницы с филвордами
+      // Страницы филвордов
       book.topics.forEach((t, i) => {
         const pPage = node("div", "page");
 
@@ -2851,7 +3419,7 @@
         doc.body.append(pPage);
       });
 
-      // 4. Страницы с ответами
+      // Страницы ответов
       const ansPage = node("div", "page");
       ansPage.append(node("h2", "", "ОТВЕТЫ И КООРДИНАТЫ"));
       const ansGrid = node("div", "answers-grid");
@@ -3191,8 +3759,9 @@
       }
 
       activeTab = tab;
-      ["constructor", "books", "reverse", "play", "topics"].forEach(name => {
-        $("view-" + name).hidden = name !== tab;
+      ["constructor", "books", "reader", "reverse", "play", "topics"].forEach(name => {
+        const viewEl = $("view-" + name);
+        if (viewEl) viewEl.hidden = name !== tab;
         const btn = document.querySelector(`[data-tab="${name}"]`);
         if (btn) {
           btn.classList.toggle("active", name === tab);
@@ -3202,6 +3771,7 @@
       });
 
       if (tab === "books") renderBooks();
+      if (tab === "reader") renderBookReader();
       if (tab === "topics") renderTopics();
       if (tab === "play") {
         if (!game) newGame();
@@ -3248,7 +3818,6 @@
         this.render();
       },
       updateCount() {
-        const letters = this.grid.filter(x => x !== "·").length;
         $("reverseCount").textContent = `${this.count} / 225`;
         $("reverseWarning").hidden = this.count === CELLS;
         $("reverseWarning").textContent = this.count > CELLS
@@ -3626,7 +4195,6 @@
         renderConstructor();
       });
 
-      // Слушатели экспорта и копирования темы конструктора
       $("xlsxButton").addEventListener("click", () => exportBoardXLSX());
       $("headerExcel").addEventListener("click", () => exportBoardXLSX());
 
@@ -3640,7 +4208,6 @@
 
       $("printButton").addEventListener("click", () => printCurrentBoard());
 
-      // Управление каталогом тем
       $("topicSearch").addEventListener("input", renderTopics);
       $("exportBackup").addEventListener("click", exportBackup);
       $("importBackup").addEventListener("click", () => $("backupFile").click());
@@ -3650,6 +4217,12 @@
         if (activeBookId) {
           switchTab("books");
           openBook(activeBookId);
+        }
+      });
+
+      $("bannerToReaderBtn").addEventListener("click", () => {
+        if (activeBookId) {
+          openBookIn3DReader(activeBookId, activeBookTopicIndex);
         }
       });
 
@@ -3674,10 +4247,20 @@
         renderBooks();
       });
 
+      $("openBookInReaderBtn").addEventListener("click", () => {
+        if (activeBookId) openBookIn3DReader(activeBookId);
+      });
+
+      $("readerBackToBooksBtn").addEventListener("click", () => {
+        switchTab("books");
+        if (activeBookId) openBook(activeBookId);
+      });
+
       $("createBookBtn").addEventListener("click", () => {
         $("bookModalTitle").textContent = "Создать новую книгу";
         $("bookModalName").value = "Новый сборник 50 филвордов";
         $("bookModalAuthor").value = "WordVault Studio";
+        $("bookModalStartPage").value = "3";
         $("bookModal").showModal();
       });
 
@@ -3688,6 +4271,7 @@
         $("bookModalTitle").textContent = "Настройки книги";
         $("bookModalName").value = b.title;
         $("bookModalAuthor").value = b.author;
+        $("bookModalStartPage").value = b.startPage || 3;
         $("bookDirH").checked = b.settings.h;
         $("bookDirV").checked = b.settings.v;
         $("bookDirD").checked = b.settings.d;
@@ -3697,11 +4281,16 @@
         $("bookModal").showModal();
       });
 
+      $("readerSettingsBtn").addEventListener("click", () => {
+        $("editBookSettingsBtn").click();
+      });
+
       $("bookModalCancel").addEventListener("click", () => $("bookModal").close());
 
       $("bookModalSave").addEventListener("click", () => {
         const title = $("bookModalName").value.trim() || "Сборник филвордов";
         const author = $("bookModalAuthor").value.trim() || "WordVault";
+        const startPage = parseInt($("bookModalStartPage").value, 10) || 3;
         const settings = {
           h: $("bookDirH").checked,
           v: $("bookDirV").checked,
@@ -3715,6 +4304,7 @@
           const b = state.books[activeBookId];
           b.title = title;
           b.author = author;
+          b.startPage = startPage;
           b.settings = settings;
           b.updatedAt = Date.now();
         } else {
@@ -3723,6 +4313,8 @@
             id: newId,
             title,
             author,
+            coverImage: null,
+            startPage,
             settings,
             topics: [],
             updatedAt: Date.now()
@@ -3732,7 +4324,66 @@
 
         $("bookModal").close();
         stateChanged();
-        openBook(activeBookId);
+        if (activeTab === "reader") renderBookReader();
+        else openBook(activeBookId);
+      });
+
+      // Загрузка обложки в ридере
+      $("readerCoverFileInput").addEventListener("change", async e => {
+        const file = e.target.files[0];
+        if (!file || !activeBookId) return;
+        const book = state.books[activeBookId];
+        if (!book) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          book.coverImage = reader.result;
+          book.updatedAt = Date.now();
+          stateChanged();
+          renderBookReader();
+          toast("Обложка сохранена!");
+        };
+        reader.readAsDataURL(file);
+        e.target.value = "";
+      });
+
+      $("readerRemoveCoverBtn").addEventListener("click", async () => {
+        if (!activeBookId) return;
+        const book = state.books[activeBookId];
+        if (!book) return;
+        const ok = await confirmModal("Удалить загруженную обложку?", "Обложка");
+        if (!ok) return;
+        book.coverImage = null;
+        book.updatedAt = Date.now();
+        stateChanged();
+        renderBookReader();
+      });
+
+      // Листание книги
+      $("bookPrevPageBtn").addEventListener("click", () => flipBookPage(-1));
+      $("bookNextPageBtn").addEventListener("click", () => flipBookPage(1));
+      $("bookCoverView").addEventListener("click", () => flipBookPage(1));
+
+      $("bookPageSlider").addEventListener("input", e => {
+        readerPageIndex = parseInt(e.target.value, 10);
+        renderBookReader();
+      });
+
+      // Полноэкранный режим
+      $("readerFullscreenBtn").addEventListener("click", () => {
+        if (!document.fullscreenElement) {
+          $("view-reader").requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      });
+
+      // Стрелки клавиатуры для листания книги
+      window.addEventListener("keydown", e => {
+        if (activeTab === "reader" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+          if (e.key === "ArrowLeft") flipBookPage(-1);
+          if (e.key === "ArrowRight") flipBookPage(1);
+        }
       });
 
       $("addFastTopicBtn").addEventListener("click", addFastTopicToBook);
@@ -3784,7 +4435,8 @@
             raw: t.raw,
             words: t.words,
             grid: null,
-            placements: []
+            placements: [],
+            found: []
           });
         });
 
@@ -3849,6 +4501,9 @@
 
       playGrid.addEventListener("pointerup", finishSelection);
       playGrid.addEventListener("pointercancel", cancelSelection);
+
+      // Инициализация хайлайтера для книги
+      initBookGridInteractions();
 
       // Слушатели раздела «Реверс-аудит»
       $("reverseRaw").addEventListener("input", () => Reverse.readRaw());
