@@ -4,11 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090d17">
-  <title>WordVault Studio — книги филвордов и 3D ридер</title>
+  <title>WordVault Studio — книги филвордов и конструктор</title>
 
   <!-- Внешние библиотеки: MQTT для облачной синхронизации и SheetJS для экспорта в Excel -->
   <script defer src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
   <style>
     :root {
@@ -161,22 +162,13 @@
 
     .nav-inner {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 6px;
-      padding: 8px 14px;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      padding: 10px 18px;
     }
 
     .tab-button { background: transparent; }
     .tab-button.active { background: #383b77; border-color: #818cf8; }
-    .tab-button.highlight-tab {
-      background: #372a15;
-      border-color: #ca8a04;
-      color: #fef08a;
-    }
-    .tab-button.highlight-tab.active {
-      background: #573f15;
-      border-color: #facc15;
-    }
 
     main { padding: 20px 18px 80px; }
 
@@ -298,7 +290,7 @@
     .cell.dragging { background: #276580; border-color: #a6efff; }
     .cell.found { background: #16775c; border-color: #77e3b8; }
 
-    #playGrid, #playGrid .cell, #bookRightGrid, #bookRightGrid .book-cell {
+    #playGrid, #playGrid .cell {
       touch-action: none;
     }
 
@@ -425,338 +417,6 @@
       font-size: 12px;
     }
 
-    .reader-theater {
-      background:
-        radial-gradient(ellipse at 50% 20%, #30261a88, transparent 70%),
-        radial-gradient(circle at 50% 90%, #0d121c, #05080e 80%);
-      border: 1px solid #3d3527;
-      border-radius: 20px;
-      padding: 18px 14px 28px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-      position: relative;
-      overflow: hidden;
-      box-shadow: inset 0 0 100px #000000aa, 0 18px 45px #00000099;
-    }
-
-    .reader-top-bar {
-      width: 100%;
-      max-width: 980px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      z-index: 10;
-    }
-
-    /* Пропорция разворота двух страниц А6: формат А5 (210х148 мм, 1.419) */
-    .book-stage {
-      perspective: 1800px;
-      width: 100%;
-      max-width: 920px;
-      aspect-ratio: 1.419;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-      margin: 8px 0;
-    }
-
-    .book-volume {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      position: relative;
-      transform-style: preserve-3d;
-      border-radius: 8px;
-      box-shadow:
-        0 26px 60px -10px #000000ee,
-        0 8px 24px #000000aa,
-        0 0 0 4px #261b11;
-    }
-
-    /* Закладка-ляссе */
-    .book-bookmark-ribbon {
-      position: absolute;
-      top: -6px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 18px;
-      height: calc(100% + 42px);
-      background: linear-gradient(90deg, #991b1b, #dc2626, #b91c1c);
-      z-index: 25;
-      box-shadow: 2px 4px 12px #00000088;
-      pointer-events: none;
-      clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 12px), 0 100%);
-    }
-
-    /* Корешок и тень сгиба */
-    .book-spine-crease {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 44px;
-      background: linear-gradient(
-        90deg,
-        rgba(0,0,0,0.35) 0%,
-        rgba(0,0,0,0.15) 35%,
-        rgba(255,255,255,0.08) 50%,
-        rgba(0,0,0,0.15) 65%,
-        rgba(0,0,0,0.35) 100%
-      );
-      z-index: 20;
-      pointer-events: none;
-    }
-
-    /* Страница книги А6 */
-    .book-page {
-      flex: 1;
-      height: 100%;
-      background: #fbf8f0; /* Тёплый цвет бумаги верже */
-      color: #1a1714;
-      padding: 16px 20px;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      overflow: hidden;
-      user-select: none;
-      -webkit-user-select: none;
-      font-family: Georgia, "Times New Roman", serif;
-      box-shadow: inset 0 0 24px #dfd4be88;
-    }
-
-    .book-page.left-page {
-      border-radius: 6px 0 0 6px;
-      border-right: 1px solid #dcd1bb;
-      box-shadow: inset -18px 0 24px -10px #00000028;
-    }
-
-    .book-page.right-page {
-      border-radius: 0 6px 6px 0;
-      border-left: 1px solid #dcd1bb;
-      box-shadow: inset 18px 0 24px -10px #00000028;
-    }
-
-    /* Режим обложки книги (закрыта / открыта) */
-    .book-cover-view {
-      position: absolute;
-      inset: 0;
-      background: #2b1810;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 30px;
-      color: #fef08a;
-      z-index: 30;
-      background-size: cover;
-      background-position: center;
-      cursor: pointer;
-      box-shadow:
-        inset 0 0 80px #000000cc,
-        0 24px 60px #000000ee;
-    }
-
-    .cover-gold-border {
-      border: 3px double #ca8a04;
-      border-radius: 8px;
-      padding: 24px 18px;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(18, 10, 6, 0.55);
-      backdrop-filter: blur(2px);
-    }
-
-    .cover-title {
-      font-size: clamp(20px, 3.8vw, 38px);
-      font-family: Georgia, serif;
-      color: #fef08a;
-      text-shadow: 0 2px 4px #000, 0 0 20px #eab30866;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      font-weight: 700;
-    }
-
-    .cover-author {
-      font-size: clamp(12px, 1.8vw, 16px);
-      color: #fef9c3;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-    }
-
-    .cover-hint {
-      font-size: 13px;
-      color: #e2d7ba;
-      background: #00000077;
-      padding: 6px 14px;
-      border-radius: 99px;
-      border: 1px solid #785a1a;
-      margin-top: 10px;
-    }
-
-    /* Книжные элементы страницы */
-    .book-running-header {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      color: #786d5e;
-      border-bottom: 1px solid #e5dac4;
-      padding-bottom: 4px;
-      display: flex;
-      justify-content: space-between;
-      font-family: system-ui, sans-serif;
-    }
-
-    .book-topic-title {
-      font-size: clamp(15px, 2.3vw, 23px);
-      color: #2b1f14;
-      margin: 8px 0 2px;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-
-    .book-rule-sub {
-      font-size: 11px;
-      color: #736756;
-      font-style: italic;
-      margin-bottom: 8px;
-    }
-
-    .book-word-list {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 5px 12px;
-      overflow-y: auto;
-      max-height: calc(100% - 110px);
-      padding-right: 4px;
-      font-size: clamp(11px, 1.4vw, 14px);
-    }
-
-    .book-word-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: #2e261f;
-      transition: all 0.2s ease;
-      cursor: pointer;
-    }
-
-    .book-word-item.done {
-      color: #8c8275;
-      text-decoration: line-through;
-      text-decoration-color: #b91c1c;
-      text-decoration-thickness: 1.5px;
-    }
-
-    .book-word-checkbox {
-      width: 12px;
-      height: 12px;
-      border: 1px solid #8c7e6c;
-      border-radius: 2px;
-      display: inline-grid;
-      place-items: center;
-      font-size: 9px;
-      color: #991b1b;
-      font-weight: bold;
-    }
-
-    .book-page-num {
-      font-size: 11px;
-      color: #8a7c6a;
-      text-align: center;
-      font-family: system-ui, sans-serif;
-      border-top: 1px solid #e5dac4;
-      padding-top: 4px;
-    }
-
-    /* Правая страница: тактильная печатная сетка А6 */
-    .book-grid-wrap {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    .book-grid {
-      display: grid;
-      grid-template-columns: repeat(15, minmax(0, 1fr));
-      grid-template-rows: repeat(15, minmax(0, 1fr));
-      gap: 1.5px;
-      width: 100%;
-      aspect-ratio: 1;
-      margin: auto;
-      background: #4a3e31;
-      padding: 1.5px;
-      border: 1.5px solid #2e251c;
-      border-radius: 4px;
-      box-shadow: 0 4px 15px #00000015;
-    }
-
-    .book-cell {
-      background: #fdfaf3;
-      color: #1a1714;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font: bold clamp(8px, 1.7vw, 15px)/1 Consolas, ui-monospace, monospace;
-      cursor: pointer;
-      user-select: none;
-      position: relative;
-    }
-
-    /* Эффект маркера-хайлайтера прямо на бумаге */
-    .book-cell.highlighter {
-      background: #fde047 !important;
-      color: #000 !important;
-    }
-
-    .book-cell.highlighter-word {
-      background: #a7f3d0 !important;
-      color: #064e3b !important;
-    }
-
-    .book-cell.book-hover {
-      background: #fef08a;
-    }
-
-    /* Панель перелистывания книги */
-    .reader-controls-bar {
-      width: 100%;
-      max-width: 780px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-      flex-wrap: wrap;
-    }
-
-    .page-slider-wrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex: 1;
-      min-width: 220px;
-    }
-
-    .page-slider {
-      width: 100%;
-      accent-color: #eab308;
-      cursor: pointer;
-    }
-
     .fast-topic-grid {
       display: grid;
       grid-template-columns: minmax(180px, 4fr) minmax(220px, 7fr) auto;
@@ -869,34 +529,7 @@
       .batch-item-words { display: none; }
     }
 
-    @media (max-width: 680px) {
-      .book-stage {
-        aspect-ratio: auto;
-        height: auto;
-        min-height: 520px;
-      }
-      .book-volume {
-        flex-direction: column;
-        border-radius: 6px;
-      }
-      .book-page.left-page {
-        border-radius: 6px 6px 0 0;
-        border-right: none;
-        border-bottom: 2px dashed #dcd1bb;
-        min-height: 240px;
-      }
-      .book-page.right-page {
-        border-radius: 0 0 6px 6px;
-        border-left: none;
-        min-height: 330px;
-      }
-      .book-spine-crease, .book-bookmark-ribbon {
-        display: none;
-      }
-      .nav-inner {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 4px;
-      }
+    @media (max-width: 640px) {
       dialog {
         padding: 16px 12px;
         width: calc(100vw - 16px) !important;
@@ -904,6 +537,35 @@
       }
       .fast-topic-grid { grid-template-columns: 1fr; }
       .book-actions-grid { grid-template-columns: 1fr 1fr; }
+
+      .topics-table-wrap { overflow-x: visible !important; }
+      .topics-table thead { display: none; }
+      .topics-table, .topics-table tbody { display: block; width: 100%; }
+      .topics-table tr {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas:
+          "num name status"
+          "words words words"
+          "actions actions actions";
+        gap: 6px 8px;
+        align-items: center;
+        background: #0d1525;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .topics-table td { padding: 0; border-bottom: none; }
+      .topics-table td.col-num { grid-area: num; font-weight: 700; color: var(--muted); }
+      .topics-table td.col-name { grid-area: name; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+      .topics-table td.col-status { grid-area: status; text-align: right; }
+      .topics-table td.col-words { grid-area: words; font-size: 11px; color: var(--muted); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .topics-table td.col-actions { grid-area: actions; width: 100%; margin-top: 4px; padding-top: 6px; border-top: 1px solid #1c273e; }
+      .topics-table td.col-actions .row { width: 100%; display: grid; grid-template-columns: 1fr 42px; gap: 8px; }
+      .topics-table td.col-actions button { width: 100%; padding: 8px 10px; font-size: 13px; justify-content: center; }
     }
   </style>
 </head>
@@ -915,7 +577,7 @@
         <div class="logo-icon" aria-hidden="true">15²</div>
         <div>
           <h1>WordVault Studio</h1>
-          <div class="desktop-description muted small-text">Конструктор · Книги филвордов · 3D Ридер</div>
+          <div class="desktop-description muted small-text">Конструктор · Книги филвордов · Аудит</div>
         </div>
       </div>
 
@@ -933,7 +595,6 @@
     <div class="nav-inner">
       <button class="tab-button active" data-tab="constructor" aria-current="page">⚡ Конструктор</button>
       <button class="tab-button" data-tab="books">📖 Книги <span id="navBooksCount">0</span></button>
-      <button class="tab-button highlight-tab" data-tab="reader">✨ 3D Книга</button>
       <button class="tab-button" data-tab="reverse">🔍 Реверс</button>
       <button class="tab-button" data-tab="play">🎮 Игра</button>
       <button class="tab-button" data-tab="topics">📚 Темы <span id="topicCount">0</span></button>
@@ -954,7 +615,6 @@
         <div class="row banner-nav-actions">
           <button id="prevBookTopicBtn" class="small" type="button">‹ Пред. тема</button>
           <button id="nextBookTopicBtn" class="small" type="button">След. тема ›</button>
-          <button id="bannerToReaderBtn" class="gold small" type="button">✨ В 3D Ридер</button>
           <button id="backToBookBtn" class="primary small" type="button">← В книгу</button>
         </div>
       </div>
@@ -1035,6 +695,7 @@
             </div>
             <div class="actions">
               <button id="printButton" type="button">🖨️ Печать / PDF темы</button>
+              <button id="openTypoModalBtn" type="button">🎨 Типография: SVG / 300 DPI</button>
             </div>
             <label class="check">
               <input id="printAnswers" type="checkbox" checked>
@@ -1073,90 +734,6 @@
       </div>
     </section>
 
-    <section id="view-reader" class="stack" hidden>
-      <div class="reader-theater">
-        <div class="reader-top-bar">
-          <div class="row wrap" style="gap: 8px;">
-            <button id="readerBackToBooksBtn" class="small" type="button">← К сборникам</button>
-            <h2 id="readerBookTitleDisplay" style="font-size: 16px; color: #fef08a;">Книга филвордов</h2>
-          </div>
-
-          <div class="row wrap" style="gap: 8px;">
-            <label class="button small" style="margin: 0; cursor: pointer;">
-              🖼️ Обложка
-              <input id="readerCoverFileInput" type="file" accept="image/*" style="display:none;">
-            </label>
-            <button id="readerRemoveCoverBtn" class="small danger" type="button" title="Удалить пользовательскую обложку" hidden>✕</button>
-            <button id="readerSettingsBtn" class="small" type="button">⚙️ Настройки</button>
-            <button id="readerFullscreenBtn" class="small" type="button" title="На весь экран">⛶</button>
-          </div>
-        </div>
-
-        <!-- 3D Разворот книги А6 -->
-        <div class="book-stage">
-          <div class="book-volume">
-            <div class="book-bookmark-ribbon" aria-hidden="true"></div>
-            <div class="book-spine-crease" aria-hidden="true"></div>
-
-            <!-- Обложка книги (Стр. 0) -->
-            <div id="bookCoverView" class="book-cover-view">
-              <div class="cover-gold-border">
-                <div class="cover-author" id="coverAuthorText">WORDVAULT STUDIO</div>
-                <div>
-                  <h1 class="cover-title" id="coverTitleText">СБОРНИК ФИЛВОРДОВ</h1>
-                  <p id="coverMetaText" style="color: #ca8a04; margin-top: 10px; font-style: italic;">50 избранных головоломок</p>
-                </div>
-                <div class="cover-hint">Нажмите, чтобы открыть книгу ➔</div>
-              </div>
-            </div>
-
-            <!-- Левая страница разворота (Тема и слова) -->
-            <div class="book-page left-page">
-              <div>
-                <div class="book-running-header">
-                  <span id="bookRunningLeftTitle">WORDVAULT</span>
-                  <span id="bookRunningLeftTopic">ТЕМА</span>
-                </div>
-
-                <h3 class="book-topic-title" id="bookLeftTitle">Название темы</h3>
-                <div class="book-rule-sub" id="bookLeftRule">Найдите слова по прямым линиям:</div>
-
-                <div class="book-word-list" id="bookWordList"></div>
-              </div>
-
-              <div class="book-page-num" id="bookLeftPageNum">Стр. 2</div>
-            </div>
-
-            <!-- Правая страница разворота (Сетка 15х15) -->
-            <div class="book-page right-page">
-              <div class="book-grid-wrap">
-                <div class="book-running-header">
-                  <span>ФИЛВОРД 15×15</span>
-                  <span id="bookGridProgressBadge">0 / 0</span>
-                </div>
-
-                <div id="bookRightGrid" class="book-grid"></div>
-
-                <div class="book-page-num" id="bookRightPageNum">Стр. 3</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Нижняя панель листания разворотов -->
-        <div class="reader-controls-bar">
-          <button id="bookPrevPageBtn" class="primary" type="button">‹ Пред. разворот</button>
-
-          <div class="page-slider-wrap">
-            <input id="bookPageSlider" type="range" min="0" max="50" value="0" class="page-slider">
-            <span id="bookPageIndicator" class="badge badge-gold mono">Обложка</span>
-          </div>
-
-          <button id="bookNextPageBtn" class="primary" type="button">След. разворот ›</button>
-        </div>
-      </div>
-    </section>
-
     <section id="view-books" class="stack" hidden>
       <!-- Режим 1: Каталог книг -->
       <div id="booksListView" class="stack">
@@ -1164,7 +741,7 @@
           <div class="row between wrap">
             <div>
               <h2>Книги и сборники филвордов</h2>
-              <p class="muted small-text">Создавайте книги на 50+ тем с едиными правилами, 3D ридером и экспортом.</p>
+              <p class="muted small-text">Создавайте книги на 50+ тем с едиными правилами и экспортом в печать.</p>
             </div>
             <div class="actions">
               <button id="createBookBtn" class="primary" type="button">+ Создать книгу</button>
@@ -1187,7 +764,6 @@
             </div>
             <div class="row wrap" style="gap: 6px;">
               <span id="currentBookProgressBadge" class="badge">0 / 0 готово</span>
-              <button id="openBookInReaderBtn" class="gold small" type="button">✨ 📖 Читать как книгу (А6)</button>
               <button id="editBookSettingsBtn" class="small" type="button">⚙️ Настройки</button>
             </div>
           </div>
@@ -1199,6 +775,7 @@
           <!-- Блок быстрых действий книги -->
           <div class="book-actions-grid gap-small">
             <button id="generateAllBookGridsBtn" class="primary" type="button">🔄 Сгенерировать сетки</button>
+            <button id="openBatchTypoModalBtn" class="primary" type="button">📦 Вся книга: SVG / 300 DPI (ZIP)</button>
             <button id="printFullBookBtn" class="success" type="button">🖨️ Печать книги (PDF)</button>
             <button id="exportBookXlsxBtn" type="button">📊 Экспорт в XLSX</button>
             <button id="exportBookJsonBtn" type="button">💾 Экспорт в JSON</button>
@@ -1391,6 +968,66 @@
 
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
+  <!-- Диалог типографского экспорта отдельной темы -->
+  <dialog id="typoModal">
+    <h2>Типография: Вектор и 300 DPI</h2>
+    <p class="muted small-text">Экспорт для профессиональной вёрстки и полиграфии (InDesign, Illustrator, KDP, типографии).</p>
+
+    <div class="stack gap">
+      <div class="card subtle stack">
+        <b>1. Головоломка (задание для игрока)</b>
+        <p class="small-text muted">Чистая сетка, название и колонки слов с чекбоксами для вычеркивания.</p>
+        <div class="actions">
+          <button id="downloadPuzzleSvgBtn" class="primary small" type="button">Векторный SVG (задание)</button>
+          <button id="downloadPuzzlePngBtn" class="small" type="button">Растровый PNG (300 DPI)</button>
+        </div>
+      </div>
+
+      <div class="card subtle stack">
+        <b>2. Лист с решениями (ответы)</b>
+        <p class="small-text muted">Сетка с цветными полупрозрачными капсулами, осевыми пунктирными линиями и реестром координат.</p>
+        <div class="actions">
+          <button id="downloadAnswersSvgBtn" class="primary small" type="button">Векторный SVG (ответы)</button>
+          <button id="downloadAnswersPngBtn" class="small" type="button">Растровый PNG (300 DPI)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions gap">
+      <button id="closeTypoModalBtn" type="button">Закрыть</button>
+    </div>
+  </dialog>
+
+  <!-- Диалог пакетного экспорта всей книги в ZIP -->
+  <dialog id="batchTypoModal">
+    <h2>Экспорт всей книги в ZIP</h2>
+    <p class="muted small-text">Генерация файлов для всех тем сборника в одном архиве.</p>
+
+    <div class="stack gap">
+      <div class="settings-grid">
+        <label class="check"><input id="batchIncludePuzzles" type="checkbox" checked> Задания</label>
+        <label class="check"><input id="batchIncludeAnswers" type="checkbox" checked> Ответы</label>
+        <label class="check"><input id="batchFormatSvg" type="checkbox" checked> Векторные SVG</label>
+        <label class="check"><input id="batchFormatPng" type="checkbox" checked> Растровые PNG (300 DPI)</label>
+      </div>
+
+      <div id="batchTypoProgressWrap" class="stack gap-small" hidden>
+        <div class="row between small-text">
+          <span id="batchTypoStatus">Подготовка архива…</span>
+          <span id="batchTypoPercent" class="mono">0%</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div id="batchTypoProgressFill" class="progress-bar-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions gap">
+      <button id="startBatchTypoBtn" class="primary" type="button">⚡ Начать экспорт в ZIP</button>
+      <button id="closeBatchTypoModalBtn" type="button">Отмена</button>
+    </div>
+  </dialog>
+
   <!-- Диалог создания/редактирования книги -->
   <dialog id="bookModal">
     <h2 id="bookModalTitle">Создать новую книгу</h2>
@@ -1402,11 +1039,6 @@
       <div>
         <label for="bookModalAuthor"><b>Автор / примечание</b></label>
         <input id="bookModalAuthor" type="text" maxlength="100" placeholder="WordVault Studio" class="gap-small">
-      </div>
-
-      <div class="row between">
-        <label for="bookModalStartPage"><b>Головоломки начинаются со страницы:</b></label>
-        <input id="bookModalStartPage" type="number" min="1" max="10" value="3" style="width: 80px; text-align: center;">
       </div>
 
       <h3>Глобальные настройки правил для сеток книги</h3>
@@ -1972,65 +1604,6 @@
             osc.stop(start + .2);
           });
         } catch {}
-      },
-
-      // Шелест переворачиваемой книжной страницы
-      playPageFlip() {
-        if (this.muted) return;
-        this.unlock();
-        try {
-          if (!this.ctx) return;
-          const now = this.ctx.currentTime;
-          const bufferSize = this.ctx.sampleRate * 0.18;
-          const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-          const data = buffer.getChannelData(0);
-          for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.random() * 2 - 1;
-          }
-
-          const noise = this.ctx.createBufferSource();
-          noise.buffer = buffer;
-
-          const filter = this.ctx.createBiquadFilter();
-          filter.type = "bandpass";
-          filter.frequency.setValueAtTime(800, now);
-          filter.frequency.exponentialRampToValueAtTime(320, now + 0.18);
-          filter.Q.value = 2.5;
-
-          const gain = this.ctx.createGain();
-          gain.gain.setValueAtTime(0.01, now);
-          gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-
-          noise.connect(filter);
-          filter.connect(gain);
-          gain.connect(this.ctx.destination);
-
-          noise.start(now);
-        } catch {}
-      },
-
-      // Карандашный росчерк при нахождении слова в книге
-      playPencilStroke() {
-        if (this.muted) return;
-        this.unlock();
-        try {
-          if (!this.ctx) return;
-          const now = this.ctx.currentTime;
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = "triangle";
-          osc.frequency.setValueAtTime(420, now);
-          osc.frequency.exponentialRampToValueAtTime(680, now + 0.12);
-
-          gain.gain.setValueAtTime(0.08, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(now);
-          osc.stop(now + 0.15);
-        } catch {}
       }
     };
 
@@ -2411,8 +1984,6 @@
           id: String(book.id || id),
           title: String(book.title || "Сборник филвордов").slice(0, 120),
           author: String(book.author || "WordVault").slice(0, 100),
-          coverImage: typeof book.coverImage === "string" ? book.coverImage : null,
-          startPage: Number.isInteger(book.startPage) ? Math.max(1, book.startPage) : 3,
           settings: cleanSettings(book.settings),
           topics: (book.topics || []).map(t => ({
             id: String(t.id || uid()),
@@ -2420,8 +1991,7 @@
             raw: typeof t.raw === "string" ? t.raw.slice(0, 30000) : "",
             words: Array.isArray(t.words) ? [...t.words] : parseWords(t.raw || "").words,
             grid: Array.isArray(t.grid) && t.grid.length === CELLS ? [...t.grid] : null,
-            placements: Array.isArray(t.placements) ? clone(t.placements) : [],
-            found: Array.isArray(t.found) ? [...t.found] : []
+            placements: Array.isArray(t.placements) ? clone(t.placements) : []
           })),
           updatedAt: Number.isFinite(book.updatedAt) ? book.updatedAt : Date.now()
         };
@@ -2563,10 +2133,7 @@
                     changedAny = true;
                   }
                 }
-                if (changedAny && activeBookId) {
-                  renderBookDetail();
-                  if (activeTab === "reader") renderBookReader();
-                }
+                if (changedAny && activeBookId) renderBookDetail();
               }
 
               if (stable(state) !== before) {
@@ -2785,239 +2352,6 @@
       if (!board.words.length) chips.append(node("span", "muted small-text", "Введите слова для генерации."));
     }
 
-    let readerPageIndex = 0; // 0 = обложка, 1 = разворот темы 1, 2 = тема 2 ...
-    let bookPointerId = null;
-    let bookSelectionStart = null;
-    let bookSelectionCells = [];
-
-    function ensureActiveBook() {
-      if (activeBookId && state.books[activeBookId]) return state.books[activeBookId];
-      const bookIds = Object.keys(state.books);
-      if (bookIds.length > 0) {
-        activeBookId = bookIds[0];
-        return state.books[activeBookId];
-      }
-      return null;
-    }
-
-    function openBookIn3DReader(bookId, topicIdx = null) {
-      activeBookId = bookId;
-      const book = state.books[bookId];
-      if (!book) return;
-
-      if (topicIdx !== null) {
-        readerPageIndex = topicIdx + 1; // 0 - обложка, 1+ темы
-      } else {
-        readerPageIndex = 0; // Начинаем с обложки
-      }
-
-      switchTab("reader");
-      renderBookReader();
-    }
-
-    function renderBookReader() {
-      const book = ensureActiveBook();
-      if (!book) {
-        $("readerBookTitleDisplay").textContent = "Нет созданных книг";
-        $("coverTitleText").textContent = "НЕТ КНИГ";
-        $("coverMetaText").textContent = "Создайте книгу во вкладке «Книги»";
-        $("bookCoverView").hidden = false;
-        $("bookCoverView").style.backgroundImage = "";
-        return;
-      }
-
-      $("readerBookTitleDisplay").textContent = book.title;
-      $("coverTitleText").textContent = book.title;
-      $("coverAuthorText").textContent = (book.author || "WordVault Studio").toUpperCase();
-      $("coverMetaText").textContent = `${book.topics.length} филвордов · формат А6`;
-
-      // Настройка обложки
-      if (book.coverImage) {
-        $("bookCoverView").style.backgroundImage = `url("${book.coverImage}")`;
-        $("readerRemoveCoverBtn").hidden = false;
-      } else {
-        $("bookCoverView").style.backgroundImage = "";
-        $("readerRemoveCoverBtn").hidden = true;
-      }
-
-      const totalTopics = book.topics.length;
-      const maxPages = totalTopics;
-      const slider = $("bookPageSlider");
-      slider.max = maxPages;
-      slider.value = readerPageIndex;
-
-      // Режим отображения: Обложка (0) или Разворот (1+)
-      if (readerPageIndex === 0) {
-        $("bookCoverView").hidden = false;
-        $("bookPageIndicator").textContent = "Обложка книги";
-        $("bookPrevPageBtn").disabled = true;
-        $("bookNextPageBtn").disabled = totalTopics === 0;
-        return;
-      }
-
-      $("bookCoverView").hidden = true;
-      const topicIndex = readerPageIndex - 1;
-      const topic = book.topics[topicIndex];
-      const startPage = book.startPage || 3;
-      const leftPageNum = (topicIndex * 2) + startPage - 1;
-      const rightPageNum = (topicIndex * 2) + startPage;
-
-      $("bookPrevPageBtn").disabled = false;
-      $("bookNextPageBtn").disabled = readerPageIndex >= totalTopics;
-      $("bookPageIndicator").textContent = `Стр. ${leftPageNum}–${rightPageNum} (#${readerPageIndex} из ${totalTopics})`;
-
-      if (!topic) return;
-
-      // Левая страница (Тема и слова)
-      $("bookRunningLeftTitle").textContent = book.title.toUpperCase();
-      $("bookRunningLeftTopic").textContent = `№ ${topicIndex + 1}`;
-      $("bookLeftTitle").textContent = topic.name;
-      $("bookLeftPageNum").textContent = `— ${leftPageNum} —`;
-      $("bookRightPageNum").textContent = `— ${rightPageNum} —`;
-
-      const ruleText = book.settings?.overlap === false
-        ? "Слова читаются по прямым линиям (не пересекаются):"
-        : "Слова читаются по прямым линиям в любом направлении:";
-      $("bookLeftRule").textContent = ruleText;
-
-      // Если сетка ещё не сгенерирована — генерируем её на лету
-      if (!topic.grid || !topic.placements.length) {
-        generateGrid(topic.words, book.settings).then(layout => {
-          topic.grid = [...layout.grid];
-          topic.placements = clone(layout.placements);
-          persistState();
-          renderBookReader();
-        });
-      }
-
-      // Список слов
-      const wordListEl = $("bookWordList");
-      wordListEl.replaceChildren();
-      const foundSet = new Set(topic.found || []);
-
-      topic.words.forEach(w => {
-        const isDone = foundSet.has(w);
-        const item = node("div", `book-word-item ${isDone ? "done" : ""}`);
-        const chk = node("span", "book-word-checkbox", isDone ? "✓" : "");
-        const label = node("span", "", w);
-        item.append(chk, label);
-
-        item.addEventListener("click", () => {
-          if (!foundSet.has(w)) {
-            foundSet.add(w);
-            Sound.playPencilStroke();
-          } else {
-            foundSet.delete(w);
-          }
-          topic.found = Array.from(foundSet);
-          persistState();
-          renderBookReader();
-        });
-
-        wordListEl.append(item);
-      });
-
-      // Правая страница (Сетка 15х15)
-      $("bookGridProgressBadge").textContent = `${foundSet.size} / ${topic.words.length} найдено`;
-      const rightGridEl = $("bookRightGrid");
-      rightGridEl.replaceChildren();
-
-      const gridData = topic.grid || Array(CELLS).fill("·");
-      const highlightPlacements = (topic.placements || []).filter(p => foundSet.has(p.word));
-      const highlightedCellIndices = new Set(highlightPlacements.flatMap(p => p.cells));
-
-      gridData.forEach((ch, idx) => {
-        const cell = node("div", "book-cell", ch);
-        cell.dataset.index = idx;
-
-        if (highlightedCellIndices.has(idx)) {
-          cell.classList.add("highlighter-word");
-        }
-
-        rightGridEl.append(cell);
-      });
-    }
-
-    function flipBookPage(delta) {
-      const book = ensureActiveBook();
-      if (!book) return;
-      const newPage = Math.max(0, Math.min(book.topics.length, readerPageIndex + delta));
-      if (newPage !== readerPageIndex) {
-        readerPageIndex = newPage;
-        Sound.playPageFlip();
-        renderBookReader();
-      }
-    }
-
-    /* Интерактивное выделение слов хайлайтером на странице книги */
-    function initBookGridInteractions() {
-      const grid = $("bookRightGrid");
-
-      grid.addEventListener("pointerdown", e => {
-        const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest("#bookRightGrid .book-cell");
-        if (!cell) return;
-        const idx = Number(cell.dataset.index);
-        bookPointerId = e.pointerId;
-        bookSelectionStart = idx;
-        bookSelectionCells = [idx];
-        grid.setPointerCapture(e.pointerId);
-        paintBookGridDrag();
-      });
-
-      grid.addEventListener("pointermove", e => {
-        if (e.pointerId !== bookPointerId || bookSelectionStart === null) return;
-        const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest("#bookRightGrid .book-cell");
-        if (!cell) return;
-        bookSelectionCells = straightLine(bookSelectionStart, Number(cell.dataset.index));
-        paintBookGridDrag();
-      });
-
-      const finishBookSelection = () => {
-        if (bookPointerId === null) return;
-        bookPointerId = null;
-
-        const book = ensureActiveBook();
-        if (book && readerPageIndex > 0) {
-          const topic = book.topics[readerPageIndex - 1];
-          if (topic && bookSelectionCells.length >= 2) {
-            const letters = bookSelectionCells.map(i => topic.grid[i]).join("");
-            const revLetters = [...letters].reverse().join("");
-            const matched = topic.words.find(w => w === letters || w === revLetters);
-
-            if (matched) {
-              if (!topic.found) topic.found = [];
-              if (!topic.found.includes(matched)) {
-                topic.found.push(matched);
-                Sound.playPencilStroke();
-                toast(`Найдено в книге: ${matched}!`);
-                persistState();
-                if (topic.found.length === topic.words.length) {
-                  Sound.play(true);
-                  $("victoryText").textContent = `Головоломка «${topic.name}» в книге полностью решена!`;
-                  $("victoryDialog").showModal();
-                }
-              }
-            }
-          }
-        }
-
-        bookSelectionCells = [];
-        bookSelectionStart = null;
-        renderBookReader();
-      };
-
-      grid.addEventListener("pointerup", finishBookSelection);
-      grid.addEventListener("pointercancel", finishBookSelection);
-    }
-
-    function paintBookGridDrag() {
-      const cells = $("bookRightGrid").children;
-      const set = new Set(bookSelectionCells);
-      for (let i = 0; i < cells.length; i++) {
-        cells[i].classList.toggle("highlighter", set.has(i));
-      }
-    }
-
     function renderBooks() {
       const books = Object.values(state.books || {});
       $("navBooksCount").textContent = books.length;
@@ -3038,7 +2372,6 @@
 
         const actions = node("div", "actions");
         actions.append(action("📖 Открыть книгу", () => openBook(book.id), "primary small"));
-        actions.append(action("✨ 3D Ридер", () => openBookIn3DReader(book.id), "gold small"));
         actions.append(action("Удалить", async () => {
           const ok = await confirmModal(`Удалить книгу «${book.title}» (${totalTopics} тем)?`, "Удаление книги");
           if (!ok) return;
@@ -3108,7 +2441,6 @@
         actionsDiv.style.justifyContent = "flex-end";
 
         actionsDiv.append(action("👁 Сетка", () => openTopicInConstructor(activeBookId, idx), "small primary"));
-        actionsDiv.append(action("📖 Читать", () => openBookIn3DReader(activeBookId, idx), "small gold"));
 
         actionsDiv.append(action("✕", async () => {
           const ok = await confirmModal(`Удалить тему «${topic.name}» из этой книги?`, "Удаление темы");
@@ -3443,6 +2775,199 @@
       setTimeout(() => win.print(), 400);
     }
 
+    function escapeXml(str) {
+      return String(str || "").replace(/[&<>"']/g, ch => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&apos;"
+      }[ch]));
+    }
+
+    function createTypographySVG(board, isAnswerSheet = false) {
+      const occupiedIndices = new Set((board.placements || []).flatMap(p => p.cells));
+      const cols = SIZE;
+      const rows = SIZE;
+      const cellSize = 40;
+      const gridWidth = cols * cellSize;
+      const gridHeight = rows * cellSize;
+      const startX = 100;
+      const startY = 130;
+
+      const words = board.words || [];
+      const placements = board.placements || [];
+
+      const wordsRows = Math.ceil(words.length / 3);
+      const wordsHeight = Math.max(120, wordsRows * 26 + 60);
+      const totalHeight = startY + gridHeight + wordsHeight + 80;
+      const totalWidth = 800;
+
+      const ruleText = board.settings?.overlap === false
+        ? "Слова читаются по прямым линиям. Слова не пересекаются."
+        : "Слова читаются по прямым линиям в 8 направлениях. Буквы могут пересекаться.";
+
+      let svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth} ${totalHeight}" width="${totalWidth}" height="${totalHeight}">
+  <defs>
+    <style>
+      .title { font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 24px; font-weight: bold; fill: #111; }
+      .subtitle { font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 13px; fill: #666; font-style: italic; }
+      .grid-border { fill: none; stroke: #222; stroke-width: 2; }
+      .grid-line { stroke: #bbb; stroke-width: 0.8; }
+      .letter { font-family: Consolas, 'Liberation Mono', monospace; font-size: 19px; font-weight: bold; text-anchor: middle; dominant-baseline: central; }
+      .word-item { font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 13px; fill: #222; }
+      .coord-text { font-family: Consolas, monospace; font-size: 12px; fill: #444; }
+      .coord-header { font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 14px; font-weight: bold; fill: #111; }
+    </style>
+  </defs>
+
+  <rect width="${totalWidth}" height="${totalHeight}" fill="#ffffff" />
+  <text x="400" y="55" text-anchor="middle" class="title">${escapeXml(board.name || "Филворд")}${isAnswerSheet ? " — Ответы и решения" : ""}</text>
+  <text x="400" y="85" text-anchor="middle" class="subtitle">${isAnswerSheet ? "Расположение и координаты всех найденных слов в сетке" : ruleText}</text>
+  <rect x="${startX}" y="${startY}" width="${gridWidth}" height="${gridHeight}" fill="#fdfdfd" class="grid-border" />
+`;
+
+      for (let i = 1; i < cols; i++) {
+        const x = startX + i * cellSize;
+        svg += `  <line x1="${x}" y1="${startY}" x2="${x}" y2="${startY + gridHeight}" class="grid-line" />\n`;
+      }
+      for (let j = 1; j < rows; j++) {
+        const y = startY + j * cellSize;
+        svg += `  <line x1="${startX}" y1="${y}" x2="${startX + gridWidth}" y2="${y}" class="grid-line" />\n`;
+      }
+
+      if (isAnswerSheet) {
+        svg += `  <!-- Капсулы слов (ответы) -->\n`;
+        placements.forEach((p, pIdx) => {
+          if (!p.cells || p.cells.length === 0) return;
+          const color = COLORS[pIdx % COLORS.length];
+          const first = p.cells[0];
+          const last = p.cells[p.cells.length - 1];
+
+          const r1 = Math.floor(first / cols);
+          const c1 = first % cols;
+          const r2 = Math.floor(last / cols);
+          const c2 = last % cols;
+
+          const x1 = startX + c1 * cellSize + cellSize / 2;
+          const y1 = startY + r1 * cellSize + cellSize / 2;
+          const x2 = startX + c2 * cellSize + cellSize / 2;
+          const y2 = startY + r2 * cellSize + cellSize / 2;
+
+          svg += `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="30" stroke-linecap="round" opacity="0.38" />\n`;
+          svg += `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2.5" stroke-dasharray="5,4" stroke-linecap="round" opacity="0.9" />\n`;
+          svg += `  <circle cx="${x1}" cy="${y1}" r="4.5" fill="${color}" stroke="#ffffff" stroke-width="1.5" />\n`;
+          svg += `  <circle cx="${x2}" cy="${y2}" r="3.5" fill="#ffffff" stroke="${color}" stroke-width="2" />\n`;
+        });
+      }
+
+      svg += `  <!-- Буквы сетки -->\n`;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const index = r * cols + c;
+          const letter = (board.grid && board.grid[index]) || "·";
+          const cx = startX + c * cellSize + cellSize / 2;
+          const cy = startY + r * cellSize + cellSize / 2;
+
+          const isOccupied = occupiedIndices.has(index);
+          const fill = isAnswerSheet
+            ? (isOccupied ? "#000000" : "#a8a8a8")
+            : "#111111";
+          const weight = (isAnswerSheet && !isOccupied) ? "normal" : "bold";
+
+          svg += `  <text x="${cx}" y="${cy}" fill="${fill}" font-weight="${weight}" class="letter">${escapeXml(letter)}</text>\n`;
+        }
+      }
+
+      svg += `  <rect x="${startX}" y="${startY}" width="${gridWidth}" height="${gridHeight}" class="grid-border" />\n`;
+
+      const bottomY = startY + gridHeight + 35;
+
+      if (!isAnswerSheet) {
+        svg += `  <!-- Список слов для поиска -->\n`;
+        svg += `  <text x="100" y="${bottomY}" class="coord-header">Найдите слова (${words.length}):</text>\n`;
+
+        const colWidth = 205;
+        const colStartX = 100;
+        const wordsListY = bottomY + 24;
+
+        words.forEach((word, idx) => {
+          const col = idx % 3;
+          const row = Math.floor(idx / 3);
+          const wx = colStartX + col * colWidth;
+          const wy = wordsListY + row * 22;
+
+          svg += `  <rect x="${wx}" y="${wy - 10}" width="11" height="11" fill="none" stroke="#666" stroke-width="1.2" rx="2" />\n`;
+          svg += `  <text x="${wx + 18}" y="${wy}" class="word-item">${escapeXml(word)}</text>\n`;
+        });
+      } else {
+        svg += `  <!-- Реестр координат ответов -->\n`;
+        svg += `  <text x="100" y="${bottomY}" class="coord-header">Координаты найденных слов (${placements.length}):</text>\n`;
+
+        const colWidth = 205;
+        const colStartX = 100;
+        const coordsListY = bottomY + 24;
+
+        placements.forEach((p, idx) => {
+          const col = idx % 3;
+          const row = Math.floor(idx / 3);
+          const cx = colStartX + col * colWidth;
+          const cy = coordsListY + row * 22;
+          const color = COLORS[idx % COLORS.length];
+
+          const firstCoord = coord(p.cells[0]);
+          const lastCoord = coord(p.cells[p.cells.length - 1]);
+          const dir = directionOf(p.cells);
+
+          svg += `  <circle cx="${cx + 5}" cy="${cy - 3}" r="5" fill="${color}" />\n`;
+          svg += `  <text x="${cx + 16}" y="${cy}" class="coord-text"><tspan font-weight="bold" fill="#111">${escapeXml(p.word)}</tspan>: ${firstCoord}–${lastCoord} (${dir})</text>\n`;
+        });
+      }
+
+      svg += `</svg>`;
+      return svg;
+    }
+
+    function svgTo300DpiPngBlob(svgString) {
+      return new Promise((resolve, reject) => {
+        const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        img.onload = () => {
+          const scale = 2.5;
+          const canvas = document.createElement("canvas");
+          canvas.width = (img.naturalWidth || 800) * scale;
+          canvas.height = (img.naturalHeight || 1130) * scale;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          canvas.toBlob(blob => {
+            if (blob) resolve(blob);
+            else reject(new Error("Не удалось сформировать растровый PNG"));
+          }, "image/png");
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("Ошибка растровой отрисовки SVG"));
+        };
+        img.src = url;
+      });
+    }
+
+    function downloadBlob(blob, name) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
     function copyText(text, success = "Скопировано в буфер обмена.") {
       try {
         const area = document.createElement("textarea");
@@ -3759,7 +3284,7 @@
       }
 
       activeTab = tab;
-      ["constructor", "books", "reader", "reverse", "play", "topics"].forEach(name => {
+      ["constructor", "books", "reverse", "play", "topics"].forEach(name => {
         const viewEl = $("view-" + name);
         if (viewEl) viewEl.hidden = name !== tab;
         const btn = document.querySelector(`[data-tab="${name}"]`);
@@ -3771,7 +3296,6 @@
       });
 
       if (tab === "books") renderBooks();
-      if (tab === "reader") renderBookReader();
       if (tab === "topics") renderTopics();
       if (tab === "play") {
         if (!game) newGame();
@@ -4208,6 +3732,168 @@
 
       $("printButton").addEventListener("click", () => printCurrentBoard());
 
+      /* ==========================================================================
+         СЛУШАТЕЛИ ЭКСПОРТА ТИПОГРАФИИ (SVG / 300 DPI) ДЛЯ ТЕКУЩЕЙ ТЕМЫ
+         ========================================================================== */
+      $("openTypoModalBtn")?.addEventListener("click", () => {
+        const board = state.board.value;
+        if (!board || !board.grid || !board.words.length) {
+          toast("Сначала создайте или перестройте сетку темы.");
+          return;
+        }
+        $("typoModal")?.showModal();
+      });
+
+      $("closeTypoModalBtn")?.addEventListener("click", () => $("typoModal")?.close());
+
+      $("downloadPuzzleSvgBtn")?.addEventListener("click", () => {
+        const board = state.board.value;
+        const svg = createTypographySVG(board, false);
+        download(svg, `${filename(board.name)}_головоломка.svg`, "image/svg+xml;charset=utf-8");
+        toast("Векторный SVG задания скачан.");
+      });
+
+      $("downloadPuzzlePngBtn")?.addEventListener("click", async () => {
+        const board = state.board.value;
+        toast("Генерация растра 300 DPI…");
+        try {
+          const svg = createTypographySVG(board, false);
+          const pngBlob = await svgTo300DpiPngBlob(svg);
+          downloadBlob(pngBlob, `${filename(board.name)}_головоломка_300dpi.png`);
+          toast("Файл PNG 300 DPI сохранён.");
+        } catch (err) {
+          toast("Ошибка генерации PNG: " + err.message);
+        }
+      });
+
+      $("downloadAnswersSvgBtn")?.addEventListener("click", () => {
+        const board = state.board.value;
+        const svg = createTypographySVG(board, true);
+        download(svg, `${filename(board.name)}_ответы.svg`, "image/svg+xml;charset=utf-8");
+        toast("Векторный SVG с ответами скачан.");
+      });
+
+      $("downloadAnswersPngBtn")?.addEventListener("click", async () => {
+        const board = state.board.value;
+        toast("Генерация растра 300 DPI с ответами…");
+        try {
+          const svg = createTypographySVG(board, true);
+          const pngBlob = await svgTo300DpiPngBlob(svg);
+          downloadBlob(pngBlob, `${filename(board.name)}_ответы_300dpi.png`);
+          toast("Файл ответов PNG 300 DPI сохранён.");
+        } catch (err) {
+          toast("Ошибка генерации PNG: " + err.message);
+        }
+      });
+
+      /* ==========================================================================
+         СЛУШАТЕЛИ ПАКЕТНОГО ЭКСПОРТА ВСЕЙ КНИГИ В ZIP
+         ========================================================================== */
+      $("openBatchTypoModalBtn")?.addEventListener("click", () => {
+        if (!activeBookId) return;
+        const book = state.books[activeBookId];
+        if (!book || !book.topics.length) {
+          toast("В книге нет тем для экспорта.");
+          return;
+        }
+        if ($("batchTypoProgressWrap")) $("batchTypoProgressWrap").hidden = true;
+        if ($("startBatchTypoBtn")) $("startBatchTypoBtn").disabled = false;
+        $("batchTypoModal")?.showModal();
+      });
+
+      $("closeBatchTypoModalBtn")?.addEventListener("click", () => $("batchTypoModal")?.close());
+
+      $("startBatchTypoBtn")?.addEventListener("click", async () => {
+        if (typeof JSZip === "undefined") {
+          toast("Библиотека JSZip ещё загружается. Подождите секунду...");
+          return;
+        }
+
+        if (!activeBookId) return;
+        const book = state.books[activeBookId];
+        if (!book || !book.topics.length) return;
+
+        const incPuzzles = $("batchIncludePuzzles")?.checked;
+        const incAnswers = $("batchIncludeAnswers")?.checked;
+        const fmtSvg = $("batchFormatSvg")?.checked;
+        const fmtPng = $("batchFormatPng")?.checked;
+
+        if (!incPuzzles && !incAnswers) {
+          toast("Выберите хотя бы один тип файлов (задания или ответы).");
+          return;
+        }
+        if (!fmtSvg && !fmtPng) {
+          toast("Выберите хотя бы один формат (SVG или PNG 300 DPI).");
+          return;
+        }
+
+        if ($("startBatchTypoBtn")) $("startBatchTypoBtn").disabled = true;
+        if ($("batchTypoProgressWrap")) $("batchTypoProgressWrap").hidden = false;
+
+        const zip = new JSZip();
+        const total = book.topics.length;
+        const puzzlesFolder = incPuzzles ? zip.folder("Головоломки") : null;
+        const answersFolder = incAnswers ? zip.folder("Ответы") : null;
+
+        for (let i = 0; i < total; i++) {
+          const t = book.topics[i];
+          const pct = Math.round(((i + 1) / total) * 100);
+          if ($("batchTypoStatus")) $("batchTypoStatus").textContent = `Обработка темы ${i + 1} из ${total}: «${t.name}»…`;
+          if ($("batchTypoPercent")) $("batchTypoPercent").textContent = `${pct}%`;
+          if ($("batchTypoProgressFill")) $("batchTypoProgressFill").style.width = `${pct}%`;
+
+          let grid = t.grid;
+          let placements = t.placements;
+          if (!grid || !placements || !placements.length) {
+            const layout = await generateGrid(t.words, book.settings);
+            grid = layout.grid;
+            placements = layout.placements;
+            t.grid = [...grid];
+            t.placements = clone(placements);
+          }
+
+          const boardData = {
+            name: `${i + 1}. ${t.name}`,
+            grid,
+            placements,
+            words: t.words,
+            settings: book.settings
+          };
+
+          const prefix = String(i + 1).padStart(2, "0") + "_" + filename(t.name);
+
+          if (incPuzzles && puzzlesFolder) {
+            const pSvg = createTypographySVG(boardData, false);
+            if (fmtSvg) puzzlesFolder.file(`${prefix}_задание.svg`, pSvg);
+            if (fmtPng) {
+              const pPngBlob = await svgTo300DpiPngBlob(pSvg);
+              puzzlesFolder.file(`${prefix}_задание_300dpi.png`, pPngBlob);
+            }
+          }
+
+          if (incAnswers && answersFolder) {
+            const aSvg = createTypographySVG(boardData, true);
+            if (fmtSvg) answersFolder.file(`${prefix}_ответы.svg`, aSvg);
+            if (fmtPng) {
+              const aPngBlob = await svgTo300DpiPngBlob(aSvg);
+              answersFolder.file(`${prefix}_ответы_300dpi.png`, aPngBlob);
+            }
+          }
+
+          await sleep(15);
+        }
+
+        if ($("batchTypoStatus")) $("batchTypoStatus").textContent = "Упаковка архива ZIP…";
+        const content = await zip.generateAsync({ type: "blob" });
+        downloadBlob(content, `${filename(book.title)}_Типография.zip`);
+
+        book.updatedAt = Date.now();
+        stateChanged();
+
+        $("batchTypoModal")?.close();
+        toast(`Архив «${book.title}» успешно скачан!`);
+      });
+
       $("topicSearch").addEventListener("input", renderTopics);
       $("exportBackup").addEventListener("click", exportBackup);
       $("importBackup").addEventListener("click", () => $("backupFile").click());
@@ -4217,12 +3903,6 @@
         if (activeBookId) {
           switchTab("books");
           openBook(activeBookId);
-        }
-      });
-
-      $("bannerToReaderBtn").addEventListener("click", () => {
-        if (activeBookId) {
-          openBookIn3DReader(activeBookId, activeBookTopicIndex);
         }
       });
 
@@ -4247,20 +3927,10 @@
         renderBooks();
       });
 
-      $("openBookInReaderBtn").addEventListener("click", () => {
-        if (activeBookId) openBookIn3DReader(activeBookId);
-      });
-
-      $("readerBackToBooksBtn").addEventListener("click", () => {
-        switchTab("books");
-        if (activeBookId) openBook(activeBookId);
-      });
-
       $("createBookBtn").addEventListener("click", () => {
         $("bookModalTitle").textContent = "Создать новую книгу";
         $("bookModalName").value = "Новый сборник 50 филвордов";
         $("bookModalAuthor").value = "WordVault Studio";
-        $("bookModalStartPage").value = "3";
         $("bookModal").showModal();
       });
 
@@ -4271,7 +3941,6 @@
         $("bookModalTitle").textContent = "Настройки книги";
         $("bookModalName").value = b.title;
         $("bookModalAuthor").value = b.author;
-        $("bookModalStartPage").value = b.startPage || 3;
         $("bookDirH").checked = b.settings.h;
         $("bookDirV").checked = b.settings.v;
         $("bookDirD").checked = b.settings.d;
@@ -4281,16 +3950,11 @@
         $("bookModal").showModal();
       });
 
-      $("readerSettingsBtn").addEventListener("click", () => {
-        $("editBookSettingsBtn").click();
-      });
-
       $("bookModalCancel").addEventListener("click", () => $("bookModal").close());
 
       $("bookModalSave").addEventListener("click", () => {
         const title = $("bookModalName").value.trim() || "Сборник филвордов";
         const author = $("bookModalAuthor").value.trim() || "WordVault";
-        const startPage = parseInt($("bookModalStartPage").value, 10) || 3;
         const settings = {
           h: $("bookDirH").checked,
           v: $("bookDirV").checked,
@@ -4304,7 +3968,6 @@
           const b = state.books[activeBookId];
           b.title = title;
           b.author = author;
-          b.startPage = startPage;
           b.settings = settings;
           b.updatedAt = Date.now();
         } else {
@@ -4313,8 +3976,6 @@
             id: newId,
             title,
             author,
-            coverImage: null,
-            startPage,
             settings,
             topics: [],
             updatedAt: Date.now()
@@ -4324,66 +3985,7 @@
 
         $("bookModal").close();
         stateChanged();
-        if (activeTab === "reader") renderBookReader();
-        else openBook(activeBookId);
-      });
-
-      // Загрузка обложки в ридере
-      $("readerCoverFileInput").addEventListener("change", async e => {
-        const file = e.target.files[0];
-        if (!file || !activeBookId) return;
-        const book = state.books[activeBookId];
-        if (!book) return;
-
-        const reader = new FileReader();
-        reader.onload = () => {
-          book.coverImage = reader.result;
-          book.updatedAt = Date.now();
-          stateChanged();
-          renderBookReader();
-          toast("Обложка сохранена!");
-        };
-        reader.readAsDataURL(file);
-        e.target.value = "";
-      });
-
-      $("readerRemoveCoverBtn").addEventListener("click", async () => {
-        if (!activeBookId) return;
-        const book = state.books[activeBookId];
-        if (!book) return;
-        const ok = await confirmModal("Удалить загруженную обложку?", "Обложка");
-        if (!ok) return;
-        book.coverImage = null;
-        book.updatedAt = Date.now();
-        stateChanged();
-        renderBookReader();
-      });
-
-      // Листание книги
-      $("bookPrevPageBtn").addEventListener("click", () => flipBookPage(-1));
-      $("bookNextPageBtn").addEventListener("click", () => flipBookPage(1));
-      $("bookCoverView").addEventListener("click", () => flipBookPage(1));
-
-      $("bookPageSlider").addEventListener("input", e => {
-        readerPageIndex = parseInt(e.target.value, 10);
-        renderBookReader();
-      });
-
-      // Полноэкранный режим
-      $("readerFullscreenBtn").addEventListener("click", () => {
-        if (!document.fullscreenElement) {
-          $("view-reader").requestFullscreen().catch(() => {});
-        } else {
-          document.exitFullscreen().catch(() => {});
-        }
-      });
-
-      // Стрелки клавиатуры для листания книги
-      window.addEventListener("keydown", e => {
-        if (activeTab === "reader" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
-          if (e.key === "ArrowLeft") flipBookPage(-1);
-          if (e.key === "ArrowRight") flipBookPage(1);
-        }
+        openBook(activeBookId);
       });
 
       $("addFastTopicBtn").addEventListener("click", addFastTopicToBook);
@@ -4501,9 +4103,6 @@
 
       playGrid.addEventListener("pointerup", finishSelection);
       playGrid.addEventListener("pointercancel", cancelSelection);
-
-      // Инициализация хайлайтера для книги
-      initBookGridInteractions();
 
       // Слушатели раздела «Реверс-аудит»
       $("reverseRaw").addEventListener("input", () => Reverse.readRaw());
