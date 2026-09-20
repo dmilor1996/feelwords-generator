@@ -523,6 +523,11 @@
               <label class="check"><input id="dirR" type="checkbox" checked> Обратные направления</label>
             </div>
 
+            <label class="check">
+              <input id="allowOverlap" type="checkbox" checked>
+              <span>Разрешить пересечения слов (общие буквы)</span>
+            </label>
+
             <label>
               <span class="small-text muted">Заполнение свободных клеток</span>
               <select id="fillerMode" class="gap-small">
@@ -826,7 +831,7 @@
     ];
 
     const DEFAULT_SETTINGS = {
-      h: true, v: true, d: true, reverse: true, filler: "freq"
+      h: true, v: true, d: true, reverse: true, filler: "freq", overlap: true
     };
 
     const clone = value => JSON.parse(JSON.stringify(value));
@@ -1137,7 +1142,8 @@
         v: typeof value.v === "boolean" ? value.v : true,
         d: typeof value.d === "boolean" ? value.d : true,
         reverse: typeof value.reverse === "boolean" ? value.reverse : true,
-        filler: ["freq", "uniform", "dots"].includes(value.filler) ? value.filler : "freq"
+        filler: ["freq", "uniform", "dots"].includes(value.filler) ? value.filler : "freq",
+        overlap: typeof value.overlap === "boolean" ? value.overlap : true
       };
     }
 
@@ -1345,6 +1351,7 @@
 
                 for (let k = 0; k < word.length; k++) {
                   const i = (r + dr * k) * SIZE + c + dc * k;
+                  if (!settings.overlap && grid[i]) { valid = false; break; }
                   if (grid[i] && grid[i] !== word[k]) { valid = false; break; }
                   if (grid[i]) overlap++;
                   cells.push(i);
@@ -1352,8 +1359,10 @@
 
                 if (!valid) continue;
 
-                // Приоритет плотным пересечениям
-                const score = overlap * (iteration % 2 ? 2.5 : 4.0) + Math.random() * 3.5;
+                // Приоритет плотным пересечениям при включенном режиме
+                const score = settings.overlap
+                  ? overlap * (iteration % 2 ? 2.5 : 4.0) + Math.random() * 3.5
+                  : Math.random() * 10;
                 if (score > topScore) {
                   topScore = score;
                   choice = cells;
@@ -1787,7 +1796,8 @@
         v: $("dirV").checked,
         d: $("dirD").checked,
         reverse: $("dirR").checked,
-        filler: $("fillerMode").value
+        filler: $("fillerMode").value,
+        overlap: $("allowOverlap").checked
       };
     }
 
@@ -1894,6 +1904,7 @@
         $("dirD").checked = board.settings.d;
         $("dirR").checked = board.settings.reverse;
         $("fillerMode").value = board.settings.filler;
+        $("allowOverlap").checked = board.settings.overlap !== false;
         updateInputWarnings();
       }
 
@@ -2783,7 +2794,9 @@
         addText(page, "h1", board.name + (answers ? " — ответы" : ""));
         addText(page, "p", answers
           ? "Показаны клетки размещённых слов."
-          : "Найдите слова по прямым линиям. Слова могут пересекаться.");
+          : (board.settings?.overlap === false
+              ? "Найдите слова по прямым линиям. Слова не пересекаются (каждая буква принадлежит только одному слову)."
+              : "Найдите слова по прямым линиям. Слова могут пересекаться и иметь общие буквы."));
 
         const grid = doc.createElement("div");
         grid.className = "grid";
@@ -2924,7 +2937,7 @@
         autoSaveMetaOnly();
       });
 
-      ["dirH", "dirV", "dirD", "dirR", "fillerMode"].forEach(id => {
+      ["dirH", "dirV", "dirD", "dirR", "fillerMode", "allowOverlap"].forEach(id => {
         $(id).addEventListener("change", () => {
           $("rebuildHint").hidden = false;
         });
