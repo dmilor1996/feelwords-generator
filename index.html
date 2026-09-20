@@ -46,16 +46,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Бесшовные модули облачной синхронизации (Firebase Firestore SDK + GunDB P2P Relay для GitHub Pages) -->
-  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    window._fbSDK = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, getFirestore, doc, setDoc, onSnapshot };
-    window.dispatchEvent(new CustomEvent('cloud-sdk-ready'));
-  </script>
+  <!-- Надежный WebSocket MQTT клиент для бесшовной кросс-платформенной синхронизации -->
+  <script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
 
   <style>
     /* Плавный скроллбар */
@@ -170,7 +162,7 @@
           </div>
         </div>
 
-        <!-- Десктопная навигация (на ПК и планшетах) -->
+        <!-- Десктопная навигация -->
         <nav class="hidden md:flex items-center gap-1 bg-surface-900/90 p-1 rounded-xl border border-white/5">
           <button id="navTabStudio" onclick="app.switchTab('studio')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-brand-600 text-white shadow-sm whitespace-nowrap">
             <span>⚡</span> <span>Конструктор</span>
@@ -186,14 +178,14 @@
           </button>
         </nav>
 
-        <!-- Кнопки действий и фоновый индикатор автосинхронизации -->
+        <!-- Кнопки действий и интерактивный статус автосинхронизации -->
         <div class="flex items-center gap-1.5 sm:gap-2">
           
-          <!-- Автоматический статус связи ПК <-> Телефон (без ручных кодов и QR) -->
-          <div id="cloudSyncIndicator" title="Автоматическая синхронизация между ПК и телефоном активна" class="px-2.5 py-1.5 rounded-xl bg-surface-900/80 border border-emerald-500/30 text-xs font-bold text-slate-200 flex items-center gap-1.5 select-none shadow-sm">
+          <!-- Автоматический статус связи ПК <-> Телефон -->
+          <div id="cloudSyncIndicator" onclick="app.openSyncInfoModal()" title="Нажмите для просмотра настроек синхронизации" class="px-2.5 py-1.5 rounded-xl bg-surface-900/80 border border-emerald-500/30 text-xs font-bold text-slate-200 flex items-center gap-1.5 select-none shadow-sm cursor-pointer hover:border-emerald-400/60 transition active:scale-95">
             <span id="syncDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span class="text-xs">☁️</span>
-            <span id="syncText" class="text-[11px] text-emerald-300 hidden sm:inline">Авто-облако</span>
+            <span id="syncText" class="text-[11px] text-emerald-300 hidden sm:inline">Авто-облако: онлайн</span>
           </div>
 
           <button id="sfxToggleBtn" onclick="app.audio.toggle()" title="Звук вкл/выкл" class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl glass-card hover:bg-white/10 flex items-center justify-center text-xs text-slate-300">
@@ -664,55 +656,47 @@
     <span id="toastMessage">Уведомление</span>
   </div>
 
-  <!-- Модальное окно связи ПК ↔ Телефон (QR-код и код комнаты) -->
-  <div id="pairModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4">
+  <!-- Модальное окно статуса облака и прямой ссылки -->
+  <div id="syncInfoModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4">
     <div class="glass-panel border border-white/15 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4">
       
       <div class="flex items-center justify-between pb-2.5 border-b border-white/10">
         <div class="flex items-center gap-2">
-          <div class="p-2 rounded-xl bg-brand-500/20 text-brand-neon text-base">📲</div>
+          <div class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 text-base">☁️</div>
           <div>
-            <h3 class="text-sm font-extrabold text-white">Синхронизация ПК ↔ Телефон</h3>
-            <p class="text-[10px] text-slate-400">Работает через защищённый WebSocket канал</p>
+            <h3 class="text-sm font-extrabold text-white">Автоматическое облако</h3>
+            <p class="text-[10px] text-slate-400">Связь компьютера и смартфона в реальном времени</p>
           </div>
         </div>
-        <button onclick="app.syncEngine.closePairModal()" class="w-7 h-7 rounded-full glass-card hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
+        <button onclick="app.closeSyncInfoModal()" class="w-7 h-7 rounded-full glass-card hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
       </div>
 
-      <!-- Статус текущей комнаты -->
-      <div class="bg-surface-900/90 border border-white/10 rounded-2xl p-3.5 space-y-2 text-center">
-        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Ваш защищённый код комнаты:</div>
-        <div class="flex items-center justify-center gap-2">
-          <span id="displayRoomCode" class="text-xl sm:text-2xl font-black font-mono tracking-widest text-brand-neon select-all">WV-0000</span>
-          <button onclick="app.syncEngine.copyRoomCode()" class="px-2.5 py-1 rounded-lg bg-surface-800 hover:bg-surface-700 text-xs text-slate-200 border border-white/10" title="Скопировать код">📋</button>
+      <div class="bg-surface-900/90 border border-white/10 rounded-2xl p-3.5 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Канал синхронизации:</span>
+          <span id="displayChannelKey" class="text-xs font-mono font-bold text-brand-neon">wv_default</span>
         </div>
-        <p class="text-[11px] text-slate-400">Любое устройство с этим кодом мгновенно получает темы и слова.</p>
+        <p class="text-[11px] text-slate-300 leading-relaxed">
+          Все ваши темы и слова синхронизируются автоматически через быстрый реалтайм-мост. Вам не нужно вводить пароли или коды.
+        </p>
       </div>
 
-      <!-- QR-код для телефона -->
-      <div class="flex flex-col items-center justify-center p-3 rounded-2xl bg-white text-center">
-        <div id="qrcodeCanvasContainer" class="p-2 bg-white rounded-xl shadow-md"></div>
-        <p class="text-[11px] font-bold text-slate-800 mt-2">Наведите камеру смартфона для мгновенной привязки</p>
-      </div>
-
-      <!-- Ручной ввод кода с другого устройства -->
-      <div class="space-y-2 pt-1 border-t border-white/10">
-        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-300 block">Подключиться к комнате другого устройства:</label>
+      <div class="space-y-2 pt-1">
+        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-300 block">Прямая ссылка для телефона:</label>
         <div class="flex gap-2">
-          <input id="manualRoomInput" type="text" placeholder="Например: WV-8492" class="flex-1 bg-surface-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono font-bold uppercase text-white focus:outline-none focus:border-brand-neon" />
-          <button onclick="app.syncEngine.joinManualRoom()" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-xs font-bold text-white transition active:scale-95">
-            Связать
+          <input id="syncDirectUrlInput" readonly type="text" class="flex-1 bg-surface-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 focus:outline-none" />
+          <button onclick="app.copyDirectSyncUrl()" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-xs font-bold text-white transition active:scale-95 whitespace-nowrap">
+            Копировать
           </button>
         </div>
       </div>
 
-      <!-- Принудительная отправка -->
-      <div class="flex items-center justify-between pt-2">
-        <button onclick="app.syncEngine.generateNewRoom()" class="text-[11px] text-slate-400 hover:text-slate-200 underline">
-          Сгенерировать новую комнату
+      <div class="flex items-center justify-between pt-2 border-t border-white/10">
+        <button onclick="app.syncEngine.fetchRemoteNow()" class="px-3.5 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-slate-300">
+          🔄 Запросить из облака
         </button>
-        <button onclick="app.syncEngine.forceBroadcastState()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-xs font-bold text-white shadow-lg flex items-center gap-1.5 active:scale-95">
-          <span>⚡</span> Отправить всё на телефон
+        <button onclick="app.syncEngine.pushStateNow()" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-lg active:scale-95">
+          ⚡ Отправить сейчас
         </button>
       </div>
 
@@ -777,7 +761,7 @@
      * Данные сохраняются навсегда в памяти устройства даже при закрытии браузера
      */
     const PermanentDB = {
-      dbName: 'WordVaultStudioDB_v2',
+      dbName: 'WordVaultStudioDB_v3',
       version: 1,
       db: null,
 
@@ -908,6 +892,166 @@
       }
     }
 
+    /**
+     * ДВУХУРОВНЕВЫЙ ОБЛАЧНЫЙ СИНХРОНИЗАТОР
+     * 1. Реалтайм-мост через защищенный WebSocket MQTT (EMQX / HiveMQ) с Retained Messages.
+     * 2. Резервный канал HTTPS REST (ntfy) для мгновенной доставки состояния при первом открытии.
+     */
+    const CloudSyncEngine = {
+      mqttClient: null,
+      channelKey: '',
+      connected: false,
+      lastPushedTimestamp: 0,
+
+      init() {
+        this.channelKey = this.computeChannelKey();
+        const displayKey = document.getElementById('displayChannelKey');
+        if (displayKey) displayKey.innerText = this.channelKey;
+        
+        const urlInput = document.getElementById('syncDirectUrlInput');
+        if (urlInput) {
+          const cleanUrl = window.location.origin + window.location.pathname + '#' + this.channelKey;
+          urlInput.value = cleanUrl;
+        }
+
+        this.connectMQTT();
+        this.fetchRestFallback();
+      },
+
+      computeChannelKey() {
+        // Если передан хэш в адресе (например #myname)
+        if (window.location.hash && window.location.hash.length > 2) {
+          return window.location.hash.replace('#', '').trim().toLowerCase().replace(/[^a-zA-Z0-9_]/g, '');
+        }
+        // Если хостинг на GitHub Pages или домене
+        const host = window.location.hostname || '';
+        const path = (window.location.pathname || '').replace(/\/index\.html$/, '').replace(/\/$/, '');
+        if (host && !host.includes('localhost') && host !== '127.0.0.1' && !host.includes('192.168.') && window.location.protocol !== 'file:') {
+          const slug = (host + path).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+          return 'wv_' + slug;
+        }
+        // Стандартный общий хаб
+        return 'wv_studio_vault';
+      },
+
+      connectMQTT() {
+        if (typeof mqtt === 'undefined') {
+          console.warn("MQTT library not ready, falling back to REST");
+          return;
+        }
+
+        try {
+          const clientId = 'wv_' + Math.random().toString(36).substring(2, 10);
+          const topic = `wordvault_v3/${this.channelKey}`;
+
+          this.mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+            clientId,
+            clean: true,
+            connectTimeout: 6000,
+            reconnectPeriod: 4000
+          });
+
+          this.mqttClient.on('connect', () => {
+            this.connected = true;
+            this.setIndicatorStatus(true);
+            this.mqttClient.subscribe(topic, { qos: 1 });
+          });
+
+          this.mqttClient.on('message', (t, message) => {
+            try {
+              const data = JSON.parse(message.toString());
+              if (data && data.updatedAt && data.updatedAt > app.lastLocalEditTimestamp) {
+                app.applyRemoteUpdate(data);
+              }
+            } catch (e) {}
+          });
+
+          this.mqttClient.on('error', () => {
+            this.setIndicatorStatus(false);
+          });
+
+          this.mqttClient.on('offline', () => {
+            this.setIndicatorStatus(false);
+          });
+        } catch (err) {
+          console.warn("MQTT connection error:", err);
+        }
+      },
+
+      async fetchRestFallback() {
+        try {
+          const res = await fetch(`https://ntfy.sh/${this.channelKey}/json?poll=1`);
+          if (!res.ok) return;
+          const text = await res.text();
+          const lines = text.trim().split('\n');
+          for (let i = lines.length - 1; i >= 0; i--) {
+            try {
+              const item = JSON.parse(lines[i]);
+              if (item.event === 'message' && item.message) {
+                const state = JSON.parse(item.message);
+                if (state && state.updatedAt && state.updatedAt > app.lastLocalEditTimestamp) {
+                  app.applyRemoteUpdate(state);
+                  break;
+                }
+              }
+            } catch (e) {}
+          }
+        } catch (e) {}
+      },
+
+      pushStateNow() {
+        const now = Date.now();
+        app.lastLocalEditTimestamp = now;
+
+        const payload = {
+          topicName: app.activeTopicName,
+          words: app.words,
+          topics: app.topics,
+          updatedAt: now
+        };
+
+        const json = JSON.stringify(payload);
+        const topic = `wordvault_v3/${this.channelKey}`;
+
+        // 1. Отправка в MQTT с флагом Retain (брокер запоминает последнее состояние для новых подключений)
+        if (this.mqttClient && this.connected) {
+          this.mqttClient.publish(topic, json, { qos: 1, retain: true });
+        }
+
+        // 2. Резервная отправка через HTTP POST на ntfy
+        fetch(`https://ntfy.sh/${this.channelKey}`, {
+          method: 'POST',
+          body: json,
+          headers: { 'Cache': 'yes' }
+        }).catch(() => {});
+
+        app.notify('⚡ Изменения отправлены в облако!');
+      },
+
+      fetchRemoteNow() {
+        this.fetchRestFallback();
+        app.notify('Запрошено обновление из облака...');
+      },
+
+      setIndicatorStatus(isOnline) {
+        const dot = document.getElementById('syncDot');
+        const text = document.getElementById('syncText');
+        const container = document.getElementById('cloudSyncIndicator');
+        if (!dot || !text || !container) return;
+
+        if (isOnline) {
+          dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+          text.innerText = "Авто-облако: онлайн";
+          text.className = "text-[11px] text-emerald-300 hidden sm:inline";
+          container.className = "px-2.5 py-1.5 rounded-xl bg-surface-900/80 border border-emerald-500/30 text-xs font-bold text-slate-200 flex items-center gap-1.5 select-none shadow-sm cursor-pointer hover:border-emerald-400/60 transition active:scale-95";
+        } else {
+          dot.className = "w-2 h-2 rounded-full bg-amber-400";
+          text.innerText = "Ожидание сети...";
+          text.className = "text-[11px] text-amber-300 hidden sm:inline";
+        }
+      }
+    };
+
     const app = {
       width: 15,
       height: 15,
@@ -925,14 +1069,7 @@
       cloudPushTimer: null,
       lastLocalEditTimestamp: 0,
       isApplyingRemoteSnapshot: false,
-
-      // Cloud SDK references & Gun P2P
-      fbDb: null,
-      fbAuth: null,
-      fbUser: null,
-      gunInstance: null,
-      gunWorkspace: null,
-      cloudConnected: false,
+      syncEngine: CloudSyncEngine,
 
       // Состояние режима решения (Play Mode)
       playState: {
@@ -950,110 +1087,30 @@
         await this.restorePersistedState();
         this.setupPlayEvents();
         this.reverse.init();
-        this.initCloudAutoSync();
+        this.syncEngine.init();
       },
 
-      // Бесшовная автоматическая синхронизация: вычисляет ключ из адреса сайта и связывает ПК с телефоном без кодов и QR
-      async initCloudAutoSync() {
-        // Вычисляем детерминированный ключ канала из адреса размещения
-        const host = window.location.hostname || 'localhost';
-        const path = window.location.pathname || '/';
-        const rawKey = (host + path).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-        const channelKey = 'wv_hub_' + (rawKey.length > 5 ? rawKey : 'default_vault');
-
-        // 1. Инициализация GunDB (работает на GitHub Pages без каких-либо API-ключей и настроек)
-        if (typeof Gun !== 'undefined') {
-          try {
-            this.gunInstance = Gun({
-              peers: [
-                'https://gun-manhattan.herokuapp.com/gun',
-                'https://relay.peer.ooo/gun'
-              ],
-              localStorage: false
-            });
-
-            this.gunWorkspace = this.gunInstance.get(channelKey).get('state');
-
-            // Подписка на моментальные обновления из сети
-            this.gunWorkspace.on((raw) => {
-              if (!raw) return;
-              try {
-                const payload = typeof raw === 'string' ? JSON.parse(raw) : (raw.payload ? JSON.parse(raw.payload) : raw);
-                this.applyRemoteUpdate(payload);
-                this.setSyncStatus('online');
-              } catch (e) {}
-            });
-          } catch (err) {
-            console.warn("Gun sync fallback:", err);
-          }
-        }
-
-        // 2. Инициализация Firebase Firestore (если запущен в окружении с конфигом)
-        if (window._fbSDK && typeof __firebase_config !== 'undefined') {
-          try {
-            const fbConfig = JSON.parse(__firebase_config);
-            const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, getFirestore, doc, onSnapshot } = window._fbSDK;
-            
-            const fbApp = initializeApp(fbConfig);
-            this.fbAuth = getAuth(fbApp);
-            this.fbDb = getFirestore(fbApp);
-
-            const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-            if (token) {
-              const cred = await signInWithCustomToken(this.fbAuth, token);
-              this.fbUser = cred.user;
-            } else {
-              const cred = await signInAnonymously(this.fbAuth);
-              this.fbUser = cred.user;
-            }
-
-            if (this.fbUser) {
-              const appId = typeof __app_id !== 'undefined' ? __app_id : 'wordvault-app';
-              const docRef = doc(this.fbDb, 'artifacts', appId, 'public', 'data', 'cloud_vaults', channelKey);
-
-              onSnapshot(docRef, (snap) => {
-                if (snap.exists()) {
-                  this.applyRemoteUpdate(snap.data());
-                  this.setSyncStatus('online');
-                }
-              }, () => {});
-            }
-          } catch (e) {}
-        }
-
-        this.setSyncStatus('online');
+      openSyncInfoModal() {
+        document.getElementById('syncInfoModal').classList.remove('hidden');
       },
 
-      setSyncStatus(mode) {
-        const dot = document.getElementById('syncDot');
-        const text = document.getElementById('syncText');
-        const container = document.getElementById('cloudSyncIndicator');
-        if (!dot || !text) return;
+      closeSyncInfoModal() {
+        document.getElementById('syncInfoModal').classList.add('hidden');
+      },
 
-        if (mode === 'online') {
-          dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
-          text.innerText = "Авто-облако: онлайн";
-          text.className = "text-[11px] text-emerald-300 hidden sm:inline";
-          container.className = "px-2.5 py-1.5 rounded-xl bg-surface-900/80 border border-emerald-500/30 text-xs font-bold text-slate-200 flex items-center gap-1.5 select-none shadow-sm";
-        } else {
-          dot.className = "w-2 h-2 rounded-full bg-brand-neon";
-          text.innerText = "Локальная память";
-          text.className = "text-[11px] text-cyan-300 hidden sm:inline";
-        }
+      copyDirectSyncUrl() {
+        const input = document.getElementById('syncDirectUrlInput');
+        if (!input) return;
+        this.copyToClipboard(input.value, '✓ Прямая ссылка для телефона скопирована!');
       },
 
       applyRemoteUpdate(data) {
         if (!data || typeof data !== 'object') return;
         if (this.isApplyingRemoteSnapshot) return;
 
-        // Если локальные изменения свежее пришедших из облака, не перезатираем
-        if (data.updatedAt && this.lastLocalEditTimestamp > data.updatedAt) {
-          return;
-        }
-
         this.isApplyingRemoteSnapshot = true;
         try {
-          // Обновление каталога тем
+          // Обновление тем каталога
           if (data.topics && typeof data.topics === 'object') {
             this.topics = { ...this.topics, ...data.topics };
             this.updateBadgeCounters();
@@ -1061,7 +1118,7 @@
             PermanentDB.set('wv_topics', this.topics);
           }
 
-          // Обновление текущего набора слов (только если фокус не стоит в поле ввода)
+          // Обновление активного списка слов, если пользователь сейчас не печатает
           const activeEl = document.activeElement;
           const isUserTyping = activeEl && activeEl.id === 'wordInputArea';
 
@@ -1075,6 +1132,7 @@
               this.updateWordPills();
               this.generate();
               PermanentDB.set('wv_current_state', { topicName: this.activeTopicName, words: this.words });
+              this.notify(`☁️ Получены данные из облака: "${this.activeTopicName}"`);
             }
           }
         } finally {
@@ -1085,39 +1143,9 @@
       scheduleCloudPush() {
         if (this.isApplyingRemoteSnapshot) return;
         clearTimeout(this.cloudPushTimer);
-        
-        this.cloudPushTimer = setTimeout(async () => {
-          const now = Date.now();
-          this.lastLocalEditTimestamp = now;
-
-          const payload = {
-            topicName: this.activeTopicName,
-            words: this.words,
-            topics: this.topics,
-            updatedAt: now
-          };
-
-          // 1. Отправка в GunDB
-          if (this.gunWorkspace) {
-            try {
-              this.gunWorkspace.put({ payload: JSON.stringify(payload) });
-            } catch (e) {}
-          }
-
-          // 2. Отправка в Firebase Firestore (если активен)
-          if (this.fbDb && this.fbUser) {
-            try {
-              const { doc, setDoc } = window._fbSDK;
-              const host = window.location.hostname || 'localhost';
-              const path = window.location.pathname || '/';
-              const channelKey = 'wv_hub_' + (host + path).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-              const appId = typeof __app_id !== 'undefined' ? __app_id : 'wordvault-app';
-              const docRef = doc(this.fbDb, 'artifacts', appId, 'public', 'data', 'cloud_vaults', channelKey);
-
-              await setDoc(docRef, payload, { merge: true });
-            } catch (err) {}
-          }
-        }, 400);
+        this.cloudPushTimer = setTimeout(() => {
+          this.syncEngine.pushStateNow();
+        }, 500);
       },
 
       updateBadgeCounters() {
@@ -1157,7 +1185,7 @@
           words: this.words
         });
         this.updateBadgeCounters();
-        this.syncEngine.broadcastState();
+        this.scheduleCloudPush();
       },
 
       cleanWordTokens(text) {
