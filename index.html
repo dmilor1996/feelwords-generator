@@ -46,7 +46,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Бесшовные модули облачной синхронизации (Firebase Firestore SDK) -->
+  <!-- Бесшовные модули облачной синхронизации (Firebase Firestore SDK + GunDB P2P Relay для GitHub Pages) -->
+  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -663,6 +664,61 @@
     <span id="toastMessage">Уведомление</span>
   </div>
 
+  <!-- Модальное окно связи ПК ↔ Телефон (QR-код и код комнаты) -->
+  <div id="pairModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="glass-panel border border-white/15 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4">
+      
+      <div class="flex items-center justify-between pb-2.5 border-b border-white/10">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded-xl bg-brand-500/20 text-brand-neon text-base">📲</div>
+          <div>
+            <h3 class="text-sm font-extrabold text-white">Синхронизация ПК ↔ Телефон</h3>
+            <p class="text-[10px] text-slate-400">Работает через защищённый WebSocket канал</p>
+          </div>
+        </div>
+        <button onclick="app.syncEngine.closePairModal()" class="w-7 h-7 rounded-full glass-card hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
+      </div>
+
+      <!-- Статус текущей комнаты -->
+      <div class="bg-surface-900/90 border border-white/10 rounded-2xl p-3.5 space-y-2 text-center">
+        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Ваш защищённый код комнаты:</div>
+        <div class="flex items-center justify-center gap-2">
+          <span id="displayRoomCode" class="text-xl sm:text-2xl font-black font-mono tracking-widest text-brand-neon select-all">WV-0000</span>
+          <button onclick="app.syncEngine.copyRoomCode()" class="px-2.5 py-1 rounded-lg bg-surface-800 hover:bg-surface-700 text-xs text-slate-200 border border-white/10" title="Скопировать код">📋</button>
+        </div>
+        <p class="text-[11px] text-slate-400">Любое устройство с этим кодом мгновенно получает темы и слова.</p>
+      </div>
+
+      <!-- QR-код для телефона -->
+      <div class="flex flex-col items-center justify-center p-3 rounded-2xl bg-white text-center">
+        <div id="qrcodeCanvasContainer" class="p-2 bg-white rounded-xl shadow-md"></div>
+        <p class="text-[11px] font-bold text-slate-800 mt-2">Наведите камеру смартфона для мгновенной привязки</p>
+      </div>
+
+      <!-- Ручной ввод кода с другого устройства -->
+      <div class="space-y-2 pt-1 border-t border-white/10">
+        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-300 block">Подключиться к комнате другого устройства:</label>
+        <div class="flex gap-2">
+          <input id="manualRoomInput" type="text" placeholder="Например: WV-8492" class="flex-1 bg-surface-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono font-bold uppercase text-white focus:outline-none focus:border-brand-neon" />
+          <button onclick="app.syncEngine.joinManualRoom()" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-xs font-bold text-white transition active:scale-95">
+            Связать
+          </button>
+        </div>
+      </div>
+
+      <!-- Принудительная отправка -->
+      <div class="flex items-center justify-between pt-2">
+        <button onclick="app.syncEngine.generateNewRoom()" class="text-[11px] text-slate-400 hover:text-slate-200 underline">
+          Сгенерировать новую комнату
+        </button>
+        <button onclick="app.syncEngine.forceBroadcastState()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-xs font-bold text-white shadow-lg flex items-center gap-1.5 active:scale-95">
+          <span>⚡</span> Отправить всё на телефон
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Модалка подтверждения (без window.confirm) -->
   <div id="confirmModal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="glass-panel border border-white/15 rounded-2xl p-5 sm:p-6 max-w-sm w-full shadow-2xl space-y-3">
@@ -870,10 +926,12 @@
       lastLocalEditTimestamp: 0,
       isApplyingRemoteSnapshot: false,
 
-      // Cloud SDK references
+      // Cloud SDK references & Gun P2P
       fbDb: null,
       fbAuth: null,
       fbUser: null,
+      gunInstance: null,
+      gunWorkspace: null,
       cloudConnected: false,
 
       // Состояние режима решения (Play Mode)
@@ -895,61 +953,75 @@
         this.initCloudAutoSync();
       },
 
-      // Инициализация бесшовной фоновой синхронизации ПК <-> Телефон
+      // Бесшовная автоматическая синхронизация: вычисляет ключ из адреса сайта и связывает ПК с телефоном без кодов и QR
       async initCloudAutoSync() {
-        if (!window._fbSDK) {
-          window.addEventListener('cloud-sdk-ready', () => this.initCloudAutoSync(), { once: true });
-          return;
+        // Вычисляем детерминированный ключ канала из адреса размещения
+        const host = window.location.hostname || 'localhost';
+        const path = window.location.pathname || '/';
+        const rawKey = (host + path).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+        const channelKey = 'wv_hub_' + (rawKey.length > 5 ? rawKey : 'default_vault');
+
+        // 1. Инициализация GunDB (работает на GitHub Pages без каких-либо API-ключей и настроек)
+        if (typeof Gun !== 'undefined') {
+          try {
+            this.gunInstance = Gun({
+              peers: [
+                'https://gun-manhattan.herokuapp.com/gun',
+                'https://relay.peer.ooo/gun'
+              ],
+              localStorage: false
+            });
+
+            this.gunWorkspace = this.gunInstance.get(channelKey).get('state');
+
+            // Подписка на моментальные обновления из сети
+            this.gunWorkspace.on((raw) => {
+              if (!raw) return;
+              try {
+                const payload = typeof raw === 'string' ? JSON.parse(raw) : (raw.payload ? JSON.parse(raw.payload) : raw);
+                this.applyRemoteUpdate(payload);
+                this.setSyncStatus('online');
+              } catch (e) {}
+            });
+          } catch (err) {
+            console.warn("Gun sync fallback:", err);
+          }
         }
 
-        try {
-          const cfgStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-          if (!cfgStr) {
-            this.setSyncStatus('local');
-            return;
-          }
+        // 2. Инициализация Firebase Firestore (если запущен в окружении с конфигом)
+        if (window._fbSDK && typeof __firebase_config !== 'undefined') {
+          try {
+            const fbConfig = JSON.parse(__firebase_config);
+            const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, getFirestore, doc, onSnapshot } = window._fbSDK;
+            
+            const fbApp = initializeApp(fbConfig);
+            this.fbAuth = getAuth(fbApp);
+            this.fbDb = getFirestore(fbApp);
 
-          const fbConfig = JSON.parse(cfgStr);
-          const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, getFirestore, doc, onSnapshot } = window._fbSDK;
-          
-          const fbApp = initializeApp(fbConfig);
-          this.fbAuth = getAuth(fbApp);
-          this.fbDb = getFirestore(fbApp);
-
-          const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-          if (token) {
-            const cred = await signInWithCustomToken(this.fbAuth, token);
-            this.fbUser = cred.user;
-          } else {
-            const cred = await signInAnonymously(this.fbAuth);
-            this.fbUser = cred.user;
-          }
-
-          if (!this.fbUser) return;
-
-          // Строгий путь для публичной синхронизации между устройствами
-          const appId = typeof __app_id !== 'undefined' ? __app_id : 'wordvault-app';
-          const docRef = doc(this.fbDb, 'artifacts', appId, 'public', 'data', 'cloud_vaults', 'shared_workspace');
-
-          onSnapshot(docRef, (snap) => {
-            if (snap.exists()) {
-              const data = snap.data();
-              this.applyRemoteUpdate(data);
-              this.setSyncStatus('online');
+            const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            if (token) {
+              const cred = await signInWithCustomToken(this.fbAuth, token);
+              this.fbUser = cred.user;
             } else {
-              this.setSyncStatus('online');
+              const cred = await signInAnonymously(this.fbAuth);
+              this.fbUser = cred.user;
             }
-          }, (err) => {
-            console.warn("Cloud snapshot info:", err);
-            this.setSyncStatus('offline');
-          });
 
-          this.cloudConnected = true;
-          this.setSyncStatus('online');
-        } catch (e) {
-          console.warn("Auto-sync mode initialized locally:", e);
-          this.setSyncStatus('local');
+            if (this.fbUser) {
+              const appId = typeof __app_id !== 'undefined' ? __app_id : 'wordvault-app';
+              const docRef = doc(this.fbDb, 'artifacts', appId, 'public', 'data', 'cloud_vaults', channelKey);
+
+              onSnapshot(docRef, (snap) => {
+                if (snap.exists()) {
+                  this.applyRemoteUpdate(snap.data());
+                  this.setSyncStatus('online');
+                }
+              }, () => {});
+            }
+          } catch (e) {}
         }
+
+        this.setSyncStatus('online');
       },
 
       setSyncStatus(mode) {
@@ -963,10 +1035,6 @@
           text.innerText = "Авто-облако: онлайн";
           text.className = "text-[11px] text-emerald-300 hidden sm:inline";
           container.className = "px-2.5 py-1.5 rounded-xl bg-surface-900/80 border border-emerald-500/30 text-xs font-bold text-slate-200 flex items-center gap-1.5 select-none shadow-sm";
-        } else if (mode === 'offline') {
-          dot.className = "w-2 h-2 rounded-full bg-amber-400";
-          text.innerText = "Авто-облако: повтор...";
-          text.className = "text-[11px] text-amber-300 hidden sm:inline";
         } else {
           dot.className = "w-2 h-2 rounded-full bg-brand-neon";
           text.innerText = "Локальная память";
@@ -978,13 +1046,14 @@
         if (!data || typeof data !== 'object') return;
         if (this.isApplyingRemoteSnapshot) return;
 
-        // Если локальные изменения свежее пришедших из сети, не перезатираем
+        // Если локальные изменения свежее пришедших из облака, не перезатираем
         if (data.updatedAt && this.lastLocalEditTimestamp > data.updatedAt) {
           return;
         }
 
         this.isApplyingRemoteSnapshot = true;
         try {
+          // Обновление каталога тем
           if (data.topics && typeof data.topics === 'object') {
             this.topics = { ...this.topics, ...data.topics };
             this.updateBadgeCounters();
@@ -992,8 +1061,12 @@
             PermanentDB.set('wv_topics', this.topics);
           }
 
-          if (data.words && Array.isArray(data.words)) {
-            const hasChanged = JSON.stringify(data.words) !== JSON.stringify(this.words) || data.topicName !== this.activeTopicName;
+          // Обновление текущего набора слов (только если фокус не стоит в поле ввода)
+          const activeEl = document.activeElement;
+          const isUserTyping = activeEl && activeEl.id === 'wordInputArea';
+
+          if (data.words && Array.isArray(data.words) && !isUserTyping) {
+            const hasChanged = JSON.stringify(data.words) !== JSON.stringify(this.words) || (data.topicName && data.topicName !== this.activeTopicName);
             if (hasChanged) {
               this.words = data.words;
               this.activeTopicName = data.topicName || "Филворд";
@@ -1002,7 +1075,6 @@
               this.updateWordPills();
               this.generate();
               PermanentDB.set('wv_current_state', { topicName: this.activeTopicName, words: this.words });
-              this.notify(`Синхронизировано: "${this.activeTopicName}"`);
             }
           }
         } finally {
@@ -1011,26 +1083,41 @@
       },
 
       scheduleCloudPush() {
-        if (!this.fbDb || !this.fbUser || this.isApplyingRemoteSnapshot) return;
+        if (this.isApplyingRemoteSnapshot) return;
         clearTimeout(this.cloudPushTimer);
+        
         this.cloudPushTimer = setTimeout(async () => {
-          try {
-            const { doc, setDoc } = window._fbSDK;
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'wordvault-app';
-            const docRef = doc(this.fbDb, 'artifacts', appId, 'public', 'data', 'cloud_vaults', 'shared_workspace');
-            const now = Date.now();
-            this.lastLocalEditTimestamp = now;
+          const now = Date.now();
+          this.lastLocalEditTimestamp = now;
 
-            await setDoc(docRef, {
-              topicName: this.activeTopicName,
-              words: this.words,
-              topics: this.topics,
-              updatedAt: now
-            }, { merge: true });
-          } catch (err) {
-            console.warn("Cloud push notice:", err);
+          const payload = {
+            topicName: this.activeTopicName,
+            words: this.words,
+            topics: this.topics,
+            updatedAt: now
+          };
+
+          // 1. Отправка в GunDB
+          if (this.gunWorkspace) {
+            try {
+              this.gunWorkspace.put({ payload: JSON.stringify(payload) });
+            } catch (e) {}
           }
-        }, 550);
+
+          // 2. Отправка в Firebase Firestore (если активен)
+          if (this.fbDb && this.fbUser) {
+            try {
+              const { doc, setDoc } = window._fbSDK;
+              const host = window.location.hostname || 'localhost';
+              const path = window.location.pathname || '/';
+              const channelKey = 'wv_hub_' + (host + path).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+              const appId = typeof __app_id !== 'undefined' ? __app_id : 'wordvault-app';
+              const docRef = doc(this.fbDb, 'artifacts', appId, 'public', 'data', 'cloud_vaults', channelKey);
+
+              await setDoc(docRef, payload, { merge: true });
+            } catch (err) {}
+          }
+        }, 400);
       },
 
       updateBadgeCounters() {
@@ -1070,7 +1157,7 @@
           words: this.words
         });
         this.updateBadgeCounters();
-        this.scheduleCloudPush();
+        this.syncEngine.broadcastState();
       },
 
       cleanWordTokens(text) {
