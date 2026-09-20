@@ -398,21 +398,40 @@
       font-size: 12px;
     }
 
+    /* Адаптивная форма быстрого ввода тем */
+    .fast-topic-grid {
+      display: grid;
+      grid-template-columns: minmax(180px, 4fr) minmax(220px, 7fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* Адаптивная панель действий книги */
+    .book-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+      width: 100%;
+    }
+
     /* Стили для интерактивного предпросмотра массового импорта */
     .batch-preview-box {
       max-height: 250px;
       overflow-y: auto;
+      overflow-x: hidden;
       border: 1px solid var(--line);
       border-radius: 10px;
       background: #080d19;
       padding: 8px;
       display: grid;
       gap: 6px;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .batch-item-row {
       display: grid;
-      grid-template-columns: 36px minmax(140px, 3fr) minmax(0, 5fr) auto;
+      grid-template-columns: 36px minmax(130px, 3fr) minmax(0, 5fr) auto;
       align-items: center;
       gap: 10px;
       padding: 7px 10px;
@@ -420,6 +439,14 @@
       background: #101728;
       font-size: 12px;
       border-left: 3px solid transparent;
+      min-width: 0;
+    }
+
+    .batch-item-row b {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
     }
 
     .batch-item-row.ok { border-left-color: var(--green); }
@@ -454,8 +481,11 @@
       border-radius: 18px;
       padding: 24px;
       width: min(560px, calc(100vw - 32px));
+      max-width: calc(100vw - 32px);
       max-height: 88vh;
-      overflow: auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+      box-sizing: border-box;
     }
 
     dialog::backdrop { background: #000b; backdrop-filter: blur(5px); }
@@ -479,8 +509,150 @@
       .layout, .play-layout { grid-template-columns: 1fr; }
       .topics-grid, .books-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .desktop-description { display: none; }
-      .batch-item-row { grid-template-columns: 30px 1fr auto; }
+      .batch-item-row { grid-template-columns: 30px minmax(0, 1fr) auto; }
       .batch-item-words { display: none; }
+    }
+
+    /* Мобильная адаптация для таблиц тем, диалогов и форм книги */
+    @media (max-width: 640px) {
+      dialog {
+        padding: 16px 12px;
+        width: calc(100vw - 16px) !important;
+        max-width: calc(100vw - 16px) !important;
+        border-radius: 14px;
+        margin: auto;
+      }
+
+      .fast-topic-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .fast-topic-grid button {
+        width: 100%;
+        padding: 11px;
+      }
+
+      .book-actions-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+
+      .book-actions-grid button {
+        font-size: 11px;
+        padding: 9px 5px;
+        text-align: center;
+      }
+
+      .book-header-banner {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding: 9px 11px;
+      }
+
+      .banner-nav-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1.3fr;
+        gap: 6px;
+        width: 100%;
+      }
+
+      .banner-nav-actions button {
+        width: 100%;
+        padding: 7px 4px;
+        font-size: 11px;
+      }
+
+      /* Трансформация таблицы тем в мобильные карточки без бокового скролла */
+      .topics-table-wrap {
+        overflow-x: visible !important;
+      }
+
+      .topics-table thead {
+        display: none;
+      }
+
+      .topics-table, .topics-table tbody {
+        display: block;
+        width: 100%;
+      }
+
+      .topics-table tr {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas:
+          "num name status"
+          "words words words"
+          "actions actions actions";
+        gap: 6px 8px;
+        align-items: center;
+        background: #0d1525;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .topics-table td {
+        padding: 0;
+        border-bottom: none;
+      }
+
+      .topics-table td.col-num {
+        grid-area: num;
+        font-weight: 700;
+        color: var(--muted);
+      }
+
+      .topics-table td.col-name {
+        grid-area: name;
+        font-weight: 600;
+        font-size: 14px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+
+      .topics-table td.col-status {
+        grid-area: status;
+        text-align: right;
+      }
+
+      .topics-table td.col-words {
+        grid-area: words;
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .topics-table td.col-actions {
+        grid-area: actions;
+        width: 100%;
+        margin-top: 4px;
+        padding-top: 6px;
+        border-top: 1px solid #1c273e;
+      }
+
+      .topics-table td.col-actions .row {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 42px;
+        gap: 8px;
+      }
+
+      .topics-table td.col-actions button {
+        width: 100%;
+        padding: 8px 10px;
+        font-size: 13px;
+        justify-content: center;
+      }
     }
 
     @media (max-width: 560px) {
@@ -547,17 +719,17 @@
     <section id="view-constructor" class="stack">
       <!-- Контекстный баннер книги -->
       <div id="bookContextBanner" class="book-header-banner" hidden>
-        <div class="row wrap">
-          <span class="badge badge-green">Режим книги</span>
-          <div>
+        <div class="row wrap banner-info">
+          <span class="badge badge-green">Книга</span>
+          <div class="banner-title-text">
             <b>Книга:</b> <span id="bannerBookTitle">—</span> &nbsp;›&nbsp;
             <b>Тема:</b> <span id="bannerTopicTitle">—</span> (<span id="bannerTopicPos">#1 из 50</span>)
           </div>
         </div>
-        <div class="row">
+        <div class="row banner-nav-actions">
           <button id="prevBookTopicBtn" class="small" type="button">‹ Пред. тема</button>
           <button id="nextBookTopicBtn" class="small" type="button">След. тема ›</button>
-          <button id="backToBookBtn" class="primary small" type="button">← К списку книги</button>
+          <button id="backToBookBtn" class="primary small" type="button">← В книгу</button>
         </div>
       </div>
 
@@ -702,14 +874,14 @@
       <!-- Режим 2: Просмотр и редактирование книги -->
       <div id="bookDetailView" class="stack" hidden>
         <div class="card stack">
-          <div class="row between wrap">
-            <div class="row">
-              <button id="backToBooksListBtn" class="small" type="button">← К каталогу книг</button>
-              <h2 id="currentBookTitle">Книга</h2>
+          <div class="row between wrap gap-small">
+            <div class="row wrap" style="gap: 6px;">
+              <button id="backToBooksListBtn" class="small" type="button">← Каталог</button>
+              <h2 id="currentBookTitle" style="font-size: 17px; word-break: break-word;">Книга</h2>
             </div>
-            <div class="row wrap">
+            <div class="row wrap" style="gap: 6px;">
               <span id="currentBookProgressBadge" class="badge">0 / 0 готово</span>
-              <button id="editBookSettingsBtn" class="small" type="button">⚙️ Настройки книги</button>
+              <button id="editBookSettingsBtn" class="small" type="button">⚙️ Настройки</button>
             </div>
           </div>
 
@@ -718,9 +890,9 @@
           </div>
 
           <!-- Блок быстрых действий книги -->
-          <div class="actions">
-            <button id="generateAllBookGridsBtn" class="primary" type="button">🔄 Сгенерировать все сетки книги</button>
-            <button id="printFullBookBtn" class="success" type="button">🖨️ Печать всей книги (PDF)</button>
+          <div class="book-actions-grid gap-small">
+            <button id="generateAllBookGridsBtn" class="primary" type="button">🔄 Сгенерировать сетки</button>
+            <button id="printFullBookBtn" class="success" type="button">🖨️ Печать книги (PDF)</button>
             <button id="exportBookXlsxBtn" type="button">📊 Экспорт в XLSX</button>
             <button id="exportBookJsonBtn" type="button">💾 Экспорт в JSON</button>
           </div>
@@ -728,28 +900,28 @@
 
         <!-- Быстрый ввод тем -->
         <div class="card stack">
-          <div class="row between wrap">
+          <div class="row between wrap gap-small">
             <h3>Быстрое добавление темы</h3>
-            <button id="openBatchImportBtn" class="small primary" type="button">⚡ Массовый ввод 50 тем (Умный парсер)</button>
+            <button id="openBatchImportBtn" class="small primary" type="button">⚡ Массовый ввод (Парсер)</button>
           </div>
-          <div class="layout" style="grid-template-columns: minmax(200px, 4fr) minmax(260px, 7fr) auto; gap: 8px;">
+          <div class="fast-topic-grid gap-small">
             <input id="fastTopicName" type="text" placeholder="Название темы (напр. Космос)" maxlength="120">
-            <input id="fastTopicWords" type="text" placeholder="Слова через запятую или пробел (напр. ОРБИТА, ЗВЕЗДА, ПЛАНЕТА)">
+            <input id="fastTopicWords" type="text" placeholder="Слова через запятую или пробел (ОРБИТА, ЗВЕЗДА...)">
             <button id="addFastTopicBtn" class="primary" type="button" style="white-space:nowrap;">+ Добавить</button>
           </div>
           <p class="muted small-text">
-            Совет: можно вводить название, слова и нажимать Enter для быстрого наполнения сборника.
+            Совет: вводите название, слова и нажимайте Enter для быстрого добавления темы.
           </p>
         </div>
 
         <!-- Таблица тем книги -->
         <div class="card stack">
-          <div class="row between">
+          <div class="row between wrap gap-small">
             <h3>Темы сборника (<span id="bookTopicsCount">0</span>)</h3>
-            <span class="muted small-text">Нажмите «Сетка», чтобы увидеть или скорректировать макет</span>
+            <span class="muted small-text">Нажмите «Сетка» для перехода в макет</span>
           </div>
 
-          <div style="overflow-x: auto;">
+          <div class="topics-table-wrap" style="overflow-x: auto;">
             <table class="topics-table">
               <thead>
                 <tr>
@@ -973,24 +1145,24 @@
   </dialog>
 
   <!-- Улучшенный диалог массового ввода 50 тем с интерактивным предпросмотром -->
-  <dialog id="batchImportModal" style="width: min(840px, calc(100vw - 32px));">
-    <div class="row between wrap">
+  <dialog id="batchImportModal" style="width: min(840px, calc(100vw - 20px));">
+    <div class="row between wrap gap-small">
       <h2>Массовый ввод тем в книгу</h2>
-      <button id="batchSampleBtn" class="small" type="button">📋 Вставить пример (3 темы)</button>
+      <button id="batchSampleBtn" class="small" type="button">📋 Пример</button>
     </div>
     <p class="small-text muted">
-      Вставьте текст в любом удобном формате (с <code># Заголовок</code>, нумерацией <code>1. Тема</code>, двоеточием <code>Тема: слова</code> или пустыми строками). Ни одна тема не пропадёт молча.
+      Вставьте текст в любом удобном формате (с <code># Заголовок</code>, нумерацией <code>1. Тема</code> или двоеточием <code>Тема: слова</code>).
     </p>
 
     <div class="row between wrap gap-small">
       <label class="check" style="margin: 0;">
         <input id="batchAutoSplit" type="checkbox" checked>
-        <span>Делить темы более 25 слов на части (Часть 1, Часть 2)</span>
+        <span>Делить темы более 25 слов на части (Часть 1, 2)</span>
       </label>
-      <span class="small-text muted">Оптимально для сетки 15×15: 12–22 слова</span>
+      <span class="small-text muted">Для сетки 15×15: 12–22 слова</span>
     </div>
 
-    <textarea id="batchImportText" rows="9" class="mono gap-small" placeholder="# Космос
+    <textarea id="batchImportText" rows="8" class="mono gap-small" placeholder="# Космос
 
 ПЛАНЕТА, ЗВЕЗДА, ОРБИТА, КОМЕТА, СПУТНИК, АСТЕРОИД, ГАЛАКТИКА
 
@@ -1000,12 +1172,12 @@
 1. Животные: ВОЛК, ЛИСИЦА, МЕДВЕДЬ, РЫСЬ, БАРСУК, БОБР"></textarea>
 
     <div class="row between wrap gap-small">
-      <div class="row wrap" id="batchLiveBadges">
+      <div class="row wrap" id="batchLiveBadges" style="gap: 5px;">
         <span id="batchCountBadge" class="badge">Распознано: 0 тем</span>
         <span id="batchWordsBadge" class="badge">Всего слов: 0</span>
-        <span id="batchWarnBadge" class="badge badge-amber" hidden>0 предупреждений</span>
+        <span id="batchWarnBadge" class="badge badge-amber" hidden>0 предпр.</span>
       </div>
-      <span class="small-text muted">Живой предпросмотр перед добавлением:</span>
+      <span class="small-text muted">Живой предпросмотр:</span>
     </div>
 
     <div id="batchPreviewList" class="batch-preview-box gap-small"></div>
@@ -2345,15 +2517,15 @@
       book.topics.forEach((topic, idx) => {
         const tr = document.createElement("tr");
 
-        const tdNum = node("td", "mono muted", idx + 1);
-        const tdName = node("td", "", topic.name);
-        const tdWords = node("td", "small-text muted", topic.words.slice(0, 10).join(", ") + (topic.words.length > 10 ? "…" : ""));
+        const tdNum = node("td", "mono muted col-num", idx + 1);
+        const tdName = node("td", "col-name", topic.name);
+        const tdWords = node("td", "small-text muted col-words", topic.words.slice(0, 10).join(", ") + (topic.words.length > 10 ? "…" : ""));
 
         const placedCount = topic.placements?.length || 0;
         const totalCount = topic.words.length;
         const isReady = topic.grid && placedCount > 0;
 
-        const tdStatus = node("td", "");
+        const tdStatus = node("td", "col-status");
         if (isReady) {
           const badgeClass = placedCount === totalCount ? "badge-green" : "badge-amber";
           tdStatus.append(node("span", `badge ${badgeClass}`, `${placedCount}/${totalCount}`));
@@ -2361,7 +2533,7 @@
           tdStatus.append(node("span", "badge", "Не создана"));
         }
 
-        const tdActions = node("td", "");
+        const tdActions = node("td", "col-actions");
         const actionsDiv = node("div", "row", "");
         actionsDiv.style.justifyContent = "flex-end";
 
