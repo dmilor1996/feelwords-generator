@@ -371,6 +371,12 @@
       flex-wrap: wrap;
     }
 
+    .free-editor-banner {
+      background: var(--panel2);
+      border-color: var(--line);
+      padding: 9px 14px;
+    }
+
     .topics-table {
       width: 100%;
       border-collapse: collapse;
@@ -606,6 +612,14 @@
 
   <main>
     <section id="view-constructor" class="stack">
+      <!-- Состояние самостоятельного черновика -->
+      <div id="freeContextBanner" class="book-header-banner free-editor-banner">
+        <div class="row wrap banner-info">
+          <span class="badge">Свободный режим</span>
+          <span class="muted small-text">Отдельный черновик. Изменения не затрагивают книги.</span>
+        </div>
+      </div>
+
       <!-- Контекстный баннер книги -->
       <div id="bookContextBanner" class="book-header-banner" hidden>
         <div class="row wrap banner-info">
@@ -619,6 +633,7 @@
           <button id="prevBookTopicBtn" class="small" type="button">‹ Пред. тема</button>
           <button id="nextBookTopicBtn" class="small" type="button">След. тема ›</button>
           <button id="backToBookBtn" class="primary small" type="button">← В книгу</button>
+          <button id="leaveBookEditorBtn" class="small" type="button" title="Вернуться к отдельному черновику">⚡ Свободный конструктор</button>
         </div>
       </div>
 
@@ -1654,9 +1669,35 @@
     let activeTab = "constructor";
     let activeBookId = null;
     let activeBookTopicIndex = null;
+    // The persisted state.board is always the standalone draft.
+    // Book grids are edited through a separate transient entity.
+    let bookEditorBoard = null;
+    let editorSession = 0;
+    let generationRequest = 0;
+
+    function isBookEditor() {
+      return bookEditorBoard !== null && activeBookId !== null && activeBookTopicIndex !== null;
+    }
+
+    function currentBoardEntity() {
+      return isBookEditor() ? bookEditorBoard : state.board;
+    }
+
+    function leaveBookEditor() {
+      if (bookEditorBoard !== null || activeBookTopicIndex !== null) {
+        editorSession++;
+        generationRequest++;
+      }
+      bookEditorBoard = null;
+      activeBookTopicIndex = null;
+      $("generateButton").disabled = false;
+      $("generationStatus").textContent = "";
+      updateBookContextBanner();
+    }
 
     let state = {
       schema: SCHEMA,
+      freeBoardIsolated: true,
       board: { rev: { n: 0, by: "" }, ancestors: [], value: emptyBoard() },
       topics: {},
       books: {},
@@ -2021,13 +2062,31 @@
         };
       }
 
+      const freeBoard = {
+        rev: clone(raw.board.rev),
+        ancestors,
+        value: validateBoard(raw.board.value)
+      };
+
+      // Older versions copied an opened book topic into the shared board.
+      // If the legacy board is an exact duplicate, keep the book data and
+      // start a fresh independent draft. Never reset an unrelated draft.
+      if (raw.freeBoardIsolated !== true) {
+        const candidate = freeBoard.value;
+        const duplicateBookTopic = Object.values(books).some(book => book.topics.some(topic =>
+          topic.grid && topic.name === candidate.name &&
+          topic.raw === candidate.raw &&
+          stable(topic.words) === stable(candidate.words) &&
+          stable(topic.grid) === stable(candidate.grid) &&
+          stable(topic.placements) === stable(candidate.placements)
+        ));
+        if (duplicateBookTopic) freeBoard.value = emptyBoard();
+      }
+
       return {
         schema: SCHEMA,
-        board: {
-          rev: clone(raw.board.rev),
-          ancestors,
-          value: validateBoard(raw.board.value)
-        },
+        freeBoardIsolated: true,
+        board: freeBoard,
         topics,
         books,
         game: raw.game && raw.game.board ? { board: validateBoard(raw.game.board), found: raw.game.found || {}, elapsedMs: Math.max(0, Number(raw.game.elapsedMs) || 0), manualPaused: !!raw.game.manualPaused, completed: !!raw.game.completed } : null
@@ -2061,33 +2120,33 @@
       updateGameNewBoard();
     }
 
-    function commitBoard(board, base = state.board) {
-      observe(state.board);
-      state.board = entityFrom(base, board);
+    function commitBoard(board, base = currentBoardEntity()) {
+      observe(base);
+      const next = entityFrom(base, board);
+      if (isBookEditor()) {
+        const book = state.books[activeBookId];
+        const topic = book?.topics[activeBookTopicIndex];
+        if (!topic) return;
+        bookEditorBoard = next;
+        topic.name = board.name;
+        topic.raw = board.raw;
+        topic.words = [...board.words];
+        topic.grid = [...board.grid];
+        topic.placements = clone(board.placements);
+        book.updatedAt = Date.now();
+      } else {
+        state.board = next;
+      }
       focusedWord = null;
       textModified = false;
       $("rebuildHint").hidden = true;
-
-      if (activeBookId && activeBookTopicIndex !== null) {
-        const book = state.books[activeBookId];
-        if (book && book.topics[activeBookTopicIndex]) {
-          const t = book.topics[activeBookTopicIndex];
-          t.name = board.name;
-          t.raw = board.raw;
-          t.words = [...board.words];
-          t.grid = [...board.grid];
-          t.placements = clone(board.placements);
-          book.updatedAt = Date.now();
-          updateBookContextBanner();
-        }
-      }
-
       renderConstructor(true);
       stateChanged();
     }
 
     function updateBookContextBanner() {
-      if (activeBookId && activeBookTopicIndex !== null) {
+      $("freeContextBanner").hidden = isBookEditor();
+      if (isBookEditor()) {
         const book = state.books[activeBookId];
         if (book && book.topics[activeBookTopicIndex]) {
           const t = book.topics[activeBookTopicIndex];
