@@ -1,0 +1,20 @@
+name: Editor isolation tests
+
+on:
+  push:
+    branches: [fix/isolate-book-editor]
+  pull_request:
+    paths:
+      - index.html
+      - tests/editor-isolation.test.cjs
+      - .github/workflows/editor-isolation.yml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test tests/editor-isolation.test.cjs
