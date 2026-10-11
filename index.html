@@ -627,6 +627,7 @@
           <div class="banner-title-text">
             <b>Книга:</b> <span id="bannerBookTitle">—</span> &nbsp;›&nbsp;
             <b>Тема:</b> <span id="bannerTopicTitle">—</span> (<span id="bannerTopicPos">#1 из 50</span>)
+            <span class="small-text"> · Изменения сохраняются в книгу автоматически</span>
           </div>
         </div>
         <div class="row banner-nav-actions">
@@ -2580,6 +2581,7 @@
       $("boardStats").textContent =
         `${board.placements.length} слов · ${occupied.size} букв · ${Math.round(occupied.size / CELLS * 100)}% занято`;
       $("placedSummary").textContent = `${board.placements.length} из ${board.words.length}`;
+      $("saveTopicButton").textContent = isBookEditor() ? "📚 Копию в каталог" : "💾 Сохранить в каталог";
       $("revealButton").textContent = showAnswers ? "👁 Подсветка: вкл" : "Подсветка: выкл";
 
       const chips = $("constructorWords");
