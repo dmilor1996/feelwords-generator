@@ -166,6 +166,9 @@ test('batch import retains newline-separated words and splits large topics into 
   const multi=api.parseBatchInput('# Animals\nCAT\nDOG\nFOX\n\n# Fruits\nPEAR\nAPPLE');
   assert.equal(multi.topics.length,2);
   assert.deepEqual(Array.from(multi.topics[0].words),['CAT','DOG','FOX']);
+  const adjacent=api.parseBatchInput('Mythical Creatures\\nDRAGON, UNICORN, MERMAID\\nDinosaurs (Jurassic Park)\\nTREX, RAPTOR, FOSSIL');
+  assert.equal(adjacent.topics.length,2);
+  assert.equal(adjacent.topics[1].name,'Dinosaurs (Jurassic Park)');
   const words=Array.from({length:47},(_,i)=>String.fromCharCode(65+Math.floor(i/26))+String.fromCharCode(65+i%26));
   const large=api.parseBatchInput('# Large\n'+words.join(', '),true);
   assert.deepEqual(Array.from(large.topics,t=>t.words.length),[20,20,7]);
