@@ -268,3 +268,49 @@ test('irreparable legacy sync acknowledgement requires explicit conflict choice'
   assert.ok($('syncConflict').hasAttribute('open'));
   assert.ok(api.state().books['book-one']);
 });
+
+
+test('export preview survives closing and reopening without refreshing the page',()=>{
+  const {api,$}=launch();
+  api.commitBoard(board(api,'Космос','ОРБИТА'));
+  $('editorExportButton').click();
+  const original=$('printPreview');
+  assert.match(original.srcdoc,/ОРБИТА/);
+  assert.equal($('exportDialog').hasAttribute('open'),true);
+  $('closeExportButton').click();
+  // Simulate Chromium discarding the hidden iframe's previous rendering context.
+  original.srcdoc='';
+  $('editorExportButton').click();
+  const reopened=$('printPreview');
+  assert.notStrictEqual(reopened,original);
+  assert.match(reopened.srcdoc,/ОРБИТА/);
+  assert.equal($('exportDialog').hasAttribute('open'),true);
+  $('closeExportButton').click();
+  api.commitBoard(board(api,'Новая сетка','КОМЕТА'));
+  $('editorExportButton').click();
+  const third=$('printPreview');
+  assert.notStrictEqual(third,reopened);
+  assert.match(third.srcdoc,/КОМЕТА/);
+  assert.doesNotMatch(third.srcdoc,/ОРБИТА/);
+});
+
+test('reopened export preview still switches PDF pages and SVG formats',()=>{
+  const {api,$}=launch();
+  api.commitBoard(board(api,'Галактика','ПЛАНЕТА'));
+  api.openExport();
+  $('exportDialog').close();
+  api.openExport();
+  const preview=$('printPreview');
+  assert.match(preview.srcdoc,/ПЛАНЕТА/);
+  assert.match($('previewPageCount').textContent,/1 \/ 2/);
+  $('previewNext').click();
+  assert.equal($('previewPageCount').textContent,'2 / 2');
+  // Linkedom's select value emulation does not reliably reflect option updates.
+  Object.defineProperty($('exportFormat'),'value',{get:()=> 'svg',configurable:true});
+  api.renderExport();
+  assert.match($('printPreview').srcdoc,/<svg/);
+  $('exportDialog').close();
+  api.openExport();
+  assert.notStrictEqual($('printPreview'),preview);
+  assert.match($('printPreview').srcdoc,/<svg/);
+});
