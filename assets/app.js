@@ -78,11 +78,13 @@
     }
 
     function stable(value) {
-      if (value === null || typeof value !== "object") return JSON.stringify(value);
-      if (Array.isArray(value)) return "[" + value.map(stable).join(",") + "]";
-      return "{" + Object.keys(value).sort().map(k =>
-        JSON.stringify(k) + ":" + stable(value[k])
-      ).join(",") + "}";
+      // Native JSON semantics omit undefined object fields and serialize
+      // undefined array entries as null. The former serializer wrote the
+      // literal token "undefined" into ack snapshots, breaking JSON.parse.
+      return JSON.stringify(value, (_key, item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) return item;
+        return Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]]));
+      }) ?? "null";
     }
 
     function toast(message) {
@@ -1115,13 +1117,53 @@
       }
     };
 
+    function restoreAcknowledgement(raw) {
+      if (!raw) return { ack: null, uncertain: false };
+      if (typeof raw !== "string") return { ack: null, uncertain: true };
+      const parse = text => stable(validateState(JSON.parse(text)));
+      try { return { ack: parse(raw), uncertain: false }; } catch {}
+
+      // Legacy versions wrote unquoted undefined tokens inside JSON.
+      // Repair only complete tokens OUTSIDE strings, never evaluate data.
+      let insideString = false, escaped = false, repaired = false, fixed = "";
+      for (let i = 0; i < raw.length; i++) {
+        const ch = raw[i];
+        if (insideString) {
+          fixed += ch;
+          if (escaped) escaped = false;
+          else if (ch === "\\") escaped = true;
+          else if (ch === '"') insideString = false;
+          continue;
+        }
+        if (ch === '"') { insideString = true; fixed += ch; continue; }
+        if (raw.startsWith("undefined", i) &&
+            /[:,\\[]/.test(raw[i - 1] || "") &&
+            /[,}\\]]/.test(raw[i + 9] || "")) {
+          fixed += "null";
+          i += 8;
+          repaired = true;
+          continue;
+        }
+        fixed += ch;
+      }
+      if (repaired) {
+        try { return { ack: parse(fixed), uncertain: false }; } catch {}
+      }
+      // If the baseline really is damaged, require the user to choose the
+      // version after reading the cloud. Never auto-overwrite cloud data.
+      return { ack: null, uncertain: true };
+    }
+
     const Sync = {
       connected: false, ready: false, timer: null, busy: false, conflict: null,
       channel: 'Личная база · Firebase', base: 0, ack: null, owner: null,
+      uncertainAck: false,
       async init(local) {
         this.owner = local?.owner || null;
         this.base = local?.base || 0;
-        this.ack = local?.ack ? stable(validateState(JSON.parse(local.ack))) : null;
+        const restored = restoreAcknowledgement(local?.ack);
+        this.ack = restored.ack;
+        this.uncertainAck = restored.uncertain;
         this.ready = true;
         $('cloudLoginForm').onsubmit = e => Cloud.login(e);
         $('cloudSignOut').onclick = () => Cloud.logout();
@@ -1168,6 +1210,7 @@
         observe(state.board);
         this.base = remote.revision;
         this.ack = stable(state);
+        this.uncertainAck = false;
         leaveBookEditor();
         activeBookId = null;
         pauseGameClock(); game = state.game ? clone(state.game) : null;
@@ -1185,6 +1228,7 @@
         }
         if (choice === 'cloud') this.apply(remote);
         else { this.base = remote.revision; this.ack = stable(validateState(remote.state)); }
+        this.uncertainAck = false;
         this.conflict = null;
         $('syncConflict').close();
         await persistState();
@@ -1204,13 +1248,22 @@
           if (remote.state) {
             remote.state = validateState(remote.state);
             const remoteText = stable(remote.state);
-            if (remoteText === stable(state)) { this.base = remote.revision; this.ack = remoteText; }
-            else if (remote.revision !== this.base) {
+            if (remoteText === stable(state)) {
+              this.base = remote.revision;
+              this.ack = remoteText;
+              this.uncertainAck = false;
+            } else if (this.uncertainAck) {
+              this.showConflict(remote);
+              return;
+            } else if (remote.revision !== this.base) {
               if (this.dirty()) { this.showConflict(remote); return; }
               this.apply(remote);
             }
           } else if (this.base !== 0) {
             throw new Error('Облачная версия недоступна. Локальная копия сохранена.');
+          } else {
+            // An empty cloud has no data that could be overwritten.
+            this.uncertainAck = false;
           }
           if (this.dirty()) {
             state = validateState(state);
