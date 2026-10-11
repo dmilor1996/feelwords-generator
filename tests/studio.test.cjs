@@ -25,7 +25,7 @@ function launch(){
       getGame:()=>game, state:()=>state, current:()=>currentBoardEntity().value,
       setGenerator:fn=>generateGrid=fn, attachBook:(book)=>state.books[book.id]=book,
       copyText,parseBatchInput,renderAnswerPaths,createTypographySVG,setAnswers:v=>{showAnswers=v;renderConstructor()},
-      stable,restoreAcknowledgement,validateState,getSync:()=>Sync,
+      stable,restoreAcknowledgement,validateState,getSync:()=>Sync,setState:next=>{state=next;},
       restoreHistory:()=>{editorHistory=new StudioCore.History(editorHistory.serialize());},
       initialize:()=>{bindEvents();bindStudioEvents();Reverse.init();renderConstructor(true);renderBooks();renderTopics();}
     };
@@ -243,6 +243,8 @@ test('restored legacy acknowledgement synchronizes without overwriting cloud boo
   const {api,$}=launch();
   const b=book(api);b.topics.forEach(topic=>delete topic.settings);api.attachBook(b);
   const remote=api.validateState(api.state());
+  // Actual page startup also validates the local persisted state first.
+  api.setState(remote);
   const sync=api.getSync(),calls=[];
   sync.request=async method=>{calls.push(method);return {data:{revision:11,state:remote}}};
   await sync.init({base:11,ack:legacyStable(remote)});
