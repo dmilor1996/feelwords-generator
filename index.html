@@ -2354,7 +2354,8 @@
         observe(state.board);
         this.base = remote.revision;
         this.ack = stable(state);
-        activeBookId = null; activeBookTopicIndex = null;
+        leaveBookEditor();
+        activeBookId = null;
         pauseGameClock(); game = state.game ? clone(state.game) : null;
         renderConstructor(true); updateInputWarnings(); renderTopics(); renderBooks();
         $('bookDetailView').hidden = true; $('booksListView').hidden = false;
@@ -2486,12 +2487,16 @@
         return;
       }
 
+      const request = ++generationRequest;
+      const session = editorSession;
       $("generateButton").disabled = true;
       $("generationStatus").textContent = "Поиск оптимальной укладки…";
 
       try {
-        const layout = await generateGrid(parsed.words, settings);
-        const base = clone(state.board);
+        const layout = await generateGrid(parsed.words, settings,
+          () => request !== generationRequest || session !== editorSession);
+        if (!layout || request !== generationRequest || session !== editorSession) return;
+        const base = clone(currentBoardEntity());
 
         const board = {
           id: uid(),
@@ -2508,10 +2513,12 @@
         $("generationStatus").textContent =
           `Готово: размещено ${board.placements.length} из ${board.words.length}.`;
       } catch (error) {
-        $("generationStatus").textContent = error.message;
-        toast(error.message);
+        if (request === generationRequest && session === editorSession) {
+          $("generationStatus").textContent = error.message;
+          toast(error.message);
+        }
       } finally {
-        $("generateButton").disabled = false;
+        if (request === generationRequest) $("generateButton").disabled = false;
       }
     }
 
@@ -2703,14 +2710,14 @@
     }
 
     function openTopicInConstructor(bookId, topicIndex) {
-      activeBookId = bookId;
-      activeBookTopicIndex = topicIndex;
       const book = state.books[bookId];
-      if (!book) return;
-      const topic = book.topics[topicIndex];
+      const topic = book?.topics[topicIndex];
       if (!topic) return;
 
-      const base = clone(state.board);
+      const session = ++editorSession;
+      generationRequest++; // Stop any rebuild from a previously opened topic.
+      activeBookId = bookId;
+      activeBookTopicIndex = topicIndex;
       const board = {
         id: uid(),
         name: topic.name,
@@ -2721,24 +2728,33 @@
         placements: topic.placements ? clone(topic.placements) : [],
         createdAt: Date.now()
       };
+      // Viewing a ready book grid never overwrites the free draft or
+      // needlessly marks the book as changed in cloud synchronization.
+      bookEditorBoard = { rev: clone(state.board.rev), ancestors: [], value: board };
+      focusedWord = null;
+      $("generationStatus").textContent = "";
+      $("generateButton").disabled = false;
+      switchTab("constructor", { bookEditor: true });
+      renderConstructor(true);
 
-      if (!topic.grid || !topic.placements.length) {
-        toast("Генерация сетки темы…");
-        generateGrid(board.words, board.settings).then(layout => {
-          board.grid = layout.grid;
-          board.placements = layout.placements;
-          topic.grid = [...layout.grid];
-          topic.placements = clone(layout.placements);
-          commitBoard(board, base);
-          switchTab("constructor");
-        }).catch(err => {
-          toast(err.message);
-          commitBoard(board, base);
-          switchTab("constructor");
-        });
-      } else {
-        commitBoard(board, base);
-        switchTab("constructor");
+      // Only never-generated topics auto-generate. Clearing a grid should
+      // leave it cleared until the user explicitly rebuilds it.
+      if (!topic.grid && board.words.length) {
+        $("generationStatus").textContent = "Генерация сетки темы…";
+        generateGrid(board.words, board.settings, () => session !== editorSession)
+          .then(layout => {
+            if (!layout || session !== editorSession || !isBookEditor()) return;
+            board.grid = layout.grid;
+            board.placements = layout.placements;
+            commitBoard(board);
+            $("generationStatus").textContent =
+              `Готово: размещено ${board.placements.length} из ${board.words.length}.`;
+          })
+          .catch(err => {
+            if (session !== editorSession || !isBookEditor()) return;
+            $("generationStatus").textContent = err.message;
+            toast(err.message);
+          });
       }
     }
 
@@ -3515,7 +3531,13 @@
       }
     }
 
-    async function switchTab(tab) {
+    async function switchTab(tab, options = {}) {
+      // Navigating via the main Constructor tab returns to the free draft.
+      // Leaving a book editor closes its transient editing session.
+      if (!options.bookEditor && bookEditorBoard !== null) {
+        leaveBookEditor();
+        if (tab === "constructor") renderConstructor(true);
+      }
       if (activeTab === "play" && tab !== "play") {
         pauseGameClock();
         cancelSelection();
@@ -3884,8 +3906,8 @@
 
         const actions = node("div", "actions");
         actions.append(action("Открыть", () => {
+          leaveBookEditor();
           activeBookId = null;
-          activeBookTopicIndex = null;
           if (item.board) {
             commitBoard(clone(item.board));
           } else {
@@ -3946,14 +3968,22 @@
       });
 
       $("clearButton").addEventListener("click", async () => {
-        const ok = await confirmModal("Очистить текущую сетку в конструкторе? (Каталог и книги сохранятся)", "Очистка");
-        if (!ok) return;
-        const board = emptyBoard();
+        const inBook = isBookEditor();
+        const session = editorSession;
+        const message = inBook
+          ? "Очистить сетку этой темы в книге? Список слов и название сохранятся."
+          : "Очистить свободную сетку? Книги и каталог тем сохранятся.";
+        const ok = await confirmModal(message, "Очистка");
+        if (!ok || session !== editorSession || inBook !== isBookEditor()) return;
+        generationRequest++;
+        const board = inBook
+          ? { ...clone(currentBoardEntity().value), grid: Array(CELLS).fill("·"), placements: [] }
+          : emptyBoard();
         board.id = uid();
         board.createdAt = Date.now();
         commitBoard(board);
         $("generationStatus").textContent = "";
-        toast("Конструктор очищен.");
+        toast(inBook ? "Сетка темы очищена. Слова сохранены." : "Свободный конструктор очищен.");
       });
 
       $("revealButton").addEventListener("click", () => {
@@ -4140,6 +4170,8 @@
       $("exportBackup").addEventListener("click", exportBackup);
       $("importBackup").addEventListener("click", () => $("backupFile").click());
       $("backupFile").addEventListener("change", e => importBackup(e.target.files[0]));
+
+      $("leaveBookEditorBtn").addEventListener("click", () => switchTab("constructor"));
 
       $("backToBookBtn").addEventListener("click", () => {
         if (activeBookId) {
