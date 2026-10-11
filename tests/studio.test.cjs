@@ -24,6 +24,7 @@ function launch(){
       performExport, newGame, exportBookXLSX,
       getGame:()=>game, state:()=>state, current:()=>currentBoardEntity().value,
       setGenerator:fn=>generateGrid=fn, attachBook:(book)=>state.books[book.id]=book,
+      copyText,parseBatchInput,renderAnswerPaths,createTypographySVG,setAnswers:v=>{showAnswers=v;renderConstructor()},
       restoreHistory:()=>{editorHistory=new StudioCore.History(editorHistory.serialize());},
       initialize:()=>{bindEvents();bindStudioEvents();Reverse.init();renderConstructor(true);renderBooks();renderTopics();}
     };
@@ -31,7 +32,7 @@ function launch(){
   const context={window,document,StudioCore,StudioPrint,crypto:webcrypto,console,navigator:{},performance:{now:()=>Date.now()},setTimeout:(fn,ms)=>setTimeout(fn,Math.min(ms,10)),clearTimeout,Uint8Array,TextEncoder,TextDecoder,Blob,URL};
   vm.runInNewContext(app,context);
   const api=window.__studio;api.initialize();
-  return {api,window,document,$:id=>document.getElementById(id)};
+  return {api,window,document,navigator:context.navigator,$:id=>document.getElementById(id)};
 }
 function board(api,name='Космос',word='ОРБИТА'){
   const b=api.emptyBoard();b.id=name;b.name=name;b.raw=word;b.words=[word];b.grid=Array(225).fill('Х');for(let i=0;i<word.length;i++)b.grid[i]=word[i];b.placements=[{word,cells:[...word].map((_,i)=>i)}];return b;
@@ -114,4 +115,91 @@ test('history truncates redo branches, caps versions, and restores serialization
   assert.equal(h.get('free',old).entries.length,30);const back=h.move('free',old,-1);assert.equal(back.name,'39');
   h.record('free',back,{...back,name:'new'});assert.equal(h.move('free',{...back,name:'new'},1),null);
   const restored=new StudioCore.History(h.serialize());assert.equal(restored.move('free',{...back,name:'new'},-1).name,'39');
+});
+
+
+test('clipboard confirms success only after Clipboard API writes actual text',async()=>{
+  const {api,window,navigator,$}=launch();
+  window.isSecureContext=true;
+  const copied=[];
+  navigator.clipboard={writeText:async text=>{copied.push(text);}};
+  assert.equal(await api.copyText('A\tB\nC'),true);
+  assert.deepEqual(copied,['A\tB\nC']);
+  assert.match($('toasts').textContent,/Скопировано/);
+});
+
+test('clipboard denial never reports a successful export',async()=>{
+  const {api,window,navigator,$}=launch();
+  window.isSecureContext=true;
+  navigator.clipboard={writeText:async()=>{throw Error('denied');}};
+  assert.equal(await api.copyText('private'),false);
+  assert.match($('toasts').textContent,/Не удалось скопировать/);
+  api.commitBoard(board(api));
+  api.openExport();
+  Object.defineProperty($('exportFormat'),'value',{get:()=> 'tsv',configurable:true});
+  api.renderExport();
+  await api.performExport();
+  assert.match($('exportStatus').textContent,/Копирование не выполнено/);
+  assert.doesNotMatch($('exportStatus').textContent,/Готово/);
+});
+
+test('visible answers show directional strokes, a start marker and an end arrow',()=>{
+  const {api,$}=launch();
+  api.commitBoard(board(api));
+  api.setAnswers(true);
+  const grid=$('constructorGrid');
+  grid.getBoundingClientRect=()=>({left:0,top:0,width:300,height:300});
+  [...grid.children].filter(el=>el.classList.contains('cell')).forEach((el,index)=>{
+    el.getBoundingClientRect=()=>({left:(index%15)*20,top:Math.floor(index/15)*20,width:20,height:20});
+  });
+  api.renderAnswerPaths();
+  const overlay=grid.querySelector('.answer-routes');
+  assert.ok(overlay);
+  assert.equal(overlay.querySelectorAll('line').length,2);
+  assert.equal(overlay.querySelectorAll('circle').length,1);
+  assert.equal(overlay.querySelectorAll('polygon').length,1);
+  assert.ok($('constructorWords').querySelector('.route-chip'));
+});
+
+test('batch import retains newline-separated words and splits large topics into groups of 20',()=>{
+  const {api}=launch();
+  const multi=api.parseBatchInput('# Animals\nCAT\nDOG\nFOX\n\n# Fruits\nPEAR\nAPPLE');
+  assert.equal(multi.topics.length,2);
+  assert.deepEqual(Array.from(multi.topics[0].words),['CAT','DOG','FOX']);
+  const adjacent=api.parseBatchInput('Mythical Creatures\nDRAGON, UNICORN, MERMAID\nDinosaurs (Jurassic Park)\nTREX, RAPTOR, FOSSIL');
+  assert.equal(adjacent.topics.length,2);
+  assert.equal(adjacent.topics[1].name,'Dinosaurs (Jurassic Park)');
+  const words=Array.from({length:47},(_,i)=>String.fromCharCode(65+Math.floor(i/26))+String.fromCharCode(65+i%26));
+  const large=api.parseBatchInput('# Large\n'+words.join(', '),true);
+  assert.deepEqual(Array.from(large.topics,t=>t.words.length),[20,20,7]);
+});
+
+test('printed answer pages contain visible word routes and arrows',()=>{
+  const {api}=launch();
+  const html=StudioPrint.pages({title:'Answers',boards:[board(api)],sheets:'answers'}).join('');
+  assert.match(html,/answer-routes-print/);
+  assert.match(html,/<polygon points=/);
+  assert.match(StudioPrint.documentHTML('Answers',html),/answer-routes-print/);
+});
+
+test('real export action puts the entire TSV grid in the clipboard',async()=>{
+  const {api,$,window,navigator}=launch();
+  window.isSecureContext=true;
+  let copied='';
+  navigator.clipboard={writeText:async text=>{copied=text;}};
+  api.commitBoard(board(api));
+  api.openExport();
+  Object.defineProperty($('exportFormat'),'value',{get:()=> 'tsv',configurable:true});
+  await api.performExport();
+  assert.equal(copied.split('\n').length,15);
+  assert.equal(copied.split('\n')[0].split('\t').length,15);
+  assert.equal($('exportStatus').textContent,'Готово.');
+});
+
+test('typography SVG answer uses slim routes and end arrows, not opaque blocks',()=>{
+  const {api}=launch();
+  const svg=api.createTypographySVG(board(api),true);
+  assert.match(svg,/<polygon points=/);
+  assert.doesNotMatch(svg,/stroke-width="30"/);
+  assert.match(svg,/stroke-width="6"/);
 });

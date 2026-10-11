@@ -155,6 +155,7 @@
       const rawBlocks = [];
       let curTitle = "";
       let curWordsLines = [];
+      let blankBefore = false;
 
       function flush() {
         const wordsRaw = curWordsLines.join(" ").trim();
@@ -175,7 +176,7 @@
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const trimmed = line.trim();
-        if (!trimmed) continue;
+        if (!trimmed) { blankBefore = true; continue; }
 
         let isHeader = false;
         let extTitle = "";
@@ -207,7 +208,7 @@
             extTitle = maybeTitle;
             inlineWords = maybeWords;
           }
-        } else if (curWordsLines.length > 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4) {
+        } else if (curWordsLines.length > 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4 && (blankBefore || /[a-zа-я]/.test(trimmed) || trimmed.includes(" ")) && (lines.slice(i + 1).find(next => next.trim()) || "").includes(",")) {
           if (/[А-ЯA-Zа-яa-z]/.test(trimmed)) {
             isHeader = true;
             extTitle = trimmed;
@@ -225,6 +226,7 @@
             curWordsLines.push(trimmed);
           }
         }
+        blankBefore = false;
       }
 
       flush();
@@ -250,8 +252,8 @@
           return;
         }
 
-        if (autoSplit && words.length > 25) {
-          const chunkSize = words.length > 40 ? Math.ceil(words.length / 2) : 20;
+        if (autoSplit && words.length > 20) {
+          const chunkSize = 20;
           let partNum = 1;
           for (let s = 0; s < words.length; s += chunkSize) {
             const chunk = words.slice(s, s + chunkSize);
@@ -1352,6 +1354,65 @@
       });
     }
 
+    function renderAnswerPaths() {
+      const grid = $("constructorGrid");
+      grid.querySelector(".answer-routes")?.remove();
+      if (!showAnswers && !focusedWord) return;
+      if (typeof grid.getBoundingClientRect !== "function") return;
+      const bounds = grid.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return; // DOM tests / hidden panel
+
+      const board = currentBoardEntity().value;
+      const svgNS = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("class", "answer-routes");
+      svg.setAttribute("viewBox", `0 0 ${bounds.width} ${bounds.height}`);
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.setAttribute("aria-hidden", "true");
+
+      const center = index => {
+        const cell = grid.children[index];
+        if (!cell || typeof cell.getBoundingClientRect !== "function") return null;
+        const rect = cell.getBoundingClientRect();
+        return { x: rect.left - bounds.left + rect.width / 2,
+                 y: rect.top - bounds.top + rect.height / 2, size: rect.width };
+      };
+      const make = (tag, attrs) => {
+        const element = document.createElementNS(svgNS, tag);
+        Object.entries(attrs).forEach(([key, value]) => element.setAttribute(key, String(value)));
+        svg.append(element);
+        return element;
+      };
+      const selected = board.placements.find(p => p.word === focusedWord);
+      const paths = board.placements.map((p, i) => ({ p, i }))
+        .filter(({ p }) => p.cells?.length > 1 && (showAnswers || p.word === focusedWord))
+        .sort((a, b) => Number(a.p === selected) - Number(b.p === selected));
+      paths.forEach(({ p, i }) => {
+        const start = center(p.cells[0]), end = center(p.cells[p.cells.length - 1]);
+        if (!start || !end) return;
+        const color = COLORS[i % COLORS.length];
+        const emphasized = p.word === focusedWord;
+        const width = Math.max(2.4, Math.min(5.5, start.size * .20));
+        const opacity = focusedWord && !emphasized ? .26 : .92;
+        make("line", { x1:start.x, y1:start.y, x2:end.x, y2:end.y,
+          stroke:"#ffffff", "stroke-width":width+2.5, "stroke-linecap":"round",
+          opacity });
+        make("line", { x1:start.x, y1:start.y, x2:end.x, y2:end.y,
+          stroke:color, "stroke-width":width, "stroke-linecap":"round",
+          opacity });
+        make("circle", { cx:start.x, cy:start.y, r:width*.95+1,
+          fill:color, stroke:"#ffffff", "stroke-width":1.4, opacity });
+        const dx=end.x-start.x, dy=end.y-start.y, angle=Math.atan2(dy,dx);
+        const back=width*1.7, wing=width*1.15;
+        const points=[
+          [end.x,end.y], [end.x-back*Math.cos(angle)+wing*Math.sin(angle),end.y-back*Math.sin(angle)-wing*Math.cos(angle)],
+          [end.x-back*Math.cos(angle)-wing*Math.sin(angle),end.y-back*Math.sin(angle)+wing*Math.cos(angle)]
+        ].map(p=>p.join(",")).join(" ");
+        make("polygon",{points,fill:color,stroke:"#fff","stroke-width":.7,opacity});
+      });
+      grid.append(svg);
+    }
+
     function renderConstructor(updateInputs = false) {
       const board = currentBoardEntity().value;
 
@@ -1405,17 +1466,24 @@
 
       board.words.forEach(word => {
         const found = placed.has(word);
+        const routeIndex = board.placements.findIndex(p => p.word === word);
         const chip = action((found ? "" : " ") + word, () => {
           if (!found) { toast("Слово не размещено. Нажмите «Перестроить сетку»."); return; }
           focusedWord = focusedWord === word ? null : word;
           renderConstructor();
           Sound.play();
         }, "chip" + (!found ? " failed" : "") + (focusedWord === word ? " active" : ""));
+        if (found) {
+          chip.classList.add("route-chip");
+          chip.style.setProperty("--route-color", COLORS[routeIndex % COLORS.length]);
+          chip.title = "Выделить маршрут слова на сетке";
+        }
         chips.append(chip);
       });
 
       if (!board.words.length) chips.append(node("span", "muted small-text", "Добавьте слова в панели «Слова» и создайте первую сетку."));
       renderStudio();
+      renderAnswerPaths();
     }
 
     function renderBooks() {
@@ -1804,10 +1872,17 @@
           const x2 = startX + c2 * cellSize + cellSize / 2;
           const y2 = startY + r2 * cellSize + cellSize / 2;
 
-          svg += `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="30" stroke-linecap="round" opacity="0.38" />\n`;
-          svg += `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2.5" stroke-dasharray="5,4" stroke-linecap="round" opacity="0.9" />\n`;
-          svg += `  <circle cx="${x1}" cy="${y1}" r="4.5" fill="${color}" stroke="#ffffff" stroke-width="1.5" />\n`;
-          svg += `  <circle cx="${x2}" cy="${y2}" r="3.5" fill="#ffffff" stroke="${color}" stroke-width="2" />\n`;
+          svg += `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ffffff" stroke-width="14" stroke-linecap="round" />\n`;
+          svg += `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="6" stroke-linecap="round" />\n`;
+          svg += `  <circle cx="${x1}" cy="${y1}" r="7" fill="${color}" stroke="#ffffff" stroke-width="2" />\n`;
+          const angle = Math.atan2(y2-y1,x2-x1);
+          const back = 17, wing = 9;
+          const endPoints = [
+            [x2,y2],
+            [x2-back*Math.cos(angle)+wing*Math.sin(angle),y2-back*Math.sin(angle)-wing*Math.cos(angle)],
+            [x2-back*Math.cos(angle)-wing*Math.sin(angle),y2-back*Math.sin(angle)+wing*Math.cos(angle)]
+          ].map(pair=>pair.join(',')).join(' ');
+          svg += `  <polygon points="${endPoints}" fill="${color}" stroke="#ffffff" stroke-width="2" />\n`;
         });
       }
 
@@ -1917,43 +1992,44 @@
       setTimeout(() => URL.revokeObjectURL(url), 1500);
     }
 
-    function copyText(text, success = "Скопировано в буфер обмена.") {
-      try {
-        const area = document.createElement("textarea");
-        area.value = text;
-        area.style.position = "fixed";
-        area.style.top = "0";
-        area.style.left = "0";
-        area.style.width = "2em";
-        area.style.height = "2em";
-        area.style.padding = "0";
-        area.style.border = "none";
-        area.style.outline = "none";
-        area.style.boxShadow = "none";
-        area.style.background = "transparent";
-        area.style.opacity = "0.01";
-        area.setAttribute("readonly", "");
-        document.body.appendChild(area);
-        area.focus();
-        area.select();
-        area.setSelectionRange(0, area.value.length);
-        const ok = document.execCommand("copy");
-        document.body.removeChild(area);
-        if (ok) {
-          toast(success);
-          return true;
+    async function copyText(text, success = "Скопировано в буфер обмена.") {
+      // Use the modern API first while the click still has user activation.
+      // Never report success until the browser has actually accepted the text.
+      let copied = false;
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function" && window.isSecureContext) {
+        try {
+          await navigator.clipboard.writeText(String(text));
+          copied = true;
+        } catch {
+          // Browser permissions or focus can block Clipboard API. Try the
+          // legacy fallback rather than silently reporting a successful export.
         }
-      } catch (err) {}
-
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(() => {
-          toast(success);
-        }).catch(() => {
-          toast("Не удалось скопировать в буфер.");
-        });
-        return;
       }
-      toast("Буфер обмена недоступен в этом браузере.");
+
+      if (!copied) {
+        let area;
+        const previousFocus = document.activeElement;
+        try {
+          area = document.createElement("textarea");
+          area.value = String(text);
+          area.setAttribute("readonly", "");
+          area.style.cssText = "position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none";
+          document.body.append(area);
+          area.focus();
+          area.select();
+          if (typeof area.setSelectionRange === "function") area.setSelectionRange(0, area.value.length);
+          copied = typeof document.execCommand === "function" && document.execCommand("copy") === true;
+        } catch {
+          copied = false;
+        } finally {
+          area?.remove();
+          if (previousFocus && typeof previousFocus.focus === "function") previousFocus.focus();
+        }
+      }
+
+      if (copied) toast(success);
+      else toast("Не удалось скопировать. Разрешите доступ к буферу обмена и повторите.");
+      return copied;
     }
 
     function exportBoardXLSX(board = currentBoardEntity().value) {
@@ -2108,7 +2184,12 @@
 
         const confirmed = await confirmModal(`Импортировать ${items.length} тем из файла?`, "Импорт тем");
         if (!confirmed) return;
-        Object.assign(state.books, importedBooks);
+        // A backup import must never overwrite an existing book with the same ID.
+        for (const [id, book] of Object.entries(importedBooks)) {
+          let newId = id;
+          while (state.books[newId]) newId = "book:" + uid();
+          state.books[newId] = { ...book, id: newId };
+        }
 
         for (const item of items) {
           const id = "import:" + uid();
@@ -2699,8 +2780,8 @@
         if(format==='pdf')printDocument(data,sheets);
         else if(format==='json')download(JSON.stringify(data.book?state.books[activeBookId]:{topics:[{name:data.title,words:data.boards[0].words,board:data.boards[0]}]},null,2),`${filename(data.title)}.json`,'application/json');
         else if(format==='xlsx'){if(typeof XLSX==='undefined')throw new Error('Не загрузилась библиотека Excel. Проверьте соединение и повторите.');if(data.book)await exportBookXLSX();else exportBoardXLSX(data.boards[0]);}
-        else if(format==='tsv')await copyText(gridTSV(data.boards[0].grid));
-        else if(format==='raw')await copyText(data.boards[0].grid.join(''));
+        else if(format==='tsv'){if(!await copyText(gridTSV(data.boards[0].grid)))throw new Error('Копирование не выполнено. Разрешите доступ к буферу обмена.');}
+        else if(format==='raw'){if(!await copyText(data.boards[0].grid.join('')))throw new Error('Копирование не выполнено. Разрешите доступ к буферу обмена.');}
         else{
           const types=sheets==='both'?[false,true]:[sheets==='answers'];
           const zipNeeded=data.book||types.length>1;
@@ -3116,6 +3197,10 @@
           return;
         }
 
+        if (book.topics.length + validTopics.length > MAX_TOPICS) {
+          toast("Слишком много тем: лимит " + MAX_TOPICS + " на книгу.");
+          return;
+        }
         validTopics.forEach(t => {
           book.topics.push({
             id: uid(),
@@ -3152,11 +3237,20 @@
         if (!file) return;
         try {
           const imported = JSON.parse(await file.text());
-          if (!imported || !Array.isArray(imported.topics)) throw new Error("Неверный формат файла книги");
+          if (!imported || typeof imported.title !== "string" || !Array.isArray(imported.topics) ||
+              imported.topics.length > MAX_TOPICS ||
+              imported.topics.some(t => !t || typeof t.name !== "string" || !Array.isArray(t.words) ||
+                t.words.some(w => typeof w !== "string") ||
+                (t.grid != null && (!Array.isArray(t.grid) || t.grid.length !== CELLS)))) {
+            throw new Error("Некорректная структура книги или слишком много тем");
+          }
           const id = "book:" + uid();
-          imported.id = id;
-          imported.updatedAt = Date.now();
-          state.books[id] = imported;
+          const safe = validateState({
+            schema: SCHEMA, board: state.board, topics: {},
+            books: { [id]: { ...imported, id, updatedAt: Date.now() } }
+          }).books[id];
+          if (!safe) throw new Error("Не удалось проверить содержимое книги");
+          state.books[id] = safe;
           stateChanged();
           toast(`Книга «${imported.title}» успешно импортирована!`);
           openBook(id);
@@ -3270,6 +3364,12 @@
       bindStudioEvents();
       Reverse.init();
       renderConstructor(true);
+      if (typeof window.ResizeObserver === "function") {
+        const observer = new window.ResizeObserver(() => renderAnswerPaths());
+        observer.observe($("constructorGrid"));
+      } else {
+        window.addEventListener("resize", renderAnswerPaths);
+      }
       renderTopics();
       renderBooks();
       game = state.game || await DB.get("wv_game_v4") || null;
