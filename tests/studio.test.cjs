@@ -123,8 +123,8 @@ test('clipboard confirms success only after Clipboard API writes actual text',as
   window.isSecureContext=true;
   const copied=[];
   navigator.clipboard={writeText:async text=>{copied.push(text);}};
-  assert.equal(await api.copyText('A\\tB\\nC'),true);
-  assert.deepEqual(copied,['A\\tB\\nC']);
+  assert.equal(await api.copyText('A\tB\nC'),true);
+  assert.deepEqual(copied,['A\tB\nC']);
   assert.match($('toasts').textContent,/Скопировано/);
 });
 
@@ -136,7 +136,7 @@ test('clipboard denial never reports a successful export',async()=>{
   assert.match($('toasts').textContent,/Не удалось скопировать/);
   api.commitBoard(board(api));
   api.openExport();
-  $('exportFormat').value='tsv';
+  Object.defineProperty($('exportFormat'),'value',{get:()=> 'tsv',configurable:true});
   api.renderExport();
   await api.performExport();
   assert.match($('exportStatus').textContent,/Копирование не выполнено/);
@@ -158,16 +158,16 @@ test('visible answers show directional strokes, a start marker and an end arrow'
   assert.equal(overlay.querySelectorAll('line').length,2);
   assert.equal(overlay.querySelectorAll('circle').length,1);
   assert.equal(overlay.querySelectorAll('polygon').length,1);
-  assert.ok(grid.querySelector('.route-chip'));
+  assert.ok($('constructorWords').querySelector('.route-chip'));
 });
 
 test('batch import retains newline-separated words and splits large topics into groups of 20',()=>{
   const {api}=launch();
-  const multi=api.parseBatchInput('# Animals\\nCAT\\nDOG\\nFOX\\n\\n# Fruits\\nPEAR\\nAPPLE');
+  const multi=api.parseBatchInput('# Animals\nCAT\nDOG\nFOX\n\n# Fruits\nPEAR\nAPPLE');
   assert.equal(multi.topics.length,2);
   assert.deepEqual(Array.from(multi.topics[0].words),['CAT','DOG','FOX']);
   const words=Array.from({length:47},(_,i)=>String.fromCharCode(65+Math.floor(i/26))+String.fromCharCode(65+i%26));
-  const large=api.parseBatchInput('# Large\\n'+words.join(', '),true);
+  const large=api.parseBatchInput('# Large\n'+words.join(', '),true);
   assert.deepEqual(Array.from(large.topics,t=>t.words.length),[20,20,7]);
 });
 
