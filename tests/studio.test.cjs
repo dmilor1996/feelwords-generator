@@ -25,11 +25,12 @@ function launch(){
       getGame:()=>game, state:()=>state, current:()=>currentBoardEntity().value,
       setGenerator:fn=>generateGrid=fn, attachBook:(book)=>state.books[book.id]=book,
       copyText,parseBatchInput,renderAnswerPaths,createTypographySVG,setAnswers:v=>{showAnswers=v;renderConstructor()},
+      stable,restoreAcknowledgement,validateState,getSync:()=>Sync,setState:next=>{state=next;},
       restoreHistory:()=>{editorHistory=new StudioCore.History(editorHistory.serialize());},
       initialize:()=>{bindEvents();bindStudioEvents();Reverse.init();renderConstructor(true);renderBooks();renderTopics();}
     };
   `);
-  const context={window,document,StudioCore,StudioPrint,crypto:webcrypto,console,navigator:{},performance:{now:()=>Date.now()},setTimeout:(fn,ms)=>setTimeout(fn,Math.min(ms,10)),clearTimeout,Uint8Array,TextEncoder,TextDecoder,Blob,URL};
+  const context={window,document,StudioCore,StudioPrint,crypto:webcrypto,console,navigator:{},performance:{now:()=>Date.now()},setTimeout:(fn,ms)=>setTimeout(fn,Math.min(ms,10)),clearTimeout,setInterval:()=>0,Uint8Array,TextEncoder,TextDecoder,Blob,URL};
   vm.runInNewContext(app,context);
   const api=window.__studio;api.initialize();
   return {api,window,document,navigator:context.navigator,$:id=>document.getElementById(id)};
@@ -202,4 +203,68 @@ test('typography SVG answer uses slim routes and end arrows, not opaque blocks',
   assert.match(svg,/<polygon points=/);
   assert.doesNotMatch(svg,/stroke-width="30"/);
   assert.match(svg,/stroke-width="6"/);
+});
+
+
+function legacyStable(value){
+  if(value===null||typeof value!=='object')return JSON.stringify(value);
+  if(Array.isArray(value))return '['+value.map(legacyStable).join(',')+']';
+  return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+legacyStable(value[key])).join(',')+'}';
+}
+
+test('canonical sync JSON omits undefined settings and always round-trips',()=>{
+  const {api}=launch();
+  const b=book(api);
+  b.topics.forEach(topic=>delete topic.settings);
+  api.attachBook(b);
+  const validated=api.validateState(api.state());
+  const serialized=api.stable(validated);
+  assert.ok(!serialized.includes('":undefined'));
+  assert.doesNotThrow(()=>JSON.parse(serialized));
+  assert.equal(JSON.parse(serialized).books['book-one'].topics[0].settings,undefined);
+  assert.deepEqual(JSON.parse(serialized),JSON.parse(api.stable(JSON.parse(serialized))));
+});
+
+test('legacy corrupted sync acknowledgement is repaired without discarding books',()=>{
+  const {api}=launch();
+  const b=book(api);
+  b.topics.forEach(topic=>delete topic.settings);
+  api.attachBook(b);
+  const validated=api.validateState(api.state());
+  const broken=legacyStable(validated);
+  assert.match(broken,/"settings":undefined/);
+  const restored=api.restoreAcknowledgement(broken);
+  assert.equal(restored.uncertain,false);
+  assert.equal(restored.ack,api.stable(validated));
+  assert.deepEqual(JSON.parse(restored.ack).books['book-one'].topics.map(t=>t.name),['Первая','Вторая']);
+});
+
+test('restored legacy acknowledgement synchronizes without overwriting cloud books',async()=>{
+  const {api,$}=launch();
+  const b=book(api);b.topics.forEach(topic=>delete topic.settings);api.attachBook(b);
+  const remote=api.validateState(api.state());
+  // Actual page startup also validates the local persisted state first.
+  api.setState(remote);
+  const sync=api.getSync(),calls=[];
+  sync.request=async method=>{calls.push(method);return {data:{revision:11,state:remote}}};
+  await sync.init({base:11,ack:legacyStable(remote)});
+  assert.deepEqual(calls,['GET']);
+  assert.equal(sync.uncertainAck,false);
+  assert.equal(sync.conflict,null);
+  assert.match($('syncButton').textContent,/Облако: сохранено/);
+  assert.equal(api.state().books['book-one'].topics.length,2);
+});
+
+test('irreparable legacy sync acknowledgement requires explicit conflict choice',async()=>{
+  const {api,$}=launch();
+  const remote=api.validateState(api.state());
+  api.attachBook(book(api));
+  const calls=[],sync=api.getSync();
+  sync.request=async method=>{calls.push(method);return {data:{revision:11,state:remote}}};
+  await sync.init({base:11,ack:'{"settings":undefined,"corrupted"'});
+  assert.equal(sync.uncertainAck,true);
+  assert.ok(sync.conflict);
+  assert.deepEqual(calls,['GET']);
+  assert.ok($('syncConflict').hasAttribute('open'));
+  assert.ok(api.state().books['book-one']);
 });
