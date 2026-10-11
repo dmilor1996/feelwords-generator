@@ -166,7 +166,7 @@ test('batch import retains newline-separated words and splits large topics into 
   const multi=api.parseBatchInput('# Animals\nCAT\nDOG\nFOX\n\n# Fruits\nPEAR\nAPPLE');
   assert.equal(multi.topics.length,2);
   assert.deepEqual(Array.from(multi.topics[0].words),['CAT','DOG','FOX']);
-  const adjacent=api.parseBatchInput('Mythical Creatures\\nDRAGON, UNICORN, MERMAID\\nDinosaurs (Jurassic Park)\\nTREX, RAPTOR, FOSSIL');
+  const adjacent=api.parseBatchInput('Mythical Creatures\nDRAGON, UNICORN, MERMAID\nDinosaurs (Jurassic Park)\nTREX, RAPTOR, FOSSIL');
   assert.equal(adjacent.topics.length,2);
   assert.equal(adjacent.topics[1].name,'Dinosaurs (Jurassic Park)');
   const words=Array.from({length:47},(_,i)=>String.fromCharCode(65+Math.floor(i/26))+String.fromCharCode(65+i%26));
@@ -191,8 +191,8 @@ test('real export action puts the entire TSV grid in the clipboard',async()=>{
   api.openExport();
   Object.defineProperty($('exportFormat'),'value',{get:()=> 'tsv',configurable:true});
   await api.performExport();
-  assert.equal(copied.split('\\n').length,15);
-  assert.equal(copied.split('\\n')[0].split('\\t').length,15);
+  assert.equal(copied.split('\n').length,15);
+  assert.equal(copied.split('\n')[0].split('\t').length,15);
   assert.equal($('exportStatus').textContent,'Готово.');
 });
 
