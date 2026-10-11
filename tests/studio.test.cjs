@@ -24,7 +24,7 @@ function launch(){
       performExport, newGame, exportBookXLSX,
       getGame:()=>game, state:()=>state, current:()=>currentBoardEntity().value,
       setGenerator:fn=>generateGrid=fn, attachBook:(book)=>state.books[book.id]=book,
-      copyText,parseBatchInput,renderAnswerPaths,setAnswers:v=>{showAnswers=v;renderConstructor()},
+      copyText,parseBatchInput,renderAnswerPaths,createTypographySVG,setAnswers:v=>{showAnswers=v;renderConstructor()},
       restoreHistory:()=>{editorHistory=new StudioCore.History(editorHistory.serialize());},
       initialize:()=>{bindEvents();bindStudioEvents();Reverse.init();renderConstructor(true);renderBooks();renderTopics();}
     };
@@ -177,4 +177,26 @@ test('printed answer pages contain visible word routes and arrows',()=>{
   assert.match(html,/answer-routes-print/);
   assert.match(html,/<polygon points=/);
   assert.match(StudioPrint.documentHTML('Answers',html),/answer-routes-print/);
+});
+
+test('real export action puts the entire TSV grid in the clipboard',async()=>{
+  const {api,$,window,navigator}=launch();
+  window.isSecureContext=true;
+  let copied='';
+  navigator.clipboard={writeText:async text=>{copied=text;}};
+  api.commitBoard(board(api));
+  api.openExport();
+  Object.defineProperty($('exportFormat'),'value',{get:()=> 'tsv',configurable:true});
+  await api.performExport();
+  assert.equal(copied.split('\\n').length,15);
+  assert.equal(copied.split('\\n')[0].split('\\t').length,15);
+  assert.equal($('exportStatus').textContent,'Готово.');
+});
+
+test('typography SVG answer uses slim routes and end arrows, not opaque blocks',()=>{
+  const {api}=launch();
+  const svg=api.createTypographySVG(board(api),true);
+  assert.match(svg,/<polygon points=/);
+  assert.doesNotMatch(svg,/stroke-width="30"/);
+  assert.match(svg,/stroke-width="6"/);
 });
