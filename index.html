@@ -2452,7 +2452,7 @@
       $("wordWarnings").hidden = warnings.length === 0;
       $("wordWarnings").textContent = warnings.join(" ");
 
-      const currentWords = state.board.value.words;
+      const currentWords = currentBoardEntity().value.words;
       const isWordsChanged = stable(parsed.words) !== stable(currentWords);
       textModified = isWordsChanged;
       $("rebuildHint").hidden = !isWordsChanged;
@@ -2460,10 +2460,13 @@
 
     function autoSaveMetaOnly() {
       const name = $("topicName").value.trim().slice(0, 120) || "Новая тема";
-      if (name !== state.board.value.name || $("wordsInput").value.slice(0, 30000) !== state.board.value.raw) {
-        state.board.value.name = name;
-        state.board.value.raw = $("wordsInput").value.slice(0, 30000);
-        if (activeBookId && activeBookTopicIndex !== null) {
+      if (name !== currentBoardEntity().value.name || $("wordsInput").value.slice(0, 30000) !== currentBoardEntity().value.raw) {
+        generationRequest++; // Cancel generation started with now-outdated text.
+        $("generateButton").disabled = false;
+        $("generationStatus").textContent = "";
+        currentBoardEntity().value.name = name;
+        currentBoardEntity().value.raw = $("wordsInput").value.slice(0, 30000);
+        if (isBookEditor()) {
           const b = state.books[activeBookId];
           if (b && b.topics[activeBookTopicIndex]) {
             b.topics[activeBookTopicIndex].name = name;
@@ -2534,7 +2537,7 @@
     }
 
     function renderConstructor(updateInputs = false) {
-      const board = state.board.value;
+      const board = currentBoardEntity().value;
 
       if (updateInputs) {
         $("topicName").value = board.name;
@@ -2740,10 +2743,13 @@
       // Only never-generated topics auto-generate. Clearing a grid should
       // leave it cleared until the user explicitly rebuilds it.
       if (!topic.grid && board.words.length) {
+        const request = ++generationRequest;
+        $("generateButton").disabled = true;
         $("generationStatus").textContent = "Генерация сетки темы…";
-        generateGrid(board.words, board.settings, () => session !== editorSession)
+        generateGrid(board.words, board.settings,
+          () => session !== editorSession || request !== generationRequest)
           .then(layout => {
-            if (!layout || session !== editorSession || !isBookEditor()) return;
+            if (!layout || session !== editorSession || request !== generationRequest || !isBookEditor()) return;
             board.grid = layout.grid;
             board.placements = layout.placements;
             commitBoard(board);
@@ -2751,9 +2757,12 @@
               `Готово: размещено ${board.placements.length} из ${board.words.length}.`;
           })
           .catch(err => {
-            if (session !== editorSession || !isBookEditor()) return;
+            if (session !== editorSession || request !== generationRequest || !isBookEditor()) return;
             $("generationStatus").textContent = err.message;
             toast(err.message);
+          })
+          .finally(() => {
+            if (session === editorSession && request === generationRequest) $("generateButton").disabled = false;
           });
       }
     }
@@ -3261,7 +3270,7 @@
       toast("Буфер обмена недоступен в этом браузере.");
     }
 
-    function exportBoardXLSX(board = state.board.value) {
+    function exportBoardXLSX(board = currentBoardEntity().value) {
       if (typeof XLSX === "undefined") {
         toast("Библиотека XLSX ещё загружается...");
         return;
@@ -3305,7 +3314,7 @@
       toast(`Файл «${board.name}» (XLSX) сохранён.`);
     }
 
-    function printCurrentBoard(board = state.board.value) {
+    function printCurrentBoard(board = currentBoardEntity().value) {
       if (!board || !board.grid) {
         toast("Нет сетки для печати.");
         return;
@@ -3762,10 +3771,10 @@
 
         const board = {
           id: uid(),
-          name: state.board.value.name,
+          name: currentBoardEntity().value.name,
           raw: $("reverseWords").value.slice(0, 30000),
           words,
-          settings: clone(state.board.value.settings),
+          settings: clone(currentBoardEntity().value.settings),
           grid: [...this.grid],
           placements: placementsFromGrid(this.grid, words),
           createdAt: Date.now()
@@ -3959,7 +3968,7 @@
       $("generateButton").addEventListener("click", executeRebuild);
 
       $("saveTopicButton").addEventListener("click", () => {
-        const b = state.board.value;
+        const b = currentBoardEntity().value;
         if (!b.words.length) { toast("Сначала создайте сетку со словами."); return; }
         const id = "topic:" + b.name.toLowerCase();
         state.topics[id] = { rev: nextRevision(), deleted: false, value: { name: b.name, words: [...b.words], board: clone(b), updatedAt: Date.now() } };
@@ -3995,11 +4004,11 @@
       $("headerExcel").addEventListener("click", () => exportBoardXLSX());
 
       $("tsvButton").addEventListener("click", () => {
-        copyText(gridTSV(state.board.value.grid), "Сетка скопирована для Excel (TSV).");
+        copyText(gridTSV(currentBoardEntity().value.grid), "Сетка скопирована для Excel (TSV).");
       });
 
       $("rawButton").addEventListener("click", () => {
-        copyText(state.board.value.grid.join(""), "Скопировано 225 символов матрицы.");
+        copyText(currentBoardEntity().value.grid.join(""), "Скопировано 225 символов матрицы.");
       });
 
       $("printButton").addEventListener("click", () => printCurrentBoard());
@@ -4008,7 +4017,7 @@
          СЛУШАТЕЛИ ЭКСПОРТА ТИПОГРАФИИ (SVG / 300 DPI) ДЛЯ ТЕКУЩЕЙ ТЕМЫ
          ========================================================================== */
       $("openTypoModalBtn")?.addEventListener("click", () => {
-        const board = state.board.value;
+        const board = currentBoardEntity().value;
         if (!board || !board.grid || !board.words.length) {
           toast("Сначала создайте или перестройте сетку темы.");
           return;
@@ -4019,14 +4028,14 @@
       $("closeTypoModalBtn")?.addEventListener("click", () => $("typoModal")?.close());
 
       $("downloadPuzzleSvgBtn")?.addEventListener("click", () => {
-        const board = state.board.value;
+        const board = currentBoardEntity().value;
         const svg = createTypographySVG(board, false);
         download(svg, `${filename(board.name)}_головоломка.svg`, "image/svg+xml;charset=utf-8");
         toast("Векторный SVG задания скачан.");
       });
 
       $("downloadPuzzlePngBtn")?.addEventListener("click", async () => {
-        const board = state.board.value;
+        const board = currentBoardEntity().value;
         toast("Генерация растра 300 DPI…");
         try {
           const svg = createTypographySVG(board, false);
@@ -4039,14 +4048,14 @@
       });
 
       $("downloadAnswersSvgBtn")?.addEventListener("click", () => {
-        const board = state.board.value;
+        const board = currentBoardEntity().value;
         const svg = createTypographySVG(board, true);
         download(svg, `${filename(board.name)}_ответы.svg`, "image/svg+xml;charset=utf-8");
         toast("Векторный SVG с ответами скачан.");
       });
 
       $("downloadAnswersPngBtn")?.addEventListener("click", async () => {
-        const board = state.board.value;
+        const board = currentBoardEntity().value;
         toast("Генерация растра 300 DPI с ответами…");
         try {
           const svg = createTypographySVG(board, true);
@@ -4398,9 +4407,9 @@
       });
 
       $("reverseLoad").addEventListener("click", () => {
-        Reverse.grid = [...state.board.value.grid];
+        Reverse.grid = [...currentBoardEntity().value.grid];
         Reverse.writeRaw();
-        $("reverseWords").value = state.board.value.words.join(", ");
+        $("reverseWords").value = currentBoardEntity().value.words.join(", ");
         Reverse.render();
       });
 
