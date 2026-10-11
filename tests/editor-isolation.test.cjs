@@ -37,7 +37,13 @@ function launch() {
   };
 
   const expose = `
-    renderConstructor = () => updateBookContextBanner();
+    renderConstructor = (updateInputs = false) => {
+      if (updateInputs) {
+        $("topicName").value = currentBoardEntity().value.name;
+        $("wordsInput").value = currentBoardEntity().value.raw;
+      }
+      updateBookContextBanner();
+    };
     renderBooks = () => {};
     renderTopics = () => {};
     renderBookDetail = () => {};
@@ -108,6 +114,8 @@ test("book edit never overwrites the standalone draft", async () => {
   assert.equal(api.currentBoardEntity().value.name, "Independent");
   assert.equal(element("freeContextBanner").hidden, false);
   assert.equal(element("bookContextBanner").hidden, true);
+  assert.equal(element("topicName").value, "Independent");
+  assert.equal(element("wordsInput").value, "SUN");
 });
 
 test("main Constructor navigation exits book mode without changing either board", async () => {
