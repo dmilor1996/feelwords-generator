@@ -208,7 +208,7 @@
             extTitle = maybeTitle;
             inlineWords = maybeWords;
           }
-        } else if (blankBefore && curWordsLines.length > 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4 && (lines.slice(i + 1).find(next => next.trim()) || "").includes(",")) {
+        } else if (curWordsLines.length > 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4 && (blankBefore || /[a-zа-я]/.test(trimmed) || trimmed.includes(" ")) && (lines.slice(i + 1).find(next => next.trim()) || "").includes(",")) {
           if (/[А-ЯA-Zа-яa-z]/.test(trimmed)) {
             isHeader = true;
             extTitle = trimmed;
