@@ -2781,8 +2781,22 @@
       const format=$('exportFormat');
       for(const option of format.options) option.disabled=scope==='book'&&['tsv','raw'].includes(option.value);
       if(scope==='book'&&['tsv','raw'].includes(format.value))format.value='pdf';
+
+      const dialog=$('exportDialog');
+      if(!dialog.open) {
+        // A sandboxed srcdoc iframe can retain an empty rendering context
+        // after its parent dialog becomes hidden. Give each opening a fresh
+        // browsing context while retaining its sandbox and accessibility attrs.
+        dialog.showModal();
+        const oldFrame=$('printPreview');
+        const newFrame=oldFrame.cloneNode(false);
+        newFrame.removeAttribute('srcdoc');
+        newFrame.removeAttribute('src');
+        oldFrame.replaceWith(newFrame);
+        $('exportStatus').textContent='';
+      }
+      // Populate srcdoc only after the dialog is visible.
       renderExport();
-      $('exportDialog').showModal();
     }
     function renderExport() {
       const data=exportData(),format=$('exportFormat').value,sheets=$('exportSheets').value;
