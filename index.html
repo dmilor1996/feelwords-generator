@@ -371,6 +371,12 @@
       flex-wrap: wrap;
     }
 
+    .free-editor-banner {
+      background: var(--panel2);
+      border-color: var(--line);
+      padding: 9px 14px;
+    }
+
     .topics-table {
       width: 100%;
       border-collapse: collapse;
@@ -606,6 +612,14 @@
 
   <main>
     <section id="view-constructor" class="stack">
+      <!-- Состояние самостоятельного черновика -->
+      <div id="freeContextBanner" class="book-header-banner free-editor-banner">
+        <div class="row wrap banner-info">
+          <span class="badge">Свободный режим</span>
+          <span class="muted small-text">Отдельный черновик. Изменения не затрагивают книги.</span>
+        </div>
+      </div>
+
       <!-- Контекстный баннер книги -->
       <div id="bookContextBanner" class="book-header-banner" hidden>
         <div class="row wrap banner-info">
@@ -613,12 +627,14 @@
           <div class="banner-title-text">
             <b>Книга:</b> <span id="bannerBookTitle">—</span> &nbsp;›&nbsp;
             <b>Тема:</b> <span id="bannerTopicTitle">—</span> (<span id="bannerTopicPos">#1 из 50</span>)
+            <span class="small-text"> · Изменения сохраняются в книгу автоматически</span>
           </div>
         </div>
         <div class="row banner-nav-actions">
           <button id="prevBookTopicBtn" class="small" type="button">‹ Пред. тема</button>
           <button id="nextBookTopicBtn" class="small" type="button">След. тема ›</button>
           <button id="backToBookBtn" class="primary small" type="button">← В книгу</button>
+          <button id="leaveBookEditorBtn" class="small" type="button" title="Вернуться к отдельному черновику">⚡ Свободный конструктор</button>
         </div>
       </div>
 
@@ -1654,9 +1670,35 @@
     let activeTab = "constructor";
     let activeBookId = null;
     let activeBookTopicIndex = null;
+    // The persisted state.board is always the standalone draft.
+    // Book grids are edited through a separate transient entity.
+    let bookEditorBoard = null;
+    let editorSession = 0;
+    let generationRequest = 0;
+
+    function isBookEditor() {
+      return bookEditorBoard !== null && activeBookId !== null && activeBookTopicIndex !== null;
+    }
+
+    function currentBoardEntity() {
+      return isBookEditor() ? bookEditorBoard : state.board;
+    }
+
+    function leaveBookEditor() {
+      if (bookEditorBoard !== null || activeBookTopicIndex !== null) {
+        editorSession++;
+        generationRequest++;
+      }
+      bookEditorBoard = null;
+      activeBookTopicIndex = null;
+      $("generateButton").disabled = false;
+      $("generationStatus").textContent = "";
+      updateBookContextBanner();
+    }
 
     let state = {
       schema: SCHEMA,
+      freeBoardIsolated: true,
       board: { rev: { n: 0, by: "" }, ancestors: [], value: emptyBoard() },
       topics: {},
       books: {},
@@ -2021,13 +2063,31 @@
         };
       }
 
+      const freeBoard = {
+        rev: clone(raw.board.rev),
+        ancestors,
+        value: validateBoard(raw.board.value)
+      };
+
+      // Older versions copied an opened book topic into the shared board.
+      // If the legacy board is an exact duplicate, keep the book data and
+      // start a fresh independent draft. Never reset an unrelated draft.
+      if (raw.freeBoardIsolated !== true) {
+        const candidate = freeBoard.value;
+        const duplicateBookTopic = Object.values(books).some(book => book.topics.some(topic =>
+          topic.grid && topic.name === candidate.name &&
+          topic.raw === candidate.raw &&
+          stable(topic.words) === stable(candidate.words) &&
+          stable(topic.grid) === stable(candidate.grid) &&
+          stable(topic.placements) === stable(candidate.placements)
+        ));
+        if (duplicateBookTopic) freeBoard.value = emptyBoard();
+      }
+
       return {
         schema: SCHEMA,
-        board: {
-          rev: clone(raw.board.rev),
-          ancestors,
-          value: validateBoard(raw.board.value)
-        },
+        freeBoardIsolated: true,
+        board: freeBoard,
         topics,
         books,
         game: raw.game && raw.game.board ? { board: validateBoard(raw.game.board), found: raw.game.found || {}, elapsedMs: Math.max(0, Number(raw.game.elapsedMs) || 0), manualPaused: !!raw.game.manualPaused, completed: !!raw.game.completed } : null
@@ -2061,33 +2121,33 @@
       updateGameNewBoard();
     }
 
-    function commitBoard(board, base = state.board) {
-      observe(state.board);
-      state.board = entityFrom(base, board);
+    function commitBoard(board, base = currentBoardEntity()) {
+      observe(base);
+      const next = entityFrom(base, board);
+      if (isBookEditor()) {
+        const book = state.books[activeBookId];
+        const topic = book?.topics[activeBookTopicIndex];
+        if (!topic) return;
+        bookEditorBoard = next;
+        topic.name = board.name;
+        topic.raw = board.raw;
+        topic.words = [...board.words];
+        topic.grid = [...board.grid];
+        topic.placements = clone(board.placements);
+        book.updatedAt = Date.now();
+      } else {
+        state.board = next;
+      }
       focusedWord = null;
       textModified = false;
       $("rebuildHint").hidden = true;
-
-      if (activeBookId && activeBookTopicIndex !== null) {
-        const book = state.books[activeBookId];
-        if (book && book.topics[activeBookTopicIndex]) {
-          const t = book.topics[activeBookTopicIndex];
-          t.name = board.name;
-          t.raw = board.raw;
-          t.words = [...board.words];
-          t.grid = [...board.grid];
-          t.placements = clone(board.placements);
-          book.updatedAt = Date.now();
-          updateBookContextBanner();
-        }
-      }
-
       renderConstructor(true);
       stateChanged();
     }
 
     function updateBookContextBanner() {
-      if (activeBookId && activeBookTopicIndex !== null) {
+      $("freeContextBanner").hidden = isBookEditor();
+      if (isBookEditor()) {
         const book = state.books[activeBookId];
         if (book && book.topics[activeBookTopicIndex]) {
           const t = book.topics[activeBookTopicIndex];
@@ -2295,7 +2355,8 @@
         observe(state.board);
         this.base = remote.revision;
         this.ack = stable(state);
-        activeBookId = null; activeBookTopicIndex = null;
+        leaveBookEditor();
+        activeBookId = null;
         pauseGameClock(); game = state.game ? clone(state.game) : null;
         renderConstructor(true); updateInputWarnings(); renderTopics(); renderBooks();
         $('bookDetailView').hidden = true; $('booksListView').hidden = false;
@@ -2392,7 +2453,7 @@
       $("wordWarnings").hidden = warnings.length === 0;
       $("wordWarnings").textContent = warnings.join(" ");
 
-      const currentWords = state.board.value.words;
+      const currentWords = currentBoardEntity().value.words;
       const isWordsChanged = stable(parsed.words) !== stable(currentWords);
       textModified = isWordsChanged;
       $("rebuildHint").hidden = !isWordsChanged;
@@ -2400,10 +2461,13 @@
 
     function autoSaveMetaOnly() {
       const name = $("topicName").value.trim().slice(0, 120) || "Новая тема";
-      if (name !== state.board.value.name || $("wordsInput").value.slice(0, 30000) !== state.board.value.raw) {
-        state.board.value.name = name;
-        state.board.value.raw = $("wordsInput").value.slice(0, 30000);
-        if (activeBookId && activeBookTopicIndex !== null) {
+      if (name !== currentBoardEntity().value.name || $("wordsInput").value.slice(0, 30000) !== currentBoardEntity().value.raw) {
+        generationRequest++; // Cancel generation started with now-outdated text.
+        $("generateButton").disabled = false;
+        $("generationStatus").textContent = "";
+        currentBoardEntity().value.name = name;
+        currentBoardEntity().value.raw = $("wordsInput").value.slice(0, 30000);
+        if (isBookEditor()) {
           const b = state.books[activeBookId];
           if (b && b.topics[activeBookTopicIndex]) {
             b.topics[activeBookTopicIndex].name = name;
@@ -2427,12 +2491,16 @@
         return;
       }
 
+      const request = ++generationRequest;
+      const session = editorSession;
       $("generateButton").disabled = true;
       $("generationStatus").textContent = "Поиск оптимальной укладки…";
 
       try {
-        const layout = await generateGrid(parsed.words, settings);
-        const base = clone(state.board);
+        const layout = await generateGrid(parsed.words, settings,
+          () => request !== generationRequest || session !== editorSession);
+        if (!layout || request !== generationRequest || session !== editorSession) return;
+        const base = clone(currentBoardEntity());
 
         const board = {
           id: uid(),
@@ -2449,10 +2517,12 @@
         $("generationStatus").textContent =
           `Готово: размещено ${board.placements.length} из ${board.words.length}.`;
       } catch (error) {
-        $("generationStatus").textContent = error.message;
-        toast(error.message);
+        if (request === generationRequest && session === editorSession) {
+          $("generationStatus").textContent = error.message;
+          toast(error.message);
+        }
       } finally {
-        $("generateButton").disabled = false;
+        if (request === generationRequest) $("generateButton").disabled = false;
       }
     }
 
@@ -2468,7 +2538,7 @@
     }
 
     function renderConstructor(updateInputs = false) {
-      const board = state.board.value;
+      const board = currentBoardEntity().value;
 
       if (updateInputs) {
         $("topicName").value = board.name;
@@ -2511,6 +2581,7 @@
       $("boardStats").textContent =
         `${board.placements.length} слов · ${occupied.size} букв · ${Math.round(occupied.size / CELLS * 100)}% занято`;
       $("placedSummary").textContent = `${board.placements.length} из ${board.words.length}`;
+      $("saveTopicButton").textContent = isBookEditor() ? "📚 Копию в каталог" : "💾 Сохранить в каталог";
       $("revealButton").textContent = showAnswers ? "👁 Подсветка: вкл" : "Подсветка: выкл";
 
       const chips = $("constructorWords");
@@ -2644,14 +2715,14 @@
     }
 
     function openTopicInConstructor(bookId, topicIndex) {
-      activeBookId = bookId;
-      activeBookTopicIndex = topicIndex;
       const book = state.books[bookId];
-      if (!book) return;
-      const topic = book.topics[topicIndex];
+      const topic = book?.topics[topicIndex];
       if (!topic) return;
 
-      const base = clone(state.board);
+      const session = ++editorSession;
+      generationRequest++; // Stop any rebuild from a previously opened topic.
+      activeBookId = bookId;
+      activeBookTopicIndex = topicIndex;
       const board = {
         id: uid(),
         name: topic.name,
@@ -2662,24 +2733,39 @@
         placements: topic.placements ? clone(topic.placements) : [],
         createdAt: Date.now()
       };
+      // Viewing a ready book grid never overwrites the free draft or
+      // needlessly marks the book as changed in cloud synchronization.
+      bookEditorBoard = { rev: clone(state.board.rev), ancestors: [], value: board };
+      focusedWord = null;
+      $("generationStatus").textContent = "";
+      $("generateButton").disabled = false;
+      switchTab("constructor", { bookEditor: true });
+      renderConstructor(true);
 
-      if (!topic.grid || !topic.placements.length) {
-        toast("Генерация сетки темы…");
-        generateGrid(board.words, board.settings).then(layout => {
-          board.grid = layout.grid;
-          board.placements = layout.placements;
-          topic.grid = [...layout.grid];
-          topic.placements = clone(layout.placements);
-          commitBoard(board, base);
-          switchTab("constructor");
-        }).catch(err => {
-          toast(err.message);
-          commitBoard(board, base);
-          switchTab("constructor");
-        });
-      } else {
-        commitBoard(board, base);
-        switchTab("constructor");
+      // Only never-generated topics auto-generate. Clearing a grid should
+      // leave it cleared until the user explicitly rebuilds it.
+      if (!topic.grid && board.words.length) {
+        const request = ++generationRequest;
+        $("generateButton").disabled = true;
+        $("generationStatus").textContent = "Генерация сетки темы…";
+        generateGrid(board.words, board.settings,
+          () => session !== editorSession || request !== generationRequest)
+          .then(layout => {
+            if (!layout || session !== editorSession || request !== generationRequest || !isBookEditor()) return;
+            board.grid = layout.grid;
+            board.placements = layout.placements;
+            commitBoard(board);
+            $("generationStatus").textContent =
+              `Готово: размещено ${board.placements.length} из ${board.words.length}.`;
+          })
+          .catch(err => {
+            if (session !== editorSession || request !== generationRequest || !isBookEditor()) return;
+            $("generationStatus").textContent = err.message;
+            toast(err.message);
+          })
+          .finally(() => {
+            if (session === editorSession && request === generationRequest) $("generateButton").disabled = false;
+          });
       }
     }
 
@@ -3186,7 +3272,7 @@
       toast("Буфер обмена недоступен в этом браузере.");
     }
 
-    function exportBoardXLSX(board = state.board.value) {
+    function exportBoardXLSX(board = currentBoardEntity().value) {
       if (typeof XLSX === "undefined") {
         toast("Библиотека XLSX ещё загружается...");
         return;
@@ -3230,7 +3316,7 @@
       toast(`Файл «${board.name}» (XLSX) сохранён.`);
     }
 
-    function printCurrentBoard(board = state.board.value) {
+    function printCurrentBoard(board = currentBoardEntity().value) {
       if (!board || !board.grid) {
         toast("Нет сетки для печати.");
         return;
@@ -3456,7 +3542,15 @@
       }
     }
 
-    async function switchTab(tab) {
+    async function switchTab(tab, options = {}) {
+      // Navigating via the main Constructor tab returns to the free draft.
+      // Leaving a book editor closes its transient editing session.
+      if (!options.bookEditor && bookEditorBoard !== null) {
+        leaveBookEditor();
+        // Update the hidden constructor too: otherwise it reopens showing
+        // the previously edited book grid despite the free board being active.
+        renderConstructor(true);
+      }
       if (activeTab === "play" && tab !== "play") {
         pauseGameClock();
         cancelSelection();
@@ -3681,10 +3775,10 @@
 
         const board = {
           id: uid(),
-          name: state.board.value.name,
+          name: currentBoardEntity().value.name,
           raw: $("reverseWords").value.slice(0, 30000),
           words,
-          settings: clone(state.board.value.settings),
+          settings: clone(currentBoardEntity().value.settings),
           grid: [...this.grid],
           placements: placementsFromGrid(this.grid, words),
           createdAt: Date.now()
@@ -3825,8 +3919,8 @@
 
         const actions = node("div", "actions");
         actions.append(action("Открыть", () => {
+          leaveBookEditor();
           activeBookId = null;
-          activeBookTopicIndex = null;
           if (item.board) {
             commitBoard(clone(item.board));
           } else {
@@ -3878,7 +3972,7 @@
       $("generateButton").addEventListener("click", executeRebuild);
 
       $("saveTopicButton").addEventListener("click", () => {
-        const b = state.board.value;
+        const b = currentBoardEntity().value;
         if (!b.words.length) { toast("Сначала создайте сетку со словами."); return; }
         const id = "topic:" + b.name.toLowerCase();
         state.topics[id] = { rev: nextRevision(), deleted: false, value: { name: b.name, words: [...b.words], board: clone(b), updatedAt: Date.now() } };
@@ -3887,14 +3981,23 @@
       });
 
       $("clearButton").addEventListener("click", async () => {
-        const ok = await confirmModal("Очистить текущую сетку в конструкторе? (Каталог и книги сохранятся)", "Очистка");
-        if (!ok) return;
-        const board = emptyBoard();
+        const inBook = isBookEditor();
+        const session = editorSession;
+        const message = inBook
+          ? "Очистить сетку этой темы в книге? Список слов и название сохранятся."
+          : "Очистить свободную сетку? Книги и каталог тем сохранятся.";
+        const ok = await confirmModal(message, "Очистка");
+        if (!ok || session !== editorSession || inBook !== isBookEditor()) return;
+        generationRequest++;
+        $("generateButton").disabled = false;
+        const board = inBook
+          ? { ...clone(currentBoardEntity().value), grid: Array(CELLS).fill("·"), placements: [] }
+          : emptyBoard();
         board.id = uid();
         board.createdAt = Date.now();
         commitBoard(board);
         $("generationStatus").textContent = "";
-        toast("Конструктор очищен.");
+        toast(inBook ? "Сетка темы очищена. Слова сохранены." : "Свободный конструктор очищен.");
       });
 
       $("revealButton").addEventListener("click", () => {
@@ -3906,11 +4009,11 @@
       $("headerExcel").addEventListener("click", () => exportBoardXLSX());
 
       $("tsvButton").addEventListener("click", () => {
-        copyText(gridTSV(state.board.value.grid), "Сетка скопирована для Excel (TSV).");
+        copyText(gridTSV(currentBoardEntity().value.grid), "Сетка скопирована для Excel (TSV).");
       });
 
       $("rawButton").addEventListener("click", () => {
-        copyText(state.board.value.grid.join(""), "Скопировано 225 символов матрицы.");
+        copyText(currentBoardEntity().value.grid.join(""), "Скопировано 225 символов матрицы.");
       });
 
       $("printButton").addEventListener("click", () => printCurrentBoard());
@@ -3919,7 +4022,7 @@
          СЛУШАТЕЛИ ЭКСПОРТА ТИПОГРАФИИ (SVG / 300 DPI) ДЛЯ ТЕКУЩЕЙ ТЕМЫ
          ========================================================================== */
       $("openTypoModalBtn")?.addEventListener("click", () => {
-        const board = state.board.value;
+        const board = currentBoardEntity().value;
         if (!board || !board.grid || !board.words.length) {
           toast("Сначала создайте или перестройте сетку темы.");
           return;
@@ -3930,14 +4033,14 @@
       $("closeTypoModalBtn")?.addEventListener("click", () => $("typoModal")?.close());
 
       $("downloadPuzzleSvgBtn")?.addEventListener("click", () => {
-        const board = state.board.value;
+        const board = currentBoardEntity().value;
         const svg = createTypographySVG(board, false);
         download(svg, `${filename(board.name)}_головоломка.svg`, "image/svg+xml;charset=utf-8");
         toast("Векторный SVG задания скачан.");
       });
 
       $("downloadPuzzlePngBtn")?.addEventListener("click", async () => {
-        const board = state.board.value;
+        const board = currentBoardEntity().value;
         toast("Генерация растра 300 DPI…");
         try {
           const svg = createTypographySVG(board, false);
@@ -3950,14 +4053,14 @@
       });
 
       $("downloadAnswersSvgBtn")?.addEventListener("click", () => {
-        const board = state.board.value;
+        const board = currentBoardEntity().value;
         const svg = createTypographySVG(board, true);
         download(svg, `${filename(board.name)}_ответы.svg`, "image/svg+xml;charset=utf-8");
         toast("Векторный SVG с ответами скачан.");
       });
 
       $("downloadAnswersPngBtn")?.addEventListener("click", async () => {
-        const board = state.board.value;
+        const board = currentBoardEntity().value;
         toast("Генерация растра 300 DPI с ответами…");
         try {
           const svg = createTypographySVG(board, true);
@@ -4081,6 +4184,8 @@
       $("exportBackup").addEventListener("click", exportBackup);
       $("importBackup").addEventListener("click", () => $("backupFile").click());
       $("backupFile").addEventListener("change", e => importBackup(e.target.files[0]));
+
+      $("leaveBookEditorBtn").addEventListener("click", () => switchTab("constructor"));
 
       $("backToBookBtn").addEventListener("click", () => {
         if (activeBookId) {
@@ -4307,9 +4412,9 @@
       });
 
       $("reverseLoad").addEventListener("click", () => {
-        Reverse.grid = [...state.board.value.grid];
+        Reverse.grid = [...currentBoardEntity().value.grid];
         Reverse.writeRaw();
-        $("reverseWords").value = state.board.value.words.join(", ");
+        $("reverseWords").value = currentBoardEntity().value.words.join(", ");
         Reverse.render();
       });
 
