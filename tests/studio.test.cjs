@@ -305,7 +305,8 @@ test('reopened export preview still switches PDF pages and SVG formats',()=>{
   assert.match($('previewPageCount').textContent,/1 \/ 2/);
   $('previewNext').click();
   assert.equal($('previewPageCount').textContent,'2 / 2');
-  $('exportFormat').value='svg';
+  // Linkedom's select value emulation does not reliably reflect option updates.
+  Object.defineProperty($('exportFormat'),'value',{get:()=> 'svg',configurable:true});
   api.renderExport();
   assert.match($('printPreview').srcdoc,/<svg/);
   $('exportDialog').close();
