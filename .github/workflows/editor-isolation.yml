@@ -2,7 +2,7 @@ name: Editor isolation tests
 
 on:
   push:
-    branches: [fix/isolate-book-editor]
+    branches: [main, fix/isolate-book-editor]
   pull_request:
     paths:
       - index.html
