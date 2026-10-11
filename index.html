@@ -6,10 +6,13 @@
   <meta name="theme-color" content="#090d17">
   <title>WordVault Studio — книги филвордов и конструктор</title>
 
-  <!-- Внешние библиотеки: MQTT для облачной синхронизации и SheetJS для экспорта в Excel -->
-  <script defer src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  <!-- Внешние библиотеки: SheetJS для Excel и JSZip для пакетного экспорта -->
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <script defer src="https://www.gstatic.com/firebasejs/13.0.0/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/13.0.0/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore-compat.js"></script>
 
   <style>
     :root {
@@ -1122,18 +1125,37 @@
 
   <dialog id="syncDialog">
     <h2>Синхронизация устройств</h2>
-    <p>Откройте <b>одинаковый адрес сайта</b> на телефоне и компьютере.</p>
+    <p>Откройте этот сайт на обоих устройствах и войдите под <b>одним email и паролем</b> для вашей базы. Книги, сетки, черновик и игровой прогресс сохраняются автоматически. Перед сменой устройства дождитесь «Облако: сохранено ✓».</p>
+    <p class="small-text">Перенос со старого сайта: там скачайте резервную копию JSON, здесь импортируйте её в разделе «Каталог». Достаточно одного импорта.</p>
+    <p id="syncError" role="status"></p>
+    <p id="cloudAccount">Вход не выполнен</p>
+    <form id="cloudLoginForm" class="card subtle">
+      <label for="cloudEmail">Email</label>
+      <input id="cloudEmail" type="email" autocomplete="username" required placeholder="you@example.com">
+      <label for="cloudPassword">Пароль</label>
+      <input id="cloudPassword" type="password" autocomplete="current-password" required>
+      <div class="actions"><button id="cloudLoginBtn" class="primary" type="submit">Войти</button></div>
+      <p class="small-text">Введите email и пароль пользователя, созданного в Firebase Authentication. Вход сохранится на этом устройстве.</p>
+    </form>
+    <button id="cloudSignOut" type="button" hidden>Выйти на этом устройстве</button>
     <div class="card subtle small-text">
       <div>Канал: <span id="syncChannel" class="mono"></span></div>
       <div class="gap-small">Соединение: <span id="syncConnection"></span></div>
       <div class="gap-small">Хранилище: <span id="syncStorage"></span></div>
     </div>
     <div class="actions">
-      <button id="syncNow" class="primary" type="button">Отправить / согласовать</button>
+      <button id="syncNow" class="primary" type="button">Синхронизировать сейчас</button>
       <button id="syncClose" type="button">Закрыть</button>
     </div>
   </dialog>
 
+  <dialog id="syncConflict">
+    <h2>Изменения на двух устройствах</h2>
+    <p>На этом устройстве и в облаке есть разные изменения. Автоматическая перезапись остановлена. Скачайте обе копии, если хотите сохранить их отдельно, затем выберите, с какой продолжить.</p>
+    <p class="small-text">Выбор относится ко всем книгам, каталогу, текущей сетке и игре. Перед заменой обе альтернативы сохраняются в страховочной копии этого браузера. Также можно скачать их кнопками выше.</p>
+    <div class="actions"><button id="syncConflictBackup">Скачать местную копию</button><button id="syncCloudBackup">Скачать облачную копию</button></div>
+    <div class="actions"><button id="syncUseCloud" class="primary">Продолжить с облачной</button><button id="syncUseLocal">Сохранить местную в облако</button></div>
+  </dialog>
   <dialog id="victoryDialog">
     <h2>🏆 Все слова найдены!</h2>
     <p id="victoryText"></p>
@@ -1507,7 +1529,7 @@
       },
 
       async get(key) {
-        if (this.driver === "idb" && this.db) {
+        if (this.driver === "IndexedDB" && this.db) {
           return new Promise(resolve => {
             try {
               const tx = this.db.transaction("app_state", "readonly");
@@ -1535,7 +1557,7 @@
       put(key, value) {
         const snapshot = clone(value);
         const op = () => new Promise(resolve => {
-          if (this.driver === "idb" && this.db) {
+          if (this.driver === "IndexedDB" && this.db) {
             try {
               const tx = this.db.transaction("app_state", "readwrite");
               tx.objectStore("app_state").put(snapshot, key);
@@ -1554,7 +1576,7 @@
           }
 
           this.memoryStore.set(key, snapshot);
-          resolve(true);
+          resolve(false);
         });
 
         this.queue = this.queue.then(op, op);
@@ -1637,7 +1659,8 @@
       schema: SCHEMA,
       board: { rev: { n: 0, by: "" }, ancestors: [], value: emptyBoard() },
       topics: {},
-      books: {}
+      books: {},
+      game: null
     };
 
     let showAnswers = true;
@@ -1979,6 +2002,7 @@
       const books = {};
       const bookEntries = Object.entries(raw.books || {});
       for (const [id, book] of bookEntries) {
+        if (["__proto__", "prototype", "constructor"].includes(id)) continue;
         if (!book || typeof book.title !== "string" || !Array.isArray(book.topics)) continue;
         books[id] = {
           id: String(book.id || id),
@@ -2005,7 +2029,8 @@
           value: validateBoard(raw.board.value)
         },
         topics,
-        books
+        books,
+        game: raw.game && raw.game.board ? { board: validateBoard(raw.game.board), found: raw.game.found || {}, elapsedMs: Math.max(0, Number(raw.game.elapsedMs) || 0), manualPaused: !!raw.game.manualPaused, completed: !!raw.game.completed } : null
       };
     }
 
@@ -2014,7 +2039,8 @@
     }
 
     async function persistState() {
-      const ok = await DB.put("wv_state_v4", state);
+      const snapshot = clone(state);
+      const ok = await DB.put("wv_firebase_local_v1", {state: snapshot, base: Sync.base, ack: Sync.ack, owner: Sync.owner});
       if (ok) {
         savedAt = Date.now();
         $("storageStatus").textContent =
@@ -2077,108 +2103,261 @@
       $("bookContextBanner").hidden = true;
     }
 
-    const Sync = {
-      client: null,
-      connected: false,
-      ready: false,
-      timer: null,
-      channel: "",
-      lastAck: "",
-
-      init() {
-        let hash = 0;
-        const raw = location.origin + location.pathname;
-        for (let i = 0; i < raw.length; i++) hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
-        this.channel = `wordvault_pub_${Math.abs(hash).toString(36)}`;
-
-        if (typeof mqtt === "undefined") {
-          this.update("MQTT недоступен", "offline");
-          return;
-        }
-
-        try {
-          this.client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-            clientId: "wv4_" + uid().replace(/-/g, "").slice(0, 18),
-            clean: true,
-            connectTimeout: 10000,
-            reconnectPeriod: 4000
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyBtjN9G8Rqmm2gfbYQ3kpGzo6VXq8Bomvo",
+      authDomain: "wordvault-e765c.firebaseapp.com",
+      projectId: "wordvault-e765c",
+      storageBucket: "wordvault-e765c.firebasestorage.app",
+      messagingSenderId: "676306809324",
+      appId: "1:676306809324:web:0ca30696392e2454ffd0c9"
+    };
+    const OWNER_UID = "EWc3OwcvPdWIEBJxhwwZfAxwz8i2";
+    const Cloud = {
+      db: null, auth: null, starting: null, cache: null,
+      async setup() {
+        if (this.starting) return this.starting;
+        if (!window.firebase?.auth || !window.firebase?.firestore) throw new Error('Не загрузились библиотеки Firebase. Проверьте интернет и обновите страницу.');
+        this.starting = (async () => {
+          const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
+          this.auth = app.auth(); this.db = app.firestore();
+          await this.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+          await new Promise((resolve, reject) => {
+            const stop = this.auth.onAuthStateChanged(() => { stop(); resolve(); }, reject);
           });
-
-          this.client.on("connect", () => {
-            this.connected = true;
-            this.update("Согласование…");
-            this.client.subscribe(this.topic(), { qos: 1 }, () => {
-              this.ready = true;
-              this.queuePush(200);
-            });
-          });
-
-          this.client.on("message", (topic, message) => {
-            if (topic !== this.topic()) return;
-            try {
-              if (message.length > MAX_PAYLOAD) return;
-              const remote = validateState(JSON.parse(message.toString()));
-              const before = stable(state);
-
-              if (compareRev(remote.board.rev, state.board.rev) > 0) state.board = remote.board;
-              Object.assign(state.topics, remote.topics);
-
-              if (remote.books && typeof remote.books === "object") {
-                let changedAny = false;
-                for (const [bId, rBook] of Object.entries(remote.books)) {
-                  if (!rBook || !Array.isArray(rBook.topics)) continue;
-                  const lBook = state.books[bId];
-                  if (!lBook || (rBook.updatedAt || 0) > (lBook.updatedAt || 0)) {
-                    state.books[bId] = rBook;
-                    changedAny = true;
-                  }
-                }
-                if (changedAny && activeBookId) renderBookDetail();
-              }
-
-              if (stable(state) !== before) {
-                persistState();
-                renderTopics();
-                renderBooks();
-                renderConstructor(true);
-              }
-              this.lastAck = stable(state);
-              this.update("Облако: согласовано", "online");
-            } catch {}
-          });
-
-          const offline = () => {
-            this.connected = false;
-            this.update("Офлайн · локально", "offline");
-          };
-          this.client.on("offline", offline);
-          this.client.on("close", offline);
-        } catch {
-          this.update("Офлайн", "offline");
-        }
+        })().catch(error => { this.starting = null; throw error; });
+        return this.starting;
       },
+      bindUser(user) {
+        if (!user || user.uid !== OWNER_UID) throw new Error('Войдите в аккаунт владельца WordVault.');
+        const owner = FIREBASE_CONFIG.projectId + ':' + user.uid;
+        if (Sync.owner && Sync.owner !== owner) throw new Error('Локальные данные принадлежат другому аккаунту. Сохраните резервную копию и используйте другой профиль браузера.');
+        Sync.owner = owner;
+        Sync.channel = user.email || 'Мой WordVault';
+        $('cloudAccount').textContent = user.email || 'Вход выполнен';
+        $('cloudSignOut').hidden = false;
+        $('cloudLoginForm').hidden = true;
+      },
+      async session() {
+        await this.setup();
+        if (!this.auth.currentUser) {
+          $('cloudLoginForm').hidden = false;
+          $('cloudSignOut').hidden = true;
+          $('cloudAccount').textContent = 'Войдите для синхронизации';
+          throw new Error('Откройте окно синхронизации и войдите с вашим email и паролем.');
+        }
+        this.bindUser(this.auth.currentUser);
+      },
+      async login(event) {
+        event.preventDefault();
+        if (Sync.busy) { toast('Подождите завершения подключения и нажмите «Войти» ещё раз.'); return; }
+        $('cloudLoginBtn').disabled = true;
+        try {
+          await this.setup();
+          const result = await this.auth.signInWithEmailAndPassword($('cloudEmail').value.trim(), $('cloudPassword').value);
+          $('cloudPassword').value = '';
+          if (result.user.uid !== OWNER_UID) { await this.auth.signOut(); throw new Error('Этот аккаунт не является владельцем WordVault.'); }
+          this.bindUser(result.user);
+          await persistState();
+          await Sync.push();
+        } catch (error) { $('syncError').textContent = this.errorText(error); }
+        finally { $('cloudPassword').value = ''; $('cloudLoginBtn').disabled = false; }
+      },
+      async logout() {
+        if (Sync.busy) { toast('Дождитесь завершения синхронизации.'); return; }
+        if (Sync.dirty()) { toast('Сначала синхронизируйте изменения.'); return; }
+        try {
+          await this.auth.signOut(); this.cache = null;
+          $('cloudLoginForm').hidden = false; $('cloudSignOut').hidden = true;
+          $('cloudAccount').textContent = 'Вход не выполнен';
+          Sync.connected = false; Sync.update('Локально · войдите в облако', 'offline');
+        } catch (error) { $('syncError').textContent = this.errorText(error); }
+      },
+      errorText(error) {
+        const messages = {
+          'permission-denied':'Нет доступа к базе. Проверьте правила Firestore и нажмите Publish после их вставки.',
+          'resource-exhausted':'Достигнут лимит Firebase. Локальные изменения сохранены; повторите синхронизацию позже.',
+          'unavailable':'Нет соединения с Firebase. Локальные изменения остаются на устройстве.',
+          'auth/invalid-credential':'Неверный email или пароль.',
+          'auth/wrong-password':'Неверный email или пароль.',
+          'auth/user-not-found':'Неверный email или пароль.',
+          'auth/operation-not-allowed':'В Firebase нужно включить Authentication → Email/Password.',
+          'auth/network-request-failed':'Не удалось связаться с Firebase. Проверьте соединение.',
+          'auth/too-many-requests':'Слишком много попыток входа. Попробуйте позже.'
+        };
+        return messages[error.code] || error.message || 'Ошибка синхронизации';
+      },
+      root() { return this.db.doc('users/' + OWNER_UID + '/sync/current'); },
+      part(i) { return this.root().collection('parts').doc(String(i)); },
+      metadata(snapshot) {
+        if (!snapshot.exists) return {revision:0, count:0};
+        const meta = snapshot.data();
+        if (!Number.isSafeInteger(meta.revision) || meta.revision < 1 || !Number.isInteger(meta.count) || meta.count < 1 || meta.count > 32) throw new Error('Повреждены сведения облачной версии. Сохраните локальную резервную копию.');
+        return meta;
+      },
+      async readParts(tx, meta) {
+        if (!meta.revision) return {revision:0,state:null};
+        const parts = await Promise.all(Array.from({length:meta.count}, (_,i) => tx.get(this.part(i))));
+        const payload = parts.map(part => {
+          const data = part.data();
+          if (!part.exists || data?.revision !== meta.revision || typeof data?.text !== 'string') throw new Error('Неполная облачная версия. Локальные данные не изменены.');
+          return data.text;
+        }).join('');
+        return {revision:meta.revision,state:JSON.parse(payload),savedAt:meta.savedAt};
+      },
+      async request(method, body) {
+        await this.session();
+        if (method === 'GET') {
+          const meta = this.metadata(await this.root().get({source:'server'}));
+          if (this.cache?.revision === meta.revision) return {status:200,data:clone(this.cache)};
+          const data = await this.db.runTransaction(async tx => {
+            const current = this.metadata(await tx.get(this.root()));
+            return this.readParts(tx, current);
+          });
+          this.cache = clone(data);
+          return {status:200,data};
+        }
+        const payload = JSON.stringify(body.state);
+        if (new TextEncoder().encode(payload).length > 4 * 1024 * 1024) throw new Error('Рабочая база превышает 4 МБ для одной синхронизации. Сохраните JSON и разделите сборники. Локальная копия не удалена.');
+        // Each part remains safely under Firestore's 1 MiB document limit.
+        const parts = [];
+        for (let i=0;i<payload.length;) {
+          let end = Math.min(i+180000,payload.length);
+          if (end<payload.length && /[\uD800-\uDBFF]/.test(payload[end-1])) end--;
+          parts.push(payload.slice(i,end)); i=end;
+        }
+        if (parts.length > 32) throw new Error('Слишком много частей данных для синхронизации.');
+        const result = await this.db.runTransaction(async tx => {
+          const meta = this.metadata(await tx.get(this.root()));
+          if (meta.revision !== body.base) return {status:409,data:await this.readParts(tx,meta)};
+          const revision = meta.revision + 1;
+          const savedAt = Date.now();
+          parts.forEach((text,i) => tx.set(this.part(i),{revision,text}));
+          for (let i=parts.length;i<meta.count;i++) tx.delete(this.part(i));
+          tx.set(this.root(),{revision,count:parts.length,savedAt});
+          return {status:200,data:{revision,savedAt}};
+        });
+        if (result.status === 200) this.cache = { ...result.data, state:clone(body.state) };
+        else this.cache = clone(result.data);
+        return result;
+      }
+    };
 
-      topic() { return `wordvault/${this.channel}/state_v4`; },
-      update(text, cls = "") {
-        $("syncButton").textContent = text;
-        $("syncButton").className = "sync-badge " + cls;
+    const Sync = {
+      connected: false, ready: false, timer: null, busy: false, conflict: null,
+      channel: 'Личная база · Firebase', base: 0, ack: null, owner: null,
+      async init(local) {
+        this.owner = local?.owner || null;
+        this.base = local?.base || 0;
+        this.ack = local?.ack ? stable(validateState(JSON.parse(local.ack))) : null;
+        this.ready = true;
+        $('cloudLoginForm').onsubmit = e => Cloud.login(e);
+        $('cloudSignOut').onclick = () => Cloud.logout();
+        $('syncUseCloud').onclick = () => this.resolve('cloud');
+        $('syncUseLocal').onclick = () => this.resolve('local');
+        $('syncConflictBackup').onclick = () => exportBackup();
+        $('syncCloudBackup').onclick = () => {
+          if (this.conflict) download(JSON.stringify({format:'WordVaultBackup',version:SCHEMA,state:this.conflict.state},null,2),'WordVault_Cloud.json','application/json');
+        };
+        window.addEventListener('online', () => this.push());
+        window.addEventListener('focus', () => this.push());
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) { pauseGameClock(); saveGame(); }
+          else { this.push(); refreshGameClock(); }
+        });
+        window.addEventListener('beforeunload', e => {
+          if (this.owner && this.dirty()) { e.preventDefault(); e.returnValue = ''; }
+        });
+        setInterval(() => { if (!document.hidden) this.push(); }, 15000);
+        await this.push();
+      },
+      dirty() {
+        if (this.ack !== null) return stable(state) !== this.ack;
+        return !!(state.board.value.raw || state.board.value.words.length || Object.keys(state.books).length || Object.keys(state.topics).length || state.game);
+      },
+      update(text, cls = '') {
+        $('syncButton').textContent = text;
+        $('syncButton').className = 'sync-badge ' + cls;
         updateSyncDialog();
       },
-
-      queuePush(delay = 400) {
-        if (!this.connected || !this.client) return;
+      queuePush(delay = 600) {
+        if (!this.ready) return;
         clearTimeout(this.timer);
+        this.update('Есть изменения · сохраняем…');
         this.timer = setTimeout(() => this.push(), delay);
       },
+      showConflict(remote) {
+        this.conflict = remote;
+        this.update('Две версии · выберите', 'offline');
+        if (!$('syncConflict').open) $('syncConflict').showModal();
+      },
+      apply(remote) {
+        state = validateState(remote.state);
+        observe(state.board);
+        this.base = remote.revision;
+        this.ack = stable(state);
+        activeBookId = null; activeBookTopicIndex = null;
+        pauseGameClock(); game = state.game ? clone(state.game) : null;
+        renderConstructor(true); updateInputWarnings(); renderTopics(); renderBooks();
+        $('bookDetailView').hidden = true; $('booksListView').hidden = false;
+        updateBookContextBanner(); updateGameNewBoard();
+        if (activeTab === 'play') { if (game) { renderGame(); refreshGameClock(); } else switchTab('constructor'); }
+      },
+      async resolve(choice) {
+        const remote = this.conflict;
+        if (!remote || this.busy) return;
+        // Preserve the local alternative before replacing anything.
+        if (!await DB.put('wv_sync_recovery', { state: clone(state), cloud: remote, savedAt: Date.now() })) {
+          toast('Не удалось сохранить страховочную копию. Скачайте JSON перед выбором версии.'); return;
+        }
+        if (choice === 'cloud') this.apply(remote);
+        else { this.base = remote.revision; this.ack = stable(validateState(remote.state)); }
+        this.conflict = null;
+        $('syncConflict').close();
+        await persistState();
+        await this.push();
+      },
+      async request(method, body) { return Cloud.request(method, body); },
+      async push() {
+        if (!this.ready || this.busy) return;
+        if (this.conflict) { this.showConflict(this.conflict); return; }
+        this.busy = true;
+        try {
+          this.update('Синхронизация…');
+          const {data: remote} = await this.request('GET');
+          this.connected = true;
+          $('syncError').textContent = '';
 
-      push(force = false) {
-        const payload = stable(state);
-        if (!force && payload === this.lastAck) return;
-        if (!this.connected || !this.client) return;
-        this.client.publish(this.topic(), payload, { qos: 1, retain: true }, () => {
-          this.lastAck = payload;
-          this.update("Облако: согласовано", "online");
-        });
+          if (remote.state) {
+            remote.state = validateState(remote.state);
+            const remoteText = stable(remote.state);
+            if (remoteText === stable(state)) { this.base = remote.revision; this.ack = remoteText; }
+            else if (remote.revision !== this.base) {
+              if (this.dirty()) { this.showConflict(remote); return; }
+              this.apply(remote);
+            }
+          } else if (this.base !== 0) {
+            throw new Error('Облачная версия недоступна. Локальная копия сохранена.');
+          }
+          if (this.dirty()) {
+            state = validateState(state);
+            const sent = stable(state);
+            const result = await this.request('PUT', {base: this.base, state: JSON.parse(sent)});
+            if (result.status === 409) { this.showConflict(result.data); return; }
+            this.base = result.data.revision;
+            this.ack = sent;
+          } else if (!remote.state) {
+            this.ack = stable(state);
+          }
+          await persistState();
+          this.update(this.dirty() ? 'Есть изменения · сохраняем…' : 'Облако: сохранено ✓', 'online');
+        } catch (error) {
+          this.connected = false;
+          this.update(navigator.onLine ? 'Не синхронизировано · повторим' : 'Офлайн · локальная копия', 'offline');
+          $('syncError').textContent = Cloud.errorText(error);
+        } finally {
+          this.busy = false;
+          if (!this.conflict && this.connected && this.dirty()) this.queuePush(100);
+        }
       }
     };
 
@@ -2221,7 +2400,7 @@
 
     function autoSaveMetaOnly() {
       const name = $("topicName").value.trim().slice(0, 120) || "Новая тема";
-      if (name !== state.board.value.name) {
+      if (name !== state.board.value.name || $("wordsInput").value.slice(0, 30000) !== state.board.value.raw) {
         state.board.value.name = name;
         state.board.value.raw = $("wordsInput").value.slice(0, 30000);
         if (activeBookId && activeBookTopicIndex !== null) {
@@ -3221,6 +3400,7 @@
         const raw = JSON.parse(await file.text());
         let items = [];
         let importedBoard = null;
+        let importedBooks = {};
 
         if (raw.format === "WordVaultBackup" && (raw.version === 3 || raw.version === SCHEMA)) {
           const validated = validateState(raw.state);
@@ -3229,7 +3409,7 @@
             .filter(record => !record.deleted)
             .map(record => record.value);
           if (validated.books && Object.keys(validated.books).length) {
-            Object.assign(state.books, validated.books);
+            importedBooks = validated.books;
           }
         } else if (raw.topics && typeof raw.topics === "object") {
           items = Object.values(raw.topics).map(t => ({
@@ -3243,6 +3423,7 @@
 
         const confirmed = await confirmModal(`Импортировать ${items.length} тем из файла?`, "Импорт тем");
         if (!confirmed) return;
+        Object.assign(state.books, importedBooks);
 
         for (const item of items) {
           const id = "import:" + uid();
@@ -3546,7 +3727,9 @@
       if (!game) return;
       const s = clone(game);
       s.elapsedMs = elapsedGame();
-      DB.put("wv_game_v4", s);
+      state.game = s;
+      persistState();
+      Sync.queuePush();
     }
     function updateGameNewBoard() {
       $("playNewBoard").hidden = !game || stable(game.board) === stable(state.board.value);
@@ -3690,7 +3873,7 @@
         btn.addEventListener("click", () => switchTab(btn.dataset.tab));
       });
 
-      $("wordsInput").addEventListener("input", updateInputWarnings);
+      $("wordsInput").addEventListener("input", () => { updateInputWarnings(); autoSaveMetaOnly(); });
       $("topicName").addEventListener("input", autoSaveMetaOnly);
       $("generateButton").addEventListener("click", executeRebuild);
 
@@ -4165,13 +4348,14 @@
 
       $("syncButton").addEventListener("click", () => $("syncDialog").showModal());
       $("syncClose").addEventListener("click", () => $("syncDialog").close());
-      $("syncNow").addEventListener("click", () => { Sync.push(true); toast("Синхронизация отправлена."); });
+      $("syncNow").addEventListener("click", () => Sync.push());
       $("victoryClose").addEventListener("click", () => $("victoryDialog").close());
     }
 
     async function init() {
       await DB.open();
-      const savedState = await DB.get("wv_state_v4") || await DB.get("wv_state_v3");
+      const local = await DB.get("wv_firebase_local_v1");
+      const savedState = local?.state || await DB.get("wv_state_v4") || await DB.get("wv_state_v3");
       if (savedState) {
         try {
           state = validateState(savedState);
@@ -4183,8 +4367,11 @@
       renderConstructor(true);
       renderTopics();
       renderBooks();
+      game = state.game || await DB.get("wv_game_v4") || null;
+      if (game) state.game = clone(game);
+      await Sync.init(local);
       await persistState();
-      Sync.init();
+      updateInputWarnings();
 
       setInterval(() => {
         if (game && gameRunningSince !== null) {
