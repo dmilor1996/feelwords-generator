@@ -3987,6 +3987,7 @@
         const ok = await confirmModal(message, "Очистка");
         if (!ok || session !== editorSession || inBook !== isBookEditor()) return;
         generationRequest++;
+        $("generateButton").disabled = false;
         const board = inBook
           ? { ...clone(currentBoardEntity().value), grid: Array(CELLS).fill("·"), placements: [] }
           : emptyBoard();
