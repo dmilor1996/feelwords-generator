@@ -208,7 +208,7 @@
             extTitle = maybeTitle;
             inlineWords = maybeWords;
           }
-        } else if (blankBefore && curWordsLines.length > 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4 && lines.slice(i + 1).some(next => next.includes(","))) {
+        } else if (blankBefore && curWordsLines.length > 0 && !trimmed.includes(",") && trimmed.length <= 50 && trimmed.split(/\s+/).length <= 4 && (lines.slice(i + 1).find(next => next.trim()) || "").includes(",")) {
           if (/[А-ЯA-Zа-яa-z]/.test(trimmed)) {
             isHeader = true;
             extTitle = trimmed;
@@ -1872,10 +1872,17 @@
           const x2 = startX + c2 * cellSize + cellSize / 2;
           const y2 = startY + r2 * cellSize + cellSize / 2;
 
-          svg += `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="30" stroke-linecap="round" opacity="0.38" />\n`;
-          svg += `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2.5" stroke-dasharray="5,4" stroke-linecap="round" opacity="0.9" />\n`;
-          svg += `  <circle cx="${x1}" cy="${y1}" r="4.5" fill="${color}" stroke="#ffffff" stroke-width="1.5" />\n`;
-          svg += `  <circle cx="${x2}" cy="${y2}" r="3.5" fill="#ffffff" stroke="${color}" stroke-width="2" />\n`;
+          svg += `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ffffff" stroke-width="14" stroke-linecap="round" />\n`;
+          svg += `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="6" stroke-linecap="round" />\n`;
+          svg += `  <circle cx="${x1}" cy="${y1}" r="7" fill="${color}" stroke="#ffffff" stroke-width="2" />\n`;
+          const angle = Math.atan2(y2-y1,x2-x1);
+          const back = 17, wing = 9;
+          const endPoints = [
+            [x2,y2],
+            [x2-back*Math.cos(angle)+wing*Math.sin(angle),y2-back*Math.sin(angle)-wing*Math.cos(angle)],
+            [x2-back*Math.cos(angle)-wing*Math.sin(angle),y2-back*Math.sin(angle)+wing*Math.cos(angle)]
+          ].map(pair=>pair.join(',')).join(' ');
+          svg += `  <polygon points="${endPoints}" fill="${color}" stroke="#ffffff" stroke-width="2" />\n`;
         });
       }
 
