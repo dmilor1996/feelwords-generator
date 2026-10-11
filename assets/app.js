@@ -1137,8 +1137,8 @@
         }
         if (ch === '"') { insideString = true; fixed += ch; continue; }
         if (raw.startsWith("undefined", i) &&
-            /[:,\\[]/.test(raw[i - 1] || "") &&
-            /[,}\\]]/.test(raw[i + 9] || "")) {
+            [":", ",", "["].includes(raw[i - 1]) &&
+            [",", "}", "]"].includes(raw[i + 9])) {
           fixed += "null";
           i += 8;
           repaired = true;
