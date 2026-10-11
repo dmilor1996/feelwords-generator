@@ -7,9 +7,7 @@ const vm = require("node:vm");
 const { webcrypto } = require("node:crypto");
 
 const html = fs.readFileSync(require("node:path").join(__dirname, "..", "index.html"), "utf8");
-const match = html.match(/<script>\s*"use strict";([\s\S]*?)<\/script>/);
-assert.ok(match, "main application script exists");
-const application = '"use strict";' + match[1];
+const application = fs.readFileSync(require("node:path").join(__dirname,"..","assets","app.js"),"utf8");
 // Parse the original script without mocking or executing browser APIs.
 new vm.Script(application, { filename: "wordvault-inline.js" });
 
@@ -44,6 +42,8 @@ function launch() {
       }
       updateBookContextBanner();
     };
+    renderStudio = () => {};
+    persistHistory = () => {};
     renderBooks = () => {};
     renderTopics = () => {};
     renderBookDetail = () => {};
@@ -51,6 +51,7 @@ function launch() {
     window.__test = {
       emptyBoard, validateState, commitBoard, isBookEditor, currentBoardEntity,
       openTopicInConstructor, switchTab, autoSaveMetaOnly, updateBookContextBanner,
+      moveHistory, boardQuality, generateAllBookGrids, parseWords, findOccurrences, validCells,
       state: () => state,
       attachBook: (id, book) => { state.books[id] = book; },
       setGenerator: generator => { generateGrid = generator; },
@@ -62,6 +63,7 @@ function launch() {
   assert.notEqual(code, application, "test hooks inserted");
   vm.runInNewContext(code, {
     window, document, crypto: webcrypto, setTimeout, clearTimeout,
+    StudioCore: require("../assets/studio-core.js"), StudioPrint: require("../assets/print-layout.js"),
     navigator: {}, performance: { now: () => Date.now() },
     Uint8Array, console, TextEncoder, TextDecoder,
   });
@@ -194,3 +196,5 @@ test("late async generation does not resurrect a closed book session", async () 
   assert.equal(api.state().books.b1.topics[0].grid, null);
   assert.equal(api.state().board.value.name, "Free work");
 });
+
+module.exports = {launch, makeBoard, makeTopic};

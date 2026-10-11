@@ -1,12 +1,15 @@
-name: Editor isolation tests
+name: Studio regression tests
 
 on:
   push:
-    branches: [main, fix/isolate-book-editor]
+    branches: [main, feat/studio-redesign]
   pull_request:
     paths:
       - index.html
-      - tests/editor-isolation.test.cjs
+      - 'assets/**'
+      - 'tests/**'
+      - package.json
+      - package-lock.json
       - .github/workflows/editor-isolation.yml
 
 jobs:
@@ -16,5 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-      - run: node --test tests/editor-isolation.test.cjs
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
