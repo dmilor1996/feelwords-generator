@@ -3545,7 +3545,9 @@
       // Leaving a book editor closes its transient editing session.
       if (!options.bookEditor && bookEditorBoard !== null) {
         leaveBookEditor();
-        if (tab === "constructor") renderConstructor(true);
+        // Update the hidden constructor too: otherwise it reopens showing
+        // the previously edited book grid despite the free board being active.
+        renderConstructor(true);
       }
       if (activeTab === "play" && tab !== "play") {
         pauseGameClock();
